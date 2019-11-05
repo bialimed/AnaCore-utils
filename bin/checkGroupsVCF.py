@@ -23,18 +23,11 @@ __version__ = '1.0.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
-import os
-import sys
 import json
 import argparse
 import warnings
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.abspath(os.path.join(os.path.dirname(CURRENT_DIR), "lib"))
-sys.path.append(LIB_DIR)
-
 from anacore.vcf import getFreqMatrix
 from anacore.sv import HashedSVIO
 

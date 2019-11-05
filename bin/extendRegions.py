@@ -27,11 +27,6 @@ import os
 import sys
 import logging
 import argparse
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.abspath(os.path.join(os.path.dirname(CURRENT_DIR), "lib"))
-sys.path.append(LIB_DIR)
-
 from anacore.bed import BEDIO, getAreas
 from anacore.region import consolidated
 

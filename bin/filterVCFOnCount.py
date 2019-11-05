@@ -23,15 +23,8 @@ __version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
-import os
-import sys
 import argparse
 from argparse import RawTextHelpFormatter
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.abspath(os.path.join(os.path.dirname(CURRENT_DIR), "lib"))
-sys.path.append(LIB_DIR)
-
 from anacore.vcf import VCFIO, getAlleleRecord, HeaderFilterAttr
 
 

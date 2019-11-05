@@ -24,15 +24,9 @@ __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
 import os
-import sys
 import json
 import pysam
 import argparse
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.abspath(os.path.join(os.path.dirname(CURRENT_DIR), "lib"))
-sys.path.append(LIB_DIR)
-
 from anacore.bed import getAreas
 
 

@@ -1,7 +1,7 @@
 {% set version = "2.5.0" %}
 
 package:
-    name: anacore-bin
+    name: anacore-utils
     version: {{ version }}
 
 source:
@@ -15,7 +15,6 @@ requirements:
         - python 3.6.7
 
 about:
-    summary: "Python libraries and scripts to manage NGS data."
-    license: GNU GPL v3
-    #home: https://github.com/fescudie/anacore
-    #doc_source_url: https://github.com/fescudie/anacore/blob/{{ version }}/README
+    summary: "Contains scripts, rules/components and resources for workflow managers and web components and JS libraries developped for NGS in IUCT Oncopole."
+    license: "GNU GPL v3"
+    home: https://github.com/bialimed/AnaCore-utils

@@ -30,12 +30,6 @@ import random
 import logging
 import argparse
 import numpy as np
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-APP_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
-LIB_DIR = os.path.abspath(os.path.join(APP_DIR, "lib"))
-sys.path.append(LIB_DIR)
-
 from anacore.sequenceIO import FastaIO, Sequence
 from anacore.sv import HashedSVIO
 from anacore.bed import getAreasByChr

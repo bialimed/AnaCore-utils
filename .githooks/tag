@@ -1,0 +1,10 @@
+#!/bin/bash
+
+tag=$1
+
+# Change tag name
+sed -i -E 's/set version = ".+\..+\..+"/set version = "'${tag}'"/g' conda_build/meta.yaml
+#git add conda_build/meta.yaml
+
+echo -e "[\e[92mSUCCESS\033[0m]"
+exit 0

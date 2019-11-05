@@ -31,11 +31,6 @@ import argparse
 from copy import deepcopy
 from statistics import mean
 from collections import deque
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.abspath(os.path.join(os.path.dirname(CURRENT_DIR), "lib"))
-sys.path.append(LIB_DIR)
-
 from anacore.sequenceIO import IdxFastaIO
 from anacore.vcf import VCFIO, VCFRecord, HeaderInfoAttr
 

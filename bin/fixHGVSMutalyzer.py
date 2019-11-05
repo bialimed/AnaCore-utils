@@ -30,11 +30,6 @@ import logging
 import argparse
 import requests
 import urllib.parse
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.abspath(os.path.join(os.path.dirname(CURRENT_DIR), "lib"))
-sys.path.append(LIB_DIR)
-
 from anacore.annotVcf import AnnotVCFIO
 from anacore.sv import HashedSVIO
 from anacore.hgvs import HGVS, RunMutalyzerDescription, RunMutalyzerLegend

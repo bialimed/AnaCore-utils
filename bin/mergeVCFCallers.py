@@ -28,12 +28,7 @@ import sys
 import numpy
 import logging
 import argparse
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.abspath(os.path.join(os.path.dirname(CURRENT_DIR), "lib"))
-sys.path.append(LIB_DIR)
-
-from anacore.vcf import VCFIO, getAlleleRecord, VCFRecord, HeaderInfoAttr, HeaderFormatAttr
+from anacore.vcf import VCFIO, HeaderInfoAttr, HeaderFormatAttr
 
 
 ########################################################################

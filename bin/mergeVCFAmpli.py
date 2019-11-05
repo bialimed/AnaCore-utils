@@ -23,16 +23,10 @@ __version__ = '2.4.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
-import os
 import sys
 import pysam
 import logging
 import argparse
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.abspath(os.path.join(os.path.dirname(CURRENT_DIR), "lib"))
-sys.path.append(LIB_DIR)
-
 from anacore.bed import getAreasByChr
 from anacore.region import Region
 from anacore.vcf import VCFIO, getAlleleRecord, HeaderInfoAttr, HeaderFormatAttr
@@ -46,8 +40,10 @@ from anacore.vcf import VCFIO, getAlleleRecord, HeaderInfoAttr, HeaderFormatAttr
 class ConsensusException(Exception):
     def __init__(self, value):
         self.value = value
+
     def __str__(self):
         return repr(self.value)
+
 
 def getADPContig(chrom, pos, ref, alt, aln_file, selected_RG=None):
     """
@@ -87,6 +83,7 @@ def getADPContig(chrom, pos, ref, alt, aln_file, selected_RG=None):
                 AD += 1
     # Return
     return AD, DP
+
 
 def getADPReads(chrom, pos, ref, alt, aln_file, selected_RG=None):
     """
@@ -152,6 +149,7 @@ def getADPReads(chrom, pos, ref, alt, aln_file, selected_RG=None):
     # Return
     return AD, DP
 
+
 def getAlnCost(ref, aln_seq, weights=None):
     """
     @summary: Returns cost of the alignment for alignment comparison. For two alignments on the
@@ -198,6 +196,7 @@ def getAlnCost(ref, aln_seq, weights=None):
             prev = "match"
     cost = sum([(nb[category] * weights[category]) for category in nb])
     return cost
+
 
 def getAlnAndQual(aln_file, chrom, inspect_start, inspect_end, selected_RG, max_depth=100000):
     """
@@ -308,6 +307,7 @@ def getAlnAndQual(aln_file, chrom, inspect_start, inspect_end, selected_RG, max_
                 quals[read_id][pair_id].append(None)
     return reads, quals
 
+
 def getRGIdByRGTag(in_aln, tag, selected_value):
     """
     @summary: Returns the IDs of RG with a tag value in selected values.
@@ -322,6 +322,7 @@ def getRGIdByRGTag(in_aln, tag, selected_value):
             if RG[tag] in selected_value:
                 RG_id.append(RG["ID"])
     return RG_id
+
 
 def getSimplePairConsensus(seq, qual):
     """
@@ -394,7 +395,6 @@ def getSimplePairConsensus(seq, qual):
     else:  # Only R2 overlaps inspected region
         consensus = seq["R2"]
     return consensus
-
 
 
 ########################################################################

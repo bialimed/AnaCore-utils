@@ -29,11 +29,6 @@ import json
 import logging
 import argparse
 from copy import deepcopy
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.abspath(os.path.join(os.path.dirname(CURRENT_DIR), "lib"))
-sys.path.append(LIB_DIR)
-
 from anacore.filters import filtersFromDict
 from anacore.annotVcf import AnnotVCFIO
 

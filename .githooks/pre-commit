@@ -1,17 +1,6 @@
 #!/bin/bash
 
-# Unit testing lib
-`python3 -W ignore -m unittest discover lib/test > /dev/null`
-if [ $? -ne 0 ] ; then
-	exit 1 ;
-fi
-# Update coverage badge for lib
-lib/test/coverage/updateCoverage.sh && git add lib/README.md
-if [ $? -ne 0 ] ; then
-	exit 1 ;
-fi
-
-# Unit testing bin
+# Unit testing
 `python3 -W ignore -m unittest discover bin/test > /dev/null`
 if [ $? -ne 0 ] ; then
 	exit 1 ;
