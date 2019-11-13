@@ -1,31 +1,17 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2017 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.0'
+__version__ = '1.5.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
 import os
+import sys
 import json
 import pysam
+import logging
 import argparse
 from anacore.bed import getAreas
 
@@ -37,9 +23,12 @@ from anacore.bed import getAreas
 ########################################################################
 def getSelectedAreasByChr(input_panel):
     """
-    @summary: Returns by chromosome the list of selected areas from a BED file.
-    @param input_panel: [str] The path to the amplicons with their primers (format: BED)
-    @return: [dict] By chromosome the list of BED's areas. Each area is represented by an instance of Region.
+    Return chromosome the list of selected areas from a BED file.
+
+    :param input_panel: Path to the amplicons with their primers (format: BED)
+    :type input_panel: str
+    :return: By chromosome the list of BED's areas. Each area is represented by an instance of Region.
+    :rtype: dict
     """
     selected_areas = getAreas(input_panel)
     selected_areas = sorted(selected_areas, key=lambda x: (x.chrom, x.start, x.end))
@@ -53,13 +42,19 @@ def getSelectedAreasByChr(input_panel):
 
     return(area_by_chr)
 
+
 def getSourceRegion(read, regions, anchor_offset=0):
     """
-    @summary: Returns the region where the read come from. Returns None if no region corresponds to the read.
-    @param read: [pysam.AlignedSegment] The evaluated read.
-    @param regions: [list] Evaluated source regions. Each area must be represented by an instance of Region.
-    @param anchor_offset: [int] The alignment of the read can start at N nucleotids after the start of the primer. This parameter allows to take account the possible mismatches on the firsts read positions.
-    @return: [None/Region] The region where the read come from.
+    Return the region where the read come from. Returns None if no region corresponds to the read.
+
+    :param read: The evaluated read.
+    :type read: pysam.AlignedSegment
+    :param regions: Evaluated source regions. Each area must be represented by an instance of Region.
+    :type regions: list
+    :param anchor_offset: The alignment of the read can start at N nucleotids after the start of the primer. This parameter allows to take account the possible mismatches on the firsts read positions.
+    :type anchor_offset: int
+    :return: The region where the read come from.
+    :return: None/anacore.region.Region
     """
     overlapped_region = None
     ref_start = read.reference_start + 1
@@ -85,12 +80,18 @@ def getSourceRegion(read, regions, anchor_offset=0):
 
 def pairHasOverlapOnZOI(amplicon, first_read, second_read, min_cov=10):
     """
-    @summary: Returns the region where the read come from. Returns None if no region corresponds to the read.
-    @param amplicon: [Region] The amplicon region.
-    @param first_read: [pysam.AlignedSegment] The evaluated read1.
-    @param second_read: [pysam.AlignedSegment] The evaluated read2.
-    @param min_cov: [int] The minimum cumulative length of reads pair in zone of interest (R1 on ZOI + R2 on ZOI).
-    @return: [boolean] The region where the read come from.
+    Return the region where the read come from. Returns None if no region corresponds to the read.
+
+    :param amplicon: The amplicon region.
+    :type amplicon: anacore.region.Region
+    :param first_read: The evaluated read1.
+    :type first_read: pysam.AlignedSegment
+    :param second_read: The evaluated read2.
+    :type second_read: pysam.AlignedSegment
+    :param min_cov: The minimum cumulative length of reads pair in zone of interest (R1 on ZOI + R2 on ZOI).
+    :type min_cov: int
+    :return: The region where the read come from.
+    :rtype: bool
     """
     zoi_cov_len = first_read.get_overlap(amplicon.thickStart, amplicon.thickEnd)
     zoi_cov_len += second_read.get_overlap(amplicon.thickStart, amplicon.thickEnd)
@@ -99,10 +100,14 @@ def pairHasOverlapOnZOI(amplicon, first_read, second_read, min_cov=10):
 
 def hasValidStrand(read, ampl_region):
     """
-    @summary: Returns True if the read is stranded like if it comes from the specified region.
-    @param read: [pysam.AlignedSegment] The evaluated read.
-    @param ampl_region: [Region] The amplicon region.
-    @return: [bool] True if the read is stranded like if it comes from the specified region.
+    Return True if the read is stranded like if it comes from the specified region.
+
+    :param read: The evaluated read.
+    :type read: pysam.AlignedSegment
+    :param ampl_region: The amplicon region.
+    :param ampl_region: anacore.region.Region
+    :return: True if the read is stranded like if it comes from the specified region.
+    :rtype: bool
     """
     has_valid_strand = False
     if read.is_read1:
@@ -124,20 +129,23 @@ def hasValidStrand(read, ampl_region):
 
 def writeTSVSummary(out_path, data):
     """
-    @summary: Writes summary in TSV file. It contains information about the number of reads out off target, reversed and valid.
-    @param out_path: [str] Path to the output file.
-    @param data: [dict] The metrics stored in summary.
+    Write summary in TSV file. It contains information about the number of reads out off target, reversed and valid.
+
+    :param out_path: Path to the output file.
+    :type out_path: str
+    :param data: The metrics stored in summary.
+    :type data: dict
     """
     with open(args.output_summary, "w") as FH_summary:
         print(
             "Category\tCount\tRatio",
-            "Unpaired\t{}\t{:5f}".format(data["unpaired"], data["unpaired"]/data["total"]),
-            "Unmapped\t{}\t{:5f}".format(data["pair_unmapped"], data["pair_unmapped"]/data["total"]),
-            "Out_target\t{}\t{:5f}".format(data["out_target"], data["out_target"]/data["total"]),
-            "Cross_panel\t{}\t{:5f}".format(data["cross_panel"], data["cross_panel"]/data["total"]),
-            "Invalid_pair\t{}\t{:5f}".format(data["invalid_pair"], data["invalid_pair"]/data["total"]),
-            "Only_primers\t{}\t{:5f}".format(data["only_primers"], data["only_primers"]/data["total"]),
-            "Valid\t{}\t{:5f}".format(data["valid"], data["valid"]/data["total"]),
+            "Unpaired\t{}\t{:5f}".format(data["unpaired"], data["unpaired"] / data["total"]),
+            "Unmapped\t{}\t{:5f}".format(data["pair_unmapped"], data["pair_unmapped"] / data["total"]),
+            "Out_target\t{}\t{:5f}".format(data["out_target"], data["out_target"] / data["total"]),
+            "Cross_panel\t{}\t{:5f}".format(data["cross_panel"], data["cross_panel"] / data["total"]),
+            "Invalid_pair\t{}\t{:5f}".format(data["invalid_pair"], data["invalid_pair"] / data["total"]),
+            "Only_primers\t{}\t{:5f}".format(data["only_primers"], data["only_primers"] / data["total"]),
+            "Valid\t{}\t{:5f}".format(data["valid"], data["valid"] / data["total"]),
             sep="\n",
             file=FH_summary
         )
@@ -145,9 +153,12 @@ def writeTSVSummary(out_path, data):
 
 def writeJSONSummary(out_path, data):
     """
-    @summary: Writes summary in JSON file. It contains information about the number of reads out off target, reversed and valid.
-    @param out_path: [str] Path to the output file.
-    @param data: [dict] The metrics stored in summary.
+    Write summary in JSON file. It contains information about the number of reads out off target, reversed and valid.
+
+    :param out_path: Path to the output file.
+    :type out_path: str
+    :param data: The metrics stored in summary.
+    :type data: dict
     """
     eval_order = ["unpaired", "pair_unmapped", "out_target", "cross_panel", "invalid_pair", "only_primers", "valid"]
     with open(args.output_summary, "w") as FH_summary:
@@ -163,7 +174,7 @@ def writeJSONSummary(out_path, data):
 ########################################################################
 if __name__ == "__main__":
     # Manage parameters
-    parser = argparse.ArgumentParser(description='Adds RG corresponding to the panel amplicon. for a reads pair the amplicon is determined from the position of the first match position of the reads (primers start positions).')
+    parser = argparse.ArgumentParser(description='Add RG corresponding to the amplicon source. For a reads pair the amplicon is determined from the position of the first match position of the reads (primers start positions).')
     parser.add_argument('-f', '--summary-format', default='tsv', choices=['json', 'tsv'], help='The summary format. [Default: %(default)s]')
     parser.add_argument('-l', '--anchor-offset', type=int, default=4, help='The alignment of the read can start at N nucleotids after the start of the primer. This parameter allows to take account the possible mismatches on the firsts read positions. [Default: %(default)s]')
     parser.add_argument('-z', '--min-zoi-cov', type=int, default=10, help='The minimum cumulative length of reads pair in zone of interest. If the number of nucleotids coming from R1 on ZOI + the number of nucleotids coming from R2 on ZOI is lower than this value the pair is counted in "only_primers". [Default: %(default)s]')
@@ -176,6 +187,12 @@ if __name__ == "__main__":
     group_output.add_argument('-o', '--output-aln', required=True, help='The path to the alignments file (format: BAM).')
     group_output.add_argument('-s', '--output-summary', help='The path to the summary file (format: see --summary-format). It contains information about the number of reads out off target, reversed and valid.')
     args = parser.parse_args()
+
+    # Logger
+    logging.basicConfig(format='%(asctime)s -- [%(filename)s][pid:%(process)d][%(levelname)s] -- %(message)s')
+    log = logging.getLogger(os.path.basename(__file__))
+    log.setLevel(logging.INFO)
+    log.info("Command: " + " ".join(sys.argv))
 
     # Count
     total_reads = 0.0
@@ -240,6 +257,7 @@ if __name__ == "__main__":
 
     # Sort output file
     pysam.sort("-o", args.output_aln, tmp_aln)
+    pysam.index(args.output_aln)
     os.remove(tmp_aln)
 
     # Write summary
@@ -258,3 +276,4 @@ if __name__ == "__main__":
             writeJSONSummary(args.output_summary, data)
         else:
             writeTSVSummary(args.output_summary, data)
+    log.info("End of job")
