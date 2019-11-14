@@ -1,25 +1,9 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2017 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -34,7 +18,6 @@ BIN_DIR = os.path.dirname(__file__)
 os.environ['PATH'] = os.environ['PATH'] + os.pathsep + BIN_DIR
 
 
-
 ########################################################################
 #
 # FUNCTIONS
@@ -42,9 +25,11 @@ os.environ['PATH'] = os.environ['PATH'] + os.pathsep + BIN_DIR
 ########################################################################
 class Cmd:
     """
-    @summary: Command wrapper.
-    @copyright: FROGS's team INRA.
+    Command wrapper.
+
+    :copyright: FROGS's team INRA.
     """
+
     def __init__(self, program, description, exec_parameters, version_parameters=None, interpreter=None):
         """
         @param exec_parameters: [str] The parameters to execute the program. Two possibles syntaxes.
@@ -64,7 +49,8 @@ class Cmd:
 
     def get_cmd(self):
         """
-        @summary : Returns the command line.
+        Return the command line.
+
         @return : [str] The command line.
         """
         exec_call = self.program
@@ -79,7 +65,8 @@ class Cmd:
 
     def get_version(self, location='stdout'):
         """
-        @summary : Returns the program version number.
+        Return the program version number.
+
         @param location : [str] If the version command returns the version number on 'stdout' or on 'stderr'.
         @return : [str] version number if this is possible, otherwise this method return 'unknown'.
         """
@@ -101,14 +88,16 @@ class Cmd:
 
     def parser(self, log_file):
         """
-        @summary : Parse the command results to add information in log_file.
+        Parse the command results to add information in log_file.
+
         @log_file : [str] Path to the sample process log file.
         """
         pass
 
     def submit(self, log_file=None):
         """
-        @summary : Launch command, trace this action in log and parse results.
+        Launch command, trace this action in log and parse results.
+
         @log_file : [str] Path to the sample process log file.
         """
         # Log
@@ -132,9 +121,11 @@ class Cmd:
 
 class Logger:
     """
-    @summary: Log file handler.
-    @copyright: FROGS's team INRA.
+    Log file handler.
+
+    :copyright: FROGS's team INRA.
     """
+
     def __init__(self, filepath=None):
         """
         @param filepath: [str] The log filepath. [default : STDOUT]
@@ -147,15 +138,11 @@ class Logger:
             self.file_handle = sys.stdout
 
     def __del__(self):
-        """
-        @summary: Closed file handler when the logger is detroyed.
-        """
+        """Close file handler when the logger is detroyed."""
         self.close()
 
     def close(self):
-        """
-        @summary: Closed file handler.
-        """
+        """Close file handler."""
         if self.filepath is not None and self.filepath is not sys.stdout:
             if self.file_handle is not None:
                 self.file_handle.close()
@@ -163,7 +150,8 @@ class Logger:
 
     def write(self, msg):
         """
-        @summary: Writes msg on file.
+        Write msg on file.
+
         @param msg: [str] The message to write.
         """
         self.file_handle.write(msg)
@@ -171,7 +159,8 @@ class Logger:
     @staticmethod
     def static_write(filepath, msg):
         """
-        @summary: Writes msg on file.
+        Write msg on file.
+
         @param filepath: [str] The log filepath. [default : STDOUT]
         @param msg: [str] The message to write.
         """
@@ -182,11 +171,13 @@ class Logger:
         else:
             sys.stdout.write(msg)
 
+
 class TmpFiles:
     """
-    @summary: Manager for temporary files.
-    @copyright: FROGS's team INRA.
-    @note:
+    Manager for temporary files.
+
+    :copyright: FROGS's team INRA.
+    :note:
         tmpFiles = TmpFiles(out_dir)
         try:
             ...
@@ -242,10 +233,10 @@ class TmpFiles:
         for tmp_file in all_tmp_files:
             self.delete(tmp_file)
 
+
 class SamtoolsIndex(Cmd):
-    """
-    @summary: Index alignment.
-    """
+    """Index alignment."""
+
     def __init__(self, in_aln):
         """
         @param in_aln: [str] Path to the alignment file (format: BAM).
@@ -267,6 +258,7 @@ class SamtoolsIndex(Cmd):
         """
         output = Cmd.get_version(self)
         return output.split("\n")[0].split(" ")[1].strip()
+
 
 class SplitBAMByRG(Cmd):
     """
@@ -314,58 +306,25 @@ class AddRGOnBAM(Cmd):
                       cmd_param,
                       "--version" )
 
-class GATKHaplotypeCaller(Cmd):
-    def __init__(self, in_aln, out_variants, in_reference, in_dbsnp=None, in_intervals=None, min_confidence_calling=30, min_confidence_emitting=30):
-        cmd_param = "" + \
-            " --analysis_type HaplotypeCaller" + \
-            " --standard_min_confidence_threshold_for_calling " + str(min_confidence_calling) + \
-            " --standard_min_confidence_threshold_for_emitting " + str(min_confidence_emitting) + \
-            " --annotateNDA" + \
-            " --dontUseSoftClippedBases" + \
-            " --reference_sequence " + in_reference + \
-            ("" if in_dbsnp is None else " --dbsnp " + in_dbsnp) + \
-            ("" if in_intervals is None else " --intervals " + in_intervals) + \
-            " --input_file " + in_aln + \
-            " --out " + out_variants + \
-            " 2> /dev/null"
-
-        Cmd.__init__( self,
-                      "/softs/tools/gatk/3.6/GenomeAnalysisTK.jar",
-                      "Variant calling.",
-                      cmd_param,
-                      "--version",
-                      "java -Xmx30g -jar" )
-
-class FreeBayes(Cmd):
-    def __init__(self, in_reference, in_aln, out_variants):
-        cmd_param = "" + \
-            " --fasta-reference " + in_reference + \
-            " " + in_aln + \
-            " > " + out_variants + \
-            " 2> /dev/null"
-
-        Cmd.__init__( self,
-                      "freebayes",
-                      "Variant calling.",
-                      cmd_param,
-                      "--version" )
-
 class VarDictStep1(Cmd):
     """
     @summary: Dicovers variants.
     """
-    def __init__(self, in_reference, in_regions, in_aln, out_file, min_AF=0.02, min_base_qual=25):
+    def __init__(self, in_reference, in_regions, in_aln, out_file, min_alt_freq=0.02, min_alt_count=4, min_base_qual=25):
         """
         @param in_reference: [str] Path to the reference sequences file (format: fasta).
         @param in_regions: [str] Path to the amplicons design (format: BED). Start and end of the amplicons must be with primers.
         @param in_aln: [str] Path to the alignments file (format: BAM).
         @param out_file: [str] Path to the outputted file.
-        @param min_AF: [float] The threshold for allele frequency.
+        @param min_alt_freq: [float] The threshold for allele frequency.
+        @param min_alt_count: [int] The threshold for allele count.
         @param min_base_qual: [int] The phred score for a base to be considered a good call.
         """
         cmd_param = "" + \
-            " -f " + str(min_AF) + \
+            " -r " + str(min_alt_count) + \
+            " -f " + str(min_alt_freq) + \
             " -q " + str(min_base_qual) + \
+            " -P 0" + \
             " -F 0" + \
             " -c 1 -S 2 -E 3 -g 4" + \
             " -b " + in_aln + \
@@ -398,21 +357,21 @@ class VarDictStep2(Cmd):
                       cmd_param )
 
 class VarDictStep3(Cmd):
-    """
-    @summary: Filters variants and converts to VCF.
-    """
-    def __init__(self, in_file, out_variants, min_AF=0.02):
+    """Filter variants and converts to VCF."""
+
+    def __init__(self, in_file, out_variants, min_alt_freq=0.02):
         """
         @param in_file: [str] Path to the input file.
         @param out_variants: [str] Path to the outputted file (format: VCF).
-        @param min_AF: [float] The threshold for allele frequency.
+        @param min_alt_freq: [float] The threshold for allele frequency.
         """
         cmd_param = "" + \
             " cat " + in_file + " | " + \
             " ##PROGRAM##" + \
+            " -A" + \
             " -a" + \
             " -E" + \
-            " -f " + str(min_AF) + \
+            " -f " + str(min_alt_freq) + \
             " > " + out_variants
 
         Cmd.__init__( self,
@@ -487,6 +446,27 @@ class FilterVCFPrimers(Cmd):
                       cmd_param,
                       "--version" )
 
+class fixVardictHeader(Cmd):
+    """
+    @summary: Fix errors in VCF format in VarDict outputs.
+    """
+    def __init__(self, in_variants, out_variants):
+        """
+        @param in_variants: [str] Path to the variants file (format: VCF).
+        @param out_variants: [str] Path to the outputted variants file (format: VCF).
+        """
+        cmd_param = "" + \
+            " --variant-caller vardict" + \
+            " --input-variants " + in_variants + \
+            " --output-variants " + out_variants
+
+        Cmd.__init__( self,
+                      "fixVCallerVCF.py",
+                      "Fix errors in VCF format in VarDict outputs.",
+                      cmd_param,
+                      "--version" )
+
+
 def filterBED(in_bed, in_names, out_bed, nb_col=None):
     """
     @summary: Filters a BED file with the list of names of regions to keep.
@@ -513,7 +493,7 @@ def filterBED(in_bed, in_names, out_bed, nb_col=None):
                             line = "\t".join(fields[:nb_col]) + "\n"
                         FH_out.write(line)
 
-def VarDictFct(in_reference, in_regions, in_aln, out_variants, logger, tmp_file, min_AF=0.02, min_base_qual=25):
+def VarDictFct(in_reference, in_regions, in_aln, out_variants, logger, tmp_file, min_alt_freq=0.02, min_alt_count=4, min_base_qual=25):
     """
     @summary: Dicovers amplicons variants with VarDict.
     @param in_reference: [str] Path to the reference sequences file (format: fasta).
@@ -522,14 +502,14 @@ def VarDictFct(in_reference, in_regions, in_aln, out_variants, logger, tmp_file,
     @param out_variants: [str] Path to the outputted file (format: VCF).
     @param logger: [Logger] Logger used to trace sub-commands.
     @param tmp_file: [TmpFiles] Temporaries files manager.
-    @param min_AF: [float] The threshold for allele frequency.
+    @param min_alt_freq: [float] The threshold for allele frequency.
     @param min_base_qual: [int] The phred score for a base to be considered a good call.
     """
     out_vardict = tmp.add("vardict.txt")
     out_strand_bias = tmp.add("strdBias.txt")
-    VarDictStep1(in_reference, in_regions, in_aln, out_vardict, min_AF, min_base_qual).submit(logger)
+    VarDictStep1(in_reference, in_regions, in_aln, out_vardict, min_alt_freq, min_alt_count, min_base_qual).submit(logger)
     VarDictStep2(out_vardict, out_strand_bias).submit(logger)
-    VarDictStep3(out_strand_bias, out_variants, min_AF).submit(logger)
+    VarDictStep3(out_strand_bias, out_variants, min_alt_freq).submit(logger)
 
 
 ########################################################################
@@ -540,7 +520,8 @@ def VarDictFct(in_reference, in_regions, in_aln, out_variants, logger, tmp_file,
 if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Varaint calling on Illumina amplicon sequencing. It use VarDictJava (see: https://github.com/AstraZeneca-NGS/VarDictJava).')
-    parser.add_argument('-m', '--min-AF', default=0.02, type=float, help='Variants with an allele frequency under this value are not emitted. [Default: %(default)s]')
+    parser.add_argument('-m', '--min-alt-freq', default=0.02, type=float, help='Variants with an allele frequency under this value are not emitted. [Default: %(default)s]')
+    parser.add_argument('-c', '--min-alt-count', default=4, type=int, help='Variants with an allele count under this value are not emitted. [Default: %(default)s]')
     parser.add_argument('-q', '--min-base-qual', default=25, type=int, help='The phred score for a base to be considered a good call. [Default: %(default)s]')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_reference = parser.add_argument_group('Reference')  # Reference
@@ -602,7 +583,7 @@ if __name__ == "__main__":
 
         # Call variants
         curr_gp_vcf = tmp.add(curr_gp + ".vcf")
-        VarDictFct(args.input_genome, curr_gp_regions_with_prim_4_col, curr_gp_aln_new_RG, curr_gp_vcf, args.output_log, tmp, args.min_AF, args.min_base_qual)
+        VarDictFct(args.input_genome, curr_gp_regions_with_prim_4_col, curr_gp_aln_new_RG, curr_gp_vcf, args.output_log, tmp, args.min_alt_freq, args.min_alt_count, args.min_base_qual)
 
         # Filters variants located on primers
         curr_gp_clean_vcf = tmp.add(curr_gp + "_clean.vcf")
@@ -625,7 +606,12 @@ if __name__ == "__main__":
         [curr_gp["aln"] for curr_gp in groups],
         out_gather
     ).submit(args.output_log)
-    MeltOverlappingRegions(library_name, out_gather, args.output_variants).submit(args.output_log)
+    out_melt = tmp.add("melt.vcf")
+    MeltOverlappingRegions(library_name, out_gather, out_melt).submit(args.output_log)
+
+    # Fix vardict header
+    out_gather = tmp.add("gatherOverlapping.vcf")
+    fixVardictHeader(out_melt, args.output_variants).submit(args.output_log)
 
     # Clean temporary files
     tmp.deleteAll()
