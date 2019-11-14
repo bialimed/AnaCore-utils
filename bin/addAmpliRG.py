@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.6.0'
+__version__ = '1.7.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -142,7 +142,7 @@ def writeTSVSummary(out_path, data):
             "Unpaired\t{}\t{:5f}".format(data["unpaired"], data["unpaired"] / data["total"]),
             "Unmapped\t{}\t{:5f}".format(data["pair_unmapped"], data["pair_unmapped"] / data["total"]),
             "Out_target\t{}\t{:5f}".format(data["out_target"], data["out_target"] / data["total"]),
-            "Cross_panel\t{}\t{:5f}".format(data["cross_panel"], data["cross_panel"] / data["total"]),
+            "Invalid_strand\t{}\t{:5f}".format(data["invalid_strand"], data["invalid_strand"] / data["total"]),
             "Invalid_pair\t{}\t{:5f}".format(data["invalid_pair"], data["invalid_pair"] / data["total"]),
             "Only_primers\t{}\t{:5f}".format(data["only_primers"], data["only_primers"] / data["total"]),
             "Valid\t{}\t{:5f}".format(data["valid"], data["valid"] / data["total"]),
@@ -160,7 +160,7 @@ def writeJSONSummary(out_path, data):
     :param data: The metrics stored in summary.
     :type data: dict
     """
-    eval_order = ["unpaired", "pair_unmapped", "out_target", "cross_panel", "invalid_pair", "only_primers", "valid"]
+    eval_order = ["unpaired", "pair_unmapped", "out_target", "invalid_strand", "invalid_pair", "only_primers", "valid"]
     with open(args.output_summary, "w") as FH_summary:
         FH_summary.write(
             json.dumps({"eval_order": eval_order, "results": data}, default=lambda o: o.__dict__, sort_keys=True)
@@ -176,6 +176,7 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Add RG corresponding to the amplicon source. For a reads pair the amplicon is determined from the position of the first match position of the reads (primers start positions).')
     parser.add_argument('-f', '--summary-format', default='tsv', choices=['json', 'tsv'], help='The summary format. [Default: %(default)s]')
+    parser.add_argument('-t', '--check-strand', action='store_true', help='With this option the strand of amplicons is checked.')
     parser.add_argument('-l', '--anchor-offset', type=int, default=4, help='The alignment of the read can start at N nucleotids after the start of the primer. This parameter allows to take account the possible mismatches on the firsts read positions. [Default: %(default)s]')
     parser.add_argument('-z', '--min-zoi-cov', type=int, default=10, help='The minimum cumulative length of reads pair in zone of interest. If the number of nucleotids coming from R1 on ZOI + the number of nucleotids coming from R2 on ZOI is lower than this value the pair is counted in "only_primers". [Default: %(default)s]')
     parser.add_argument('-t', '--RG-tag', default='LB', help='RG tag used to store the area ID. [Default: %(default)s]')
@@ -236,7 +237,7 @@ if __name__ == "__main__":
                             source_region = getSourceRegion(curr_read, panel_regions[curr_read.reference_name], args.anchor_offset)
                         if source_region is None:
                             out_target_reads += 1
-                        elif not hasValidStrand(curr_read, source_region):
+                        elif args.check_strand and not hasValidStrand(curr_read, source_region):
                             reverse_reads += 1
                         else:
                             valid_reads += 1
@@ -267,7 +268,7 @@ if __name__ == "__main__":
             "unpaired": unpaired_reads,
             "pair_unmapped": unmapped_pairs,
             "out_target": out_target_reads,
-            "cross_panel": reverse_reads,
+            "invalid_strand": reverse_reads,
             "invalid_pair": valid_reads - only_primers_reads_valid_pair - valid_reads_valid_pair,
             "only_primers": only_primers_reads_valid_pair,
             "valid": valid_reads_valid_pair
