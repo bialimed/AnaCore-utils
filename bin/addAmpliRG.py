@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.5.0'
+__version__ = '1.6.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -213,7 +213,7 @@ if __name__ == "__main__":
     valid_reads_by_id = dict()
     with pysam.AlignmentFile(args.input_aln, "rb") as FH_in:
         # Replace RG in header
-        new_header = FH_in.header.copy()
+        new_header = FH_in.header.to_dict()
         new_header["RG"] = list()
         RG_idx = 1
         for chrom in sorted(panel_regions):
