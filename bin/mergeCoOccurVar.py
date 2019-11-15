@@ -1,25 +1,9 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2019 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -287,10 +271,12 @@ def traceMerge(record, intersection_rate, intersection_count):
     record.info["MCO_IC"].append(intersection_count)
 
 
-def mergedRecord(first, second, ref_seq):
+def mergedRecord(vcf, first, second, ref_seq):
     """
     Return the VCFRecord corresponding to the merge of first and second.
 
+    :param vcf: The file handle to VCF.
+    :type vcf: anacore.vcf.VCFIO
     :param first: The upstream variant to merge.
     :type first: anacore.vcf.VCFRecord
     :param second: The downstream variant to merge.
@@ -330,50 +316,32 @@ def mergedRecord(first, second, ref_seq):
                 first.getDP(spl), second.getDP(spl)
             )
         if "AD" in first.format:
-            fisrt_AD = first.getAD(spl)[0]
-            second_AD = second.getAD(spl)[0]
-            alt_AD = min(fisrt_AD, second_AD)
-            if isinstance(first.samples[spl]["AD"], (int, float)) or len(first.samples[spl]["AD"]) == 1:  # Contains only alt allele
-                merged.samples[spl]["AD"] = [alt_AD]
-            else:  # Contains ref allele
-                # Manage ref_AD also when several variants exist on position
-                ref_AD = None
-                if fisrt_AD < second_AD:
-                    ref_AD = first.samples[spl]["AD"][0]
-                elif fisrt_AD > second_AD:
-                    ref_AD = second.samples[spl]["AD"][0]
-                else:
-                    ref_AD = max(first.samples[spl]["AD"][0], second.samples[spl]["AD"][0])
-                merged.samples[spl]["AD"] = [ref_AD, alt_AD]
+            if vcf.format["AD"].number == "1":  # Contains one alt allele
+                merged.samples[spl]["AD"] = min(first.samples[spl]["AD"], second.samples[spl]["AD"])
+            else:
+                merged.samples[spl]["AD"] = [min(first_AD, second_AD) for first_AD, second_AD in zip(first.samples[spl]["AD"], second.samples[spl]["AD"])]
         if "AF" in first.format:
-            first_AF = first.getAF(spl)[0]
-            second_AF = second.getAF(spl)[0]
-            alt_AF = min(first_AF, second_AF)
-            if isinstance(first.samples[spl]["AF"], (float, int)) or len(first.samples[spl]["AF"]) == 1:  # Contains only alt allele
-                merged.samples[spl]["AF"] = [alt_AF]
-            else:  # Contains ref allele
-                # Manage ref_AF also when several variants exist on position
-                ref_AF = None
-                if first_AF < second_AF:
-                    ref_AF = first.samples[spl]["AF"][0]
-                elif first_AF > second_AD:
-                    ref_AF = second.samples[spl]["AF"][0]
-                else:
-                    ref_AF = max(first.samples[spl]["AF"][0], second.samples[spl]["AF"][0])
-                merged.samples[spl]["AF"] = [ref_AF, alt_AF]
+            if vcf.format["AF"].number == "1":  # Contains one alt allele
+                merged.samples[spl]["AF"] = min(first.samples[spl]["AF"], second.samples[spl]["AF"])
+            else:
+                merged.samples[spl]["AF"] = [min(first_AF, second_AF) for first_AF, second_AF in zip(first.samples[spl]["AF"], second.samples[spl]["AF"])]
     # INFO metrics
     if "AD" in first.info:
-        if isinstance(first.info["AD"], (int, float)) or len(first.info["AD"]) == 1:  # Contains only alt allele
-            merged.info["AD"] = merged.getPopAltAD()
-        else:
+        if vcf.info["AD"].number == "1":  # Contains one alt allele
+            merged.info["AD"] = merged.getPopAltAD()[0]
+        elif vcf.info["AD"].number == "R":  # Contains ref and alt alleles
             merged.info["AD"] = [merged.getPopRefAD()] + merged.getPopAltAD()
+        else:  # Contains only alt alleles
+            merged.info["AD"] = merged.getPopAltAD()
     if "DP" in first.info:
         merged.info["DP"] = merged.getPopDP()
     if "AF" in first.info:
-        if isinstance(first.info["AF"], (float, int)) or len(first.info["AF"]) == 1:  # Contains only alt allele
-            merged.info["AF"] = merged.getPopAltAF()
-        else:
+        if vcf.info["AF"].number == "1":  # Contains one alt allele
+            merged.info["AF"] = merged.getPopAltAF()[0]
+        elif vcf.info["AF"].number == "R":  # Contains ref and alt alleles
             merged.info["AF"] = [merged.getPopRefAF()] + merged.getPopAltAF()
+        else:  # Contains only alt alleles
+            merged.info["AF"] = merged.getPopAltAF()
     # INFO Parents
     merged.info["MCO_VAR"] = []
     if "MCO_VAR" in first.info:
@@ -512,7 +480,8 @@ if __name__ == "__main__":
                                                 prev_support_shared = (prev.supporting_reads & shared_reads)
                                                 curr_support_shared = (curr.supporting_reads & shared_reads)
                                                 intersection_count = len(prev_support_shared & curr_support_shared)
-                                                intersection_rate = intersection_count / len(prev_support_shared | curr_support_shared)
+                                                analysed_count = len(prev_support_shared | curr_support_shared)
+                                                intersection_rate = 0.0 if analysed_count == 0 else intersection_count / analysed_count
                                                 log.debug("{} and {} intersection rate: {:.5} ; number: {}.".format(prev.getName(), curr.getName(), intersection_rate, intersection_count))
                                                 if intersection_rate >= args.intersection_rate and intersection_count >= args.intersection_count:
                                                     # Merge variants
@@ -521,7 +490,7 @@ if __name__ == "__main__":
                                                     if first.upstream_start > second.upstream_start:
                                                         first = curr
                                                         second = prev
-                                                    merged = mergedRecord(first, second, chrom_seq)
+                                                    merged = mergedRecord(FH_vcf, first, second, chrom_seq)
                                                     traceMerge(merged, intersection_rate, intersection_count)
                                                     log.info("Merge {} and {} in {}.".format(prev.getName(), curr.getName(), merged.getName()))
                                                     # Prepare merged to become prev

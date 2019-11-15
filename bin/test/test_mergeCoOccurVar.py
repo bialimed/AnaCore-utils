@@ -19,7 +19,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.0.0'
+__version__ = '2.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -37,7 +37,7 @@ LIB_DIR = os.path.join(APP_DIR, "lib")
 sys.path.append(BIN_DIR)
 sys.path.append(LIB_DIR)
 
-from anacore.vcf import VCFRecord
+from anacore.vcf import VCFRecord, HeaderFormatAttr, HeaderInfoAttr
 from anacore.sequenceIO import IdxFastaIO
 from mergeCoOccurVar import mergedRecord, getIncludingReads, getSupportingReads, setRefPos
 
@@ -331,8 +331,21 @@ insDelNoStd_CAAA/CGTGA_2_alt	0	chr1	3	60	15M3I1M2D103M	*	0	0	AAGCCCTGATCACGCGTGA
                     )
 
 
+class FakeVCFIO:
+    def __init__(self, info, format):
+        self.info = info
+        self.format = format
+
+
 class MergeCoOccurVar(unittest.TestCase):
     def setUp(self):
+        self.vcfio = FakeVCFIO(
+            {"AF": HeaderInfoAttr("AF", "Alternative alleles frequencies", "Float", "A")},
+            {
+                "AD": HeaderFormatAttr("AD", "Alternative alleles depths", "Integer", "A"),
+                "DP": HeaderFormatAttr("DP", "total depth", "Integer", "1")
+            }
+        )
         self.ref_seq = "ACGCAAATCTCGGCATGCCGATT"
         #               | | | | | |  |  |  |  |
         #               1 3 5 7 9 11 14 17 20 23
@@ -397,7 +410,7 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["TAATCTCGGCATGCCC"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=A/T", "chr1:20=G/C"]}
         # Eval
-        observed_merge = mergedRecord(self.variant_1, self.variant_2, self.ref_seq)
+        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_2, self.ref_seq)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -418,7 +431,7 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["TGCACGG"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/TGCA", "chr1:10=TC/GG"]}
         # Eval
-        observed_merge = mergedRecord(self.variant_1, self.variant_2, self.ref_seq)
+        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_2, self.ref_seq)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -439,7 +452,7 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["TGCAGG"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/TGCA", "chr1:9=CT/GG"]}
         # Eval
-        observed_merge = mergedRecord(self.variant_1, self.variant_2, self.ref_seq)
+        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_2, self.ref_seq)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -460,7 +473,7 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["CGGCATCT"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/-", "chr1:10=-/GGCATCT"]}
         # Eval
-        observed_merge = mergedRecord(self.variant_1, self.variant_2, self.ref_seq)
+        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_2, self.ref_seq)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -481,7 +494,7 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["AGG"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/-", "chr1:9=-/AGG"]}
         # Eval
-        observed_merge = mergedRecord(self.variant_1, self.variant_2, self.ref_seq)
+        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_2, self.ref_seq)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -502,7 +515,7 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["GTGTGAA"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=-/GTGTG", "chr1:7=ATC/-"]}
         # Eval
-        observed_merge = mergedRecord(self.variant_1, self.variant_2, self.ref_seq)
+        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_2, self.ref_seq)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -523,7 +536,7 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["GTGTGA"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=-/GTGTG", "chr1:6=AA/-"]}
         # Eval
-        observed_merge = mergedRecord(self.variant_1, self.variant_2, self.ref_seq)
+        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_2, self.ref_seq)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -544,7 +557,7 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["GTGTG"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=-/GTGTG", "chr1:5=AA/-"]}
         # Eval
-        observed_merge = mergedRecord(self.variant_1, self.variant_2, self.ref_seq)
+        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_2, self.ref_seq)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -565,7 +578,7 @@ class MergeCoOccurVar(unittest.TestCase):
     #     self.expected_merge.alt = ["CGGCATCT"]
     #     self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:4=CAAAT/-", "chr1:9=C/CGGCATCT"]}
     #     # Eval
-    #     observed_merge = mergedRecord(self.variant_1, self.variant_2, self.ref_seq)
+    #     observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_2, self.ref_seq)
     #     self.assertEqual(
     #         strVariant(observed_merge),
     #         strVariant(self.expected_merge)
