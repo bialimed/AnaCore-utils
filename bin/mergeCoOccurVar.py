@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.0.1'
+__version__ = '2.0.2'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -492,7 +492,9 @@ if __name__ == "__main__":
                                                         second = prev
                                                     merged = mergedRecord(FH_vcf, first, second, chrom_seq)
                                                     traceMerge(merged, intersection_rate, intersection_count)
-                                                    log.info("Merge {} and {} in {}.".format(prev.getName(), curr.getName(), merged.getName()))
+                                                    log.info("Merge {} and {} in {} (intersection: {:.1f} on {}]).".format(
+                                                        prev.getName(), curr.getName(), merged.getName(), intersection_rate, analysed_count
+                                                    ))
                                                     # Prepare merged to become prev
                                                     merged.fastStandardize(FH_seq, 200)
                                                     std_curr = deepcopy(merged)
@@ -502,11 +504,11 @@ if __name__ == "__main__":
                             # Store the far records and remove them from the previous ones
                             if removed_idx is None:  # All the variants was close
                                 # Remove individual version of merged variants
-                                for idx in merged_idx:
+                                for idx in sorted(merged_idx, reverse=True):
                                     del(prev_list[idx])
                             else:  # Some variants was too far
                                 # Remove individual version of merged variants
-                                for idx in merged_idx:
+                                for idx in sorted(merged_idx, reverse=True):
                                     if idx > removed_idx:
                                         del(prev_list[idx])
                                 # Push too far vairants in chrom_var
@@ -515,6 +517,7 @@ if __name__ == "__main__":
                                     if idx not in merged_idx:
                                         chrom_var.append(std_record)
                         prev_list.append((curr, std_curr))
+                        prev_list = sorted(prev_list, key=lambda var: var[0].downstream_end)
                     # Last chromosome
                     for prev, std_prev in prev_list:
                         chrom_var.append(std_prev)
