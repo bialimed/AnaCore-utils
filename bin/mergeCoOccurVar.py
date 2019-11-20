@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.0.2'
+__version__ = '2.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -271,7 +271,7 @@ def traceMerge(record, intersection_rate, intersection_count):
     record.info["MCO_IC"].append(intersection_count)
 
 
-def mergedRecord(vcf, first, second, ref_seq):
+def mergedRecord(vcf, first, first_std_name, second, second_std_name, ref_seq):
     """
     Return the VCFRecord corresponding to the merge of first and second.
 
@@ -279,8 +279,12 @@ def mergedRecord(vcf, first, second, ref_seq):
     :type vcf: anacore.vcf.VCFIO
     :param first: The upstream variant to merge.
     :type first: anacore.vcf.VCFRecord
+    :param first_std_name: The initial name of the upstream variant to merge (before normalisation).
+    :type first_std_name: str
     :param second: The downstream variant to merge.
     :type second: anacore.vcf.VCFRecord
+    :param second_std_name: The initial name of the downstream variant to merge (before normalisation).
+    :type second_std_name: str
     :param ref_seq: The sequence of the chromosome.
     :type ref_seq: str
     :return: The variant corresponding to the merge of first and second.
@@ -348,12 +352,12 @@ def mergedRecord(vcf, first, second, ref_seq):
         for parent in first.info["MCO_VAR"]:
             merged.info["MCO_VAR"].append(parent)
     else:
-        merged.info["MCO_VAR"].append(first.getName())
+        merged.info["MCO_VAR"].append(first_std_name)
     if "MCO_VAR" in second.info:
         for parent in second.info["MCO_VAR"]:
             merged.info["MCO_VAR"].append(parent)
     else:
-        merged.info["MCO_VAR"].append(second.getName())
+        merged.info["MCO_VAR"].append(second_std_name)
     # Quality
     merged.info["MCO_QUAL"] = []
     if "MCO_QUAL" in first.info:
@@ -486,11 +490,15 @@ if __name__ == "__main__":
                                                 if intersection_rate >= args.intersection_rate and intersection_count >= args.intersection_count:
                                                     # Merge variants
                                                     first = prev
+                                                    first_std_name = std_prev.getName()
                                                     second = curr
+                                                    second_std_name = std_curr.getName()
                                                     if first.upstream_start > second.upstream_start:
                                                         first = curr
+                                                        first_std_name = std_curr.getName()
                                                         second = prev
-                                                    merged = mergedRecord(FH_vcf, first, second, chrom_seq)
+                                                        second_std_name = std_prev.getName()
+                                                    merged = mergedRecord(FH_vcf, first, first_std_name, second, second_std_name, chrom_seq)
                                                     traceMerge(merged, intersection_rate, intersection_count)
                                                     log.info("Merge {} and {} in {} (intersection: {:.1f} on {}]).".format(
                                                         prev.getName(), curr.getName(), merged.getName(), intersection_rate, analysed_count
