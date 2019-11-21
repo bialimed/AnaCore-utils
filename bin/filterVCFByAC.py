@@ -1,25 +1,9 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2019 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -37,9 +21,10 @@ from anacore.vcf import VCFIO, HeaderFilterAttr
 ########################################################################
 if __name__ == "__main__":
     # Manage parameters
-    parser = argparse.ArgumentParser(description='Filter variants on their AF.')
-    parser.add_argument('-m', '--mode', default="tag", choices=["tag", "remove"], help='Select the filter mode. In mode "tag" if the variant does not fit criteria a tag "CSQ" and/or "popAF" is added in FILTER field. In mode "remove" if the variant does not fit criteria it is removed from the output. [Default: %(default)s]')
-    parser.add_argument('-a', '--min-AF', default=0.02, type=float, help='Filter variants with AF <= than this values. [Default: %(default)s]')
+    parser = argparse.ArgumentParser(description='Filter variants on their AD and AF.')
+    parser.add_argument('-m', '--mode', default="tag", choices=["tag", "remove"], help='Select the filter mode. In mode "tag" if the variant does not fit criteria a tag "lowAD" and/or "lowAF" is added in FILTER field. In mode "remove" if the variant does not fit criteria it is removed from the output. [Default: %(default)s]')
+    parser.add_argument('-d', '--min-AD', default=4, type=int, help='Filter variants with AD <= than this values. [Default: %(default)s]')
+    parser.add_argument('-f', '--min-AF', default=0.02, type=float, help='Filter variants with AF <= than this values. [Default: %(default)s]')
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-i', '--input-variants', help='Path to the variants file (format: VCF).')
     group_output = parser.add_argument_group('Outputs')  # Outputs
@@ -61,15 +46,17 @@ if __name__ == "__main__":
             FH_out.copyHeader(FH_in)
             if "ADSRC" in FH_in.format:  # Variants file come from merging of different calling
                 FH_out.filter["lowAF"] = HeaderFilterAttr("lowAF", "Variants with population AF <= {} in all variant calling sources".format(args.min_AF))
+                FH_out.filter["lowAD"] = HeaderFilterAttr("lowAD", "Variants with population AD <= {} in all variant calling sources".format(args.min_AD))
             else:
                 FH_out.filter["lowAF"] = HeaderFilterAttr("lowAF", "Variants with population AF <= {}".format(args.min_AF))
+                FH_out.filter["lowAD"] = HeaderFilterAttr("lowAD", "Variants with population AD <= {}".format(args.min_AD))
             FH_out.writeHeader()
             # Records
             for record in FH_in:
                 if len(record.alt) > 1:
                     raise Exception("The multi-allelic variants cannot be processed: {}.".format(record.getName()))
                 nb_variants += 1
-                is_filtered = False
+                new_filters = set()
                 if "ADSRC" in FH_in.format:  # Variants file come from merging of different calling
                     pop_AD = [0 for src in record.info["SRC"]]  # Population AD for each calling source
                     pop_DP = [0 for src in record.info["SRC"]]  # Population DP for each calling source
@@ -79,24 +66,29 @@ if __name__ == "__main__":
                             pop_DP[idx] += DP
                     pop_AF = [AD / DP for AD, DP in zip(spl_info["ADSRC"], spl_info["DPSRC"])]
                     if max(pop_AF) < args.min_AF:
-                        is_filtered = True
+                        new_filters.add("lowAF")
+                    if max(pop_AD) < args.min_AD:
+                        new_filters.add("lowAD")
                 else:
                     if record.getPopAltAF()[0] < args.min_AF:
-                        is_filtered = True
+                        new_filters.add("lowAF")
+                    if record.getPopAltAD()[0] < args.min_AD:
+                        new_filters.add("lowAD")
+                if len(new_filters) > 0:
+                    nb_filtered += 1
                 # Filter record
                 if args.mode == "remove":
-                    if is_filtered:
-                        nb_filtered += 1
-                    else:
+                    if len(new_filters) == 0:
+                        if record.filter is None or len(record.filter) == 0:
+                            record.filter = ["PASS"]
                         FH_out.write(record)
                 else:
-                    if record.filter is None or len(record.filter) == 0 or record.filter[0] == "PASS":
-                        record.filter = list()
-                    if is_filtered:
-                        record.filter.append("lowAF")
-                        nb_filtered += 1
+                    old_filters = set()
+                    if record.filter is None and len(record.filter) != 0 and record.filter[0] != "PASS":
+                        record.filter = set(record.filter)
+                    record.filter = sorted(old_filters | new_filters)
                     if len(record.filter) == 0:
-                        record.filter.append("PASS")
+                        record.filter = ["PASS"]
                     FH_out.write(record)
 
     # Log process
