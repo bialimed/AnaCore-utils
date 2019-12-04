@@ -1,25 +1,9 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2019 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.1.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -237,20 +221,25 @@ def logACVariance(variants, log):
                 for curr_AF in AF[1:]:
                     max_diff = max(max_diff, abs(retained_AF - curr_AF))
                 diff_AF.append(max_diff)
-    log.info("Differences between retained AF and others callers (without missing): median={:.1%}, upper_quartile={:.1%}, 90_persentile={:.1%} and max={:.1%} on {} variants".format(
-        numpy.percentile(diff_AF, 50, interpolation='midpoint'),
-        numpy.percentile(diff_AF, 75, interpolation='midpoint'),
-        numpy.percentile(diff_AF, 90, interpolation='midpoint'),
-        max(diff_AF),
-        nb_var
-    ))
-    log.info("Differences between retained AD and others callers (without missing): median={}, upper_quartile={}, 90_persentile={} and max={} on {} variants".format(
-        int(numpy.percentile(diff_AD, 50, interpolation='midpoint')),
-        int(numpy.percentile(diff_AD, 75, interpolation='midpoint')),
-        int(numpy.percentile(diff_AD, 90, interpolation='midpoint')),
-        max(diff_AD),
-        nb_var
-    ))
+    # Log
+    if nb_var == 0:
+        log.info("Differences between retained AF and others callers (without missing): 0 common variants")
+        log.info("Differences between retained AD and others callers (without missing): 0 common variants")
+    else:
+        log.info("Differences between retained AF and others callers (without missing): median={:.1%}, upper_quartile={:.1%}, 90_persentile={:.1%} and max={:.1%} on {} variants".format(
+            numpy.percentile(diff_AF, 50, interpolation='midpoint'),
+            numpy.percentile(diff_AF, 75, interpolation='midpoint'),
+            numpy.percentile(diff_AF, 90, interpolation='midpoint'),
+            max(diff_AF),
+            nb_var
+        ))
+        log.info("Differences between retained AD and others callers (without missing): median={}, upper_quartile={}, 90_persentile={} and max={} on {} variants".format(
+            int(numpy.percentile(diff_AD, 50, interpolation='midpoint')),
+            int(numpy.percentile(diff_AD, 75, interpolation='midpoint')),
+            int(numpy.percentile(diff_AD, 90, interpolation='midpoint')),
+            max(diff_AD),
+            nb_var
+        ))
 
 
 ########################################################################
