@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -78,25 +78,25 @@ if __name__ == "__main__":
     # Process
     nb_variants = 0
     nb_filtered = 0
-    with VCFIO(args.input_variants) as FH_in:
-        with VCFIO(args.output_variants, "w") as FH_out:
+    with VCFIO(args.input_variants) as handle_in:
+        with VCFIO(args.output_variants, "w") as handle_out:
             # Header
-            FH_out.copyHeader(FH_in)
-            FH_out.info[args.SOR_tag] = HeaderInfoAttr(args.SOR_tag, "Strand bias estimated by the symmetric odds ratio test.", type="Float")
-            FH_out.filter[args.bias_tag] = HeaderFilterAttr(args.bias_tag, "Strand ratio bias (estimated by the symmetric odds ratio test): substit SOR > {}, InDel SOR > {}.".format(args.substit_max_SOR, args.indel_max_SOR))
-            FH_out.writeHeader()
+            handle_out.copyHeader(handle_in)
+            handle_out.info[args.SOR_tag] = HeaderInfoAttr(args.SOR_tag, "Strand bias estimated by the symmetric odds ratio test.", type="Float")
+            handle_out.filter[args.bias_tag] = HeaderFilterAttr(args.bias_tag, "Strand ratio bias (estimated by the symmetric odds ratio test): substit SOR > {}, InDel SOR > {}.".format(args.substit_max_SOR, args.indel_max_SOR))
+            handle_out.writeHeader()
             # Records
-            for record in FH_in:
+            for record in handle_in:
                 if len(record.alt) > 1:
                     raise Exception("The multi-allelic variants cannot be processed: {}.".format(record.getName()))
                 nb_variants += 1
                 is_filtered = False
                 # Compute SOR
                 record.info[args.SOR_tag] = strandOddRatio(
-                    record.info[args.ref_fwd_tag],
-                    record.info[args.ref_rev_tag],
-                    record.info[args.alt_fwd_tag],
-                    record.info[args.alt_rev_tag]
+                    record.info[args.ref_fwd_tag] if handle_in.info[args.ref_fwd_tag].number == "1" else record.info[args.ref_fwd_tag][0],
+                    record.info[args.ref_rev_tag] if handle_in.info[args.ref_rev_tag].number == "1" else record.info[args.ref_rev_tag][0],
+                    record.info[args.alt_fwd_tag] if handle_in.info[args.alt_fwd_tag].number == "1" else record.info[args.alt_fwd_tag][0],
+                    record.info[args.alt_rev_tag] if handle_in.info[args.alt_rev_tag].number == "1" else record.info[args.alt_rev_tag][0]
                 )
                 # Evaluate filter
                 if record.type() == "indel":  # InDel
@@ -111,7 +111,7 @@ if __name__ == "__main__":
                     if not is_filtered:
                         if record.filter is None or len(record.filter) == 0:
                             record.filter = ["PASS"]
-                        FH_out.write(record)
+                        handle_out.write(record)
                 else:
                     filters = set()
                     if record.filter is not None and len(record.filter) != 0 and record.filter[0] != "PASS":
@@ -121,7 +121,7 @@ if __name__ == "__main__":
                     record.filter = sorted(filters)
                     if len(record.filter) == 0:
                         record.filter = ["PASS"]
-                    FH_out.write(record)
+                    handle_out.write(record)
 
     # Log process
     log.info(

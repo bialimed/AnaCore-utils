@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -253,6 +253,55 @@ class filterVCFBySOR(unittest.TestCase):
         with VCFIO(self.tmp_output) as FH_results:
             for record in FH_results:
                 observed.append(record.id)
+        self.assertEqual(
+            expected,
+            observed
+        )
+
+    def testTagMultipleValues(self):
+        # Write test data
+        with VCFIO(self.tmp_variants, "w") as FH_var:
+            FH_var.info = {
+                "expected": HeaderInfoAttr("expected", "Expected filter tag.", type="String", number="1"),
+                "SAR": HeaderInfoAttr("SAR", "Number of reads supporting the alternative allele in reverse strand.", type="Integer", number="A"),
+                "SAF": HeaderInfoAttr("SAF", "Number of reads supporting the alternative allele in forward strand.", type="Integer", number="A"),
+                "SRR": HeaderInfoAttr("SRR", "Number of reads supporting the reference allele in reverse strand.", type="Integer", number="A"),
+                "SRF": HeaderInfoAttr("SRF", "Number of reads supporting the reference allele in forward strand.", type="Integer", number="A"),
+            }
+            FH_var.writeHeader()
+            self.variants = [
+                # 0.5 alt, 0.5 ref, low DP, alt no bias, ref no bias
+                VCFRecord("artificial_chr1", 10, "sub_01", "G", ["T"], None, None, {
+                    "SAR": [5],
+                    "SAF": [5],
+                    "SRR": [5],
+                    "SRF": [5],
+                    "expected": "PASS"
+                }),
+                # 0.05 alt, 0.95 ref, good DP, alt strand bias, ref no bias
+                VCFRecord("artificial_chr1", 40, "sub_04", "G", ["T"], None, None, {
+                    "SAR": [9],
+                    "SAF": [1],
+                    "SRR": [95],
+                    "SRF": [95],
+                    "expected": "strandRatioBias"
+                })
+            ]
+            for idx, curr_var in enumerate(self.variants):
+                FH_var.write(curr_var)
+
+        # Execute command
+        subprocess.check_call(self.cmd, stderr=subprocess.DEVNULL)
+
+        # Validate results
+        expected = []
+        for record in self.variants:
+            for alt in record.alt:
+                expected.append(record.id + ":" + record.info["expected"])
+        observed = []
+        with VCFIO(self.tmp_output) as FH_results:
+            for record in FH_results:
+                observed.append(record.id + ":" + record.filter[0])
         self.assertEqual(
             expected,
             observed
