@@ -32,6 +32,7 @@ def getSupports(variants_tsv):
     supports_by_id = {}
     with open(variants_tsv) as handle:
         titles = [
+            "Sample",
             "Gene",
             "Chr",
             "Start",
@@ -51,27 +52,27 @@ def getSupports(variants_tsv):
             "PStd",
             "QMean",
             "QStd",
-            "MQ",
-            "Sig_Noise",
-            "HiAF",
+            "MapQ",
+            "QRatio",
+            "HiFreq",
             "ExtraAF",
-            "shift3",
-            "MSI",
-            "MSI_NT",
-            "NM",
-            "HiCnt",
-            "HiCov",
-            "5pFlankSeq",
-            "3pFlankSeq",
-            "Seg",
-            "VarType"
+            "Others",  # Change between versions
+            # "shift3",
+            # "MSI",
+            # "MSINT",
+            # "NM",
+            # "HiCnt",
+            # "HiCov",
+            # "5pFlankSeq",
+            # "3pFlankSeq",
+            # "Seg",
+            # "VarType"
         ]
         reader = DictReader(handle, delimiter="\t", fieldnames=titles)
         for record in reader:
-            id = "{}:{}-{}={}/{}".format(
+            id = "{}:{}={}/{}".format(
                 record["Chr"],
                 record["Start"],
-                record["End"],
                 record["Ref"],
                 record["Alt"]
             )
@@ -119,7 +120,7 @@ if __name__ == "__main__":
             FH_out.writeHeader()
             # Records
             for record in FH_in:
-                for key, val in supports_by_id[record.getName()]:
+                for key, val in supports_by_id[record.getName()].items():
                     record.info[key] = val
                 FH_out.write(record)
     log.info("End of job")
