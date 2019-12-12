@@ -55,7 +55,7 @@ class DateTimeEncoder(json.JSONEncoder):
 ########################################################################
 if __name__ == "__main__":
     # Manage parameters
-    parser = argparse.ArgumentParser(description='Dump run information coming from several file in run folder.')
+    parser = argparse.ArgumentParser(description='Dump run information coming from several files in run folder.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')
     group_input.add_argument('-r', '--input-run-folder', required=True, help='Path to the run folder.')

@@ -34,7 +34,7 @@ from anacore.vcf import VCFIO, getAlleleRecord
 ########################################################################
 if __name__ == "__main__":
     # Manage parameters
-    parser = argparse.ArgumentParser(description='Splits multiple alternatives variants in one line to one alternative by line.')
+    parser = argparse.ArgumentParser(description='Split multiple alternatives variants in several lines.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-i', '--input-variants', required=True, help='The path to the variants file (format: VCF).')
