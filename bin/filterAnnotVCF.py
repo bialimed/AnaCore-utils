@@ -19,7 +19,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.1'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -70,6 +70,8 @@ if __name__ == "__main__":
         parser.error('"--input-filters-annotations" and/or "--input-filters-variants" must be specified.')
 
     # Process
+    nb_rec = 0
+    nb_rec_kept = 0
     with AnnotVCFIO(args.output_variants, mode="w") as FH_out:
         with AnnotVCFIO(args.input_variants, annot_field=args.annotation_field) as FH_in:
             # Header
@@ -77,7 +79,9 @@ if __name__ == "__main__":
             FH_out.writeHeader()
             # Records
             for record in FH_in:
+                nb_rec += 1
                 if record_filters is None or record_filters.eval(record):
+                    nb_rec_kept += 1
                     if annot_filters is not None:
                         if args.annotation_field in record.info and len(record.info[args.annotation_field]) != 0:
                             kept_annot = []
@@ -88,4 +92,11 @@ if __name__ == "__main__":
                                     kept_annot.append(annot)
                             record.info[args.annotation_field] = kept_annot
                     FH_out.write(record)
+    log.info(
+        "{:.2%} of variants have been removed ({}/{})".format(
+            0 if nb_rec == 0 else (nb_rec - nb_rec_kept) / nb_rec,
+            nb_rec - nb_rec_kept,
+            nb_rec
+        )
+    )
     log.info("End of job")
