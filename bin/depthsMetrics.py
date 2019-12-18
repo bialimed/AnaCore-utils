@@ -1,30 +1,17 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2018 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
+import os
+import sys
 import json
 import numpy
+import logging
 import argparse
 from anacore.sv import SVIO
 
@@ -283,9 +270,14 @@ if __name__ == "__main__":
     group_output.add_argument('-j', '--output-json', help='The path to the outputted file (format: JSON).')
     group_output.add_argument('-t', '--output-tsv', help='The path to the outputted file (format: TSV).')
     args = parser.parse_args()
-
     if args.output_tsv is None and args.output_json is None:
         parser.error('At least one of the output parameters is required.')
+
+    # Logger
+    logging.basicConfig(format='%(asctime)s -- [%(filename)s][pid:%(process)d][%(levelname)s] -- %(message)s')
+    log = logging.getLogger(os.path.basename(__file__))
+    log.setLevel(logging.INFO)
+    log.info("Command: " + " ".join(sys.argv))
 
     # Process
     depths_list, count_by_spl = loadFromDepthFile(args.input_depths, args.samples)
@@ -296,3 +288,4 @@ if __name__ == "__main__":
         writeTSV(args.output_tsv, sequencing_by_spl, depths_list, count_by_spl, distrib_by_spl, threshold_by_spl, args)
     if args.output_json is not None:
         writeJSON(args.output_json, sequencing_by_spl, depths_list, count_by_spl, distrib_by_spl, threshold_by_spl, args)
+    log.info("End of job")
