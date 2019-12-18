@@ -1,29 +1,16 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2017 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.0'
+__version__ = '1.5.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
+import os
+import sys
 import json
+import logging
 import argparse
 from anacore.filters import filtersFromDict
 from anacore.vcf import VCFIO
@@ -45,10 +32,18 @@ if __name__ == "__main__":
     group_output.add_argument('-o', '--output-variants', required=True, help='The path to the outputted variants file (format: VCF).')
     args = parser.parse_args()
 
+    # Logger
+    logging.basicConfig(format='%(asctime)s -- [%(filename)s][pid:%(process)d][%(levelname)s] -- %(message)s')
+    log = logging.getLogger(os.path.basename(__file__))
+    log.setLevel(logging.INFO)
+    log.info("Command: " + " ".join(sys.argv))
+
     # Process
     filters = None
     with open(args.input_filters) as data_file:
         filters = filtersFromDict(json.load(data_file))
+    nb_kept = 0
+    nb_variants = 0
     with VCFIO(args.output_variants, "w") as FH_out:
         with VCFIO(args.input_variants) as FH_in:
             # Header
@@ -56,5 +51,16 @@ if __name__ == "__main__":
             FH_out.writeHeader()
             # Records
             for record in FH_in:
+                nb_variants += 1
                 if filters.eval(record):
+                    nb_kept += 1
                     FH_out.write(record)
+    # Log process
+    log.info(
+        "{:.2%} of variants have been removed ({}/{})".format(
+            0 if nb_variants == 0 else (nb_variants - nb_kept) / nb_variants,
+            (nb_variants - nb_kept),
+            nb_variants
+        )
+    )
+    log.info("End of job")
