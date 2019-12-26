@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -69,7 +69,8 @@ def getNewHeaderAttr(args):
             # INFO
             for tag, data in FH_vcf.info.items():
                 if tag == args.annotations_field:
-                    final_info[tag] = data
+                    if tag not in final_info or len(final_info[tag].description) < len(data.description):  # Manage merge between callers with 0 variants (and 0 annotations) and callers with variants
+                        final_info[tag] = data
                 else:
                     new_tag = "s{}_{}".format(idx_in, tag)
                     data.id = new_tag
