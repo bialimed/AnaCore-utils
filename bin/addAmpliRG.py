@@ -174,7 +174,7 @@ def writeJSONSummary(out_path, data):
 ########################################################################
 if __name__ == "__main__":
     # Manage parameters
-    parser = argparse.ArgumentParser(description='Add RG corresponding to the amplicon source. For a reads pair the amplicon is determined from the position of the first match position of the reads (primers start positions).')
+    parser = argparse.ArgumentParser(description='Add RG corresponding to the amplicon source. For one reads pair the amplicon is determined from the position of the first match position of the two reads (primers start positions).')
     parser.add_argument('-f', '--summary-format', default='tsv', choices=['json', 'tsv'], help='The summary format. [Default: %(default)s]')
     parser.add_argument('-d', '--check-strand', action='store_true', help='With this option the strand of amplicons is checked.')
     parser.add_argument('-l', '--anchor-offset', type=int, default=4, help='The alignment of the read can start at N nucleotids after the start of the primer. This parameter allows to take account the possible mismatches on the firsts read positions. [Default: %(default)s]')
