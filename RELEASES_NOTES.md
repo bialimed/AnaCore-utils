@@ -1,4 +1,4 @@
-# Release 3.0.0 [2020-01-2]
+# Release 3.0.0 [2020-01-02]
 Split AnaCore project in:
 * AnaCore (python libraries),
 * AnaCore-utils (scripts),

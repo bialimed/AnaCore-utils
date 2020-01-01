@@ -1,4 +1,4 @@
 #!/bin/bash
 set -ex
-cd -
-${PYTHON} -m pip install -vv .
+#${PYTHON} setup.py install
+pip install -vv .

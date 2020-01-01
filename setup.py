@@ -37,8 +37,8 @@ def load_requirements(path):
 setup(
     name='anacore-utils',
     version=get_version(),
-    description='Scripts for NGS in IUCT Oncopole.',
-    long_description='Anapath Core Utils contains scripts developped for NGS in IUCT Oncopole.',
+    description='Scripts for easily process NGS data.',
+    long_description='Scripts for easily process NGS data from medical centers. This package contains several aggregators, converters, filters, wrappers, etc.',
     author='Frederic Escudie',
     author_email='escudie.frederic@iuct-oncopole.fr',
     license='GNU GPL v3',
