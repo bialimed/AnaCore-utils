@@ -1,0 +1,42 @@
+{% set version = "3.0.0" %}
+# Dependencies versions
+{% set anacore_version = "2.6.0" %}
+{% set pysam_version = "0.15.3" %}
+{% set scipy_version = "1.2.1" %}
+
+package:
+  name: anacore-utils
+  version: {{ version }}
+
+source:
+  git_url: https://github.com/bialimed/anacore-utils
+  git_rev: {{ version }}
+
+build:
+  number: 0
+  script: ${PYTHON} setup.py install
+
+requirements:
+  build:
+    - python
+    - setuptools
+  run:
+    - python
+    - anacore {{ anacore_version }}
+    - scipy {{ scipy_version }}
+    - pysam {{ pysam_version }}
+
+test:
+  imports:
+    - scipy
+    - pysam
+    - anacore
+  commands:
+    - mergeCoOccurVar.py -h
+    - distToHC.py -h
+
+about:
+  summary: Scripts for easily process NGS data from medical centers. This package contains several aggregators, converters, filters, wrappers, etc.
+  license: GNU GPL v3
+  home: https://github.com/bialimed/anacore-utils
+  doc_source_url: https://github.com/bialimed/anacore-utils/blob/{{ version }}/README.md
