@@ -8,7 +8,7 @@ several aggregators, converters, filters, wrappers, etc.
 
 ## Installation
 
-    conda install -c fescudie anacore-utils
+    conda install -c bioconda -c fescudie anacore-utils
 
 ## Copyright
 2017 Laboratoire d'Anatomo-Cytopathologie de l'Institut Universitaire du Cancer
