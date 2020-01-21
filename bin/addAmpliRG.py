@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.7.0'
+__version__ = '2.0.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -13,7 +13,7 @@ import json
 import pysam
 import logging
 import argparse
-from anacore.bed import getAreas
+from anacore.bed import getSortedAreasByChr
 
 
 ########################################################################
@@ -21,28 +21,6 @@ from anacore.bed import getAreas
 # FUNCTIONS
 #
 ########################################################################
-def getSelectedAreasByChr(input_panel):
-    """
-    Return chromosome the list of selected areas from a BED file.
-
-    :param input_panel: Path to the amplicons with their primers (format: BED)
-    :type input_panel: str
-    :return: By chromosome the list of BED's areas. Each area is represented by an instance of Region.
-    :rtype: dict
-    """
-    selected_areas = getAreas(input_panel)
-    selected_areas = sorted(selected_areas, key=lambda x: (x.chrom, x.start, x.end))
-
-    area_by_chr = dict()
-    for curr_area in selected_areas:
-        chrom = curr_area.chrom
-        if chrom not in area_by_chr:
-            area_by_chr[chrom] = list()
-        area_by_chr[chrom].append(curr_area)
-
-    return(area_by_chr)
-
-
 def getSourceRegion(read, regions, anchor_offset=0):
     """
     Return the region where the read come from. Returns None if no region corresponds to the read.
@@ -136,19 +114,41 @@ def writeTSVSummary(out_path, data):
     :param data: The metrics stored in summary.
     :type data: dict
     """
-    with open(args.output_summary, "w") as FH_summary:
-        print(
-            "Category\tCount\tRatio",
-            "Unpaired\t{}\t{:5f}".format(data["unpaired"], data["unpaired"] / data["total"]),
-            "Unmapped\t{}\t{:5f}".format(data["pair_unmapped"], data["pair_unmapped"] / data["total"]),
-            "Out_target\t{}\t{:5f}".format(data["out_target"], data["out_target"] / data["total"]),
-            "Invalid_strand\t{}\t{:5f}".format(data["invalid_strand"], data["invalid_strand"] / data["total"]),
-            "Invalid_pair\t{}\t{:5f}".format(data["invalid_pair"], data["invalid_pair"] / data["total"]),
-            "Only_primers\t{}\t{:5f}".format(data["only_primers"], data["only_primers"] / data["total"]),
-            "Valid\t{}\t{:5f}".format(data["valid"], data["valid"] / data["total"]),
-            sep="\n",
-            file=FH_summary
+    with open(args.output_summary, "w") as writer:
+        # Summary
+        summary = data["count_by_category"]
+        writer.write(
+            "\n".join[
+                "##Summary",
+                "Category\tCount\tRatio",
+                "Unpaired\t{}\t{:5f}".format(summary["unpaired"], summary["unpaired"] / summary["total"]),
+                "Unmapped\t{}\t{:5f}".format(summary["pair_unmapped"], summary["pair_unmapped"] / summary["total"]),
+                "Out_target\t{}\t{:5f}".format(summary["out_target"], summary["out_target"] / summary["total"]),
+                "Invalid_strand\t{}\t{:5f}".format(summary["invalid_strand"], summary["invalid_strand"] / summary["total"]),
+                "Invalid_pair\t{}\t{:5f}".format(summary["invalid_pair"], summary["invalid_pair"] / summary["total"]),
+                "Only_primers\t{}\t{:5f}".format(summary["only_primers"], summary["only_primers"] / summary["total"]),
+                "Valid\t{}\t{:5f}".format(summary["valid"], summary["valid"] / summary["total"])
+            ]
         )
+        # Details
+        amplicons_depths = data["amplicons_depths"]
+        writer.write(
+            "\n".join[
+                "",
+                "",
+                "##Valid by targeted region",
+                "Target\tPosition\tCount\tRatio"
+            ]
+        )
+        for curr in amplicons_depths:
+            writer.write(
+                "{}\t{}\t{}\t{:5f}".format(
+                    curr["name"],
+                    curr["position"],
+                    curr["count"],
+                    curr["count"] / summary["valid"]
+                )
+            )
 
 
 def writeJSONSummary(out_path, data):
@@ -160,10 +160,9 @@ def writeJSONSummary(out_path, data):
     :param data: The metrics stored in summary.
     :type data: dict
     """
-    eval_order = ["unpaired", "pair_unmapped", "out_target", "invalid_strand", "invalid_pair", "only_primers", "valid"]
     with open(args.output_summary, "w") as FH_summary:
         FH_summary.write(
-            json.dumps({"eval_order": eval_order, "results": data}, default=lambda o: o.__dict__, sort_keys=True)
+            json.dumps(data, default=lambda o: o.__dict__, sort_keys=True)
         )
 
 
@@ -204,9 +203,17 @@ if __name__ == "__main__":
     valid_reads = 0
     only_primers_reads_valid_pair = 0
     valid_reads_valid_pair = 0
+    fragments_by_RG = {}
 
     # Get panel regions
-    panel_regions = getSelectedAreasByChr(args.input_panel)
+    panel_regions = getSortedAreasByChr(args.input_panel)
+    for chr, areas_in_chr in panel_regions.items():
+        for curr_area in areas_in_chr:
+            fragments_by_RG[curr_area.name] = {
+                "name": curr_area.name,
+                "position": "{}:{}-{}".format(curr_area.chrom, curr_area.start, curr_area.end),
+                "count": 0
+            }
 
     # Filter reads in panel
     RG_id_by_source = dict()
@@ -250,6 +257,7 @@ if __name__ == "__main__":
                                         FH_out.write(prev_read)
                                         FH_out.write(curr_read)
                                         valid_reads_by_id[curr_read.query_name] = None
+                                        fragments_by_RG[source_region.name]["count"] += 1
                                     else:  # Reads are only primers
                                         only_primers_reads_valid_pair += 2
                                         valid_reads_by_id[curr_read.query_name] = None
@@ -264,14 +272,22 @@ if __name__ == "__main__":
     # Write summary
     if args.output_summary is not None:
         data = {
-            "total": total_reads,
-            "unpaired": unpaired_reads,
-            "pair_unmapped": unmapped_pairs,
-            "out_target": out_target_reads,
-            "invalid_strand": reverse_reads,
-            "invalid_pair": valid_reads - only_primers_reads_valid_pair - valid_reads_valid_pair,
-            "only_primers": only_primers_reads_valid_pair,
-            "valid": valid_reads_valid_pair
+            "eval_order": ["unpaired", "pair_unmapped", "out_target", "invalid_strand", "invalid_pair", "only_primers", "valid"],
+            "count_by_category": {
+                "total": total_reads,
+                "unpaired": unpaired_reads,
+                "pair_unmapped": unmapped_pairs,
+                "out_target": out_target_reads,
+                "invalid_strand": reverse_reads,
+                "invalid_pair": valid_reads - only_primers_reads_valid_pair - valid_reads_valid_pair,
+                "only_primers": only_primers_reads_valid_pair,
+                "valid": valid_reads_valid_pair
+            },
+            "amplicons_depths": sorted(
+                fragments_by_RG.values(),
+                key=lambda elt: elt["count"],
+                reverse=True
+            )
         }
         if args.summary_format == "json":
             writeJSONSummary(args.output_summary, data)
