@@ -1,25 +1,9 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2017 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '2.0.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -40,7 +24,7 @@ os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 # FUNCTIONS
 #
 ########################################################################
-class FusionCatcherToVCF(unittest.TestCase):
+class FusionsToVCF(unittest.TestCase):
     def setUp(self):
         tmp_folder = tempfile.gettempdir()
         unique_id = str(uuid.uuid1())
@@ -51,7 +35,7 @@ class FusionCatcherToVCF(unittest.TestCase):
 
         # Exec command
         self.cmd = [
-            "fusionCatcherToVCF.py",
+            "fusionsToVCF.py",
             "--annotation-field", "TESTANN",
             "--sample-name", "testSample",
             "--input-fusions", self.tmp_input,

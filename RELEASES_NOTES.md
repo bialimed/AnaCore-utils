@@ -3,6 +3,8 @@
 ### Improvements:
   * Add count by target in `--output-summary` file from `bin/addAmpliRG.py`.
   * Add `--single-mode` for process single-end alignments in `bin/addAmpliRG.py`.
+  * Replace `bin/fusionCatcherToVCF.py` by `bin/fusionsToVCF.py` to add management
+  of Arriba and STAR-Fusion.
 
 # Release 3.0.0 [2020-01-03]
 Split AnaCore project in:
