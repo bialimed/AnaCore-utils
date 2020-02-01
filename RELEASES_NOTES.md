@@ -6,6 +6,10 @@
   * Replace `bin/fusionCatcherToVCF.py` by `bin/fusionsToVCF.py` to add management
   of Arriba and STAR-Fusion.
 
+### Bug fixes:
+  * Fix bug in `bin/splitBAMByRG.py` with change in pysam.AlignmentHeader v1.5:
+  `reader.header.copy()` to `reader.header.to_dict()`.
+
 # Release 3.0.0 [2020-01-03]
 Split AnaCore project in:
 * AnaCore (python libraries),
