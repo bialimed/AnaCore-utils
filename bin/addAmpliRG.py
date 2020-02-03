@@ -21,7 +21,7 @@ from anacore.bed import getSortedAreasByChr
 # FUNCTIONS
 #
 ########################################################################
-def getSourceRegion(read, regions, anchor_offset=0):
+def getSourceRegion(read, regions, anchor_offset=0, whole_region=False):
     """
     Return the region where the read come from. Returns None if no region corresponds to the read.
 
@@ -31,6 +31,8 @@ def getSourceRegion(read, regions, anchor_offset=0):
     :type regions: list
     :param anchor_offset: The alignment of the read can start at N nucleotids after the start of the primer. This parameter allows to take account the possible mismatches on the firsts read positions.
     :type anchor_offset: int
+    :param whole_region: The alignment of the read must match the whole region (start to end) more or less N (anchor_offset) nucleotides.
+    :type whole_region: boolean
     :return: The region where the read come from.
     :return: None/anacore.region.Region
     """
@@ -43,16 +45,34 @@ def getSourceRegion(read, regions, anchor_offset=0):
                 break
             if ref_end <= curr_region.end + anchor_offset:
                 if ref_end >= curr_region.end - anchor_offset:
-                    overlapped_region = curr_region
-                    break
+                    if whole_amplicons :
+                        if ref_start < (curr_region.start - anchor_offset):
+                            continue
+                        if ref_start <= (curr_region.start + anchor_offset):
+                            overlapped_region = curr_region
+                            break
+                        overlapped_region = curr_region
+                        continue
+                    else:
+                        overlapped_region = curr_region
+                        break
     else:
         for curr_region in regions:
             if ref_start < curr_region.start - anchor_offset:
                 break
             if ref_start >= curr_region.start - anchor_offset:
                 if ref_start <= curr_region.start + anchor_offset:
-                    overlapped_region = curr_region
-                    break
+                    if whole_amplicons :
+                        if ref_end > (curr_region.end + anchor_offset):
+                            continue
+                        if ref_end >= (curr_region.end - anchor_offset):
+                            overlapped_region = curr_region
+                            break
+                        overlapped_region = curr_region
+                        continue
+                    else:
+                        overlapped_region = curr_region
+                        break
     return overlapped_region
 
 
@@ -147,7 +167,7 @@ def processSingleReads(aln_reader, panel_regions, RG_id_by_source, args):
             else:
                 source_region = None
                 if curr_read.reference_name in panel_regions:
-                    source_region = getSourceRegion(curr_read, panel_regions[curr_read.reference_name], args.anchor_offset)
+                    source_region = getSourceRegion(curr_read, panel_regions[curr_read.reference_name], args.anchor_offset, args.whole_region)
                 if source_region is None:
                     ct_by_category["out_target"] += 1
                 elif args.check_strand and not hasValidStrand(curr_read, source_region):
@@ -217,7 +237,7 @@ def processPairedReads(aln_reader, panel_regions, RG_id_by_source, args):
             else:
                 source_region = None
                 if curr_read.reference_name in panel_regions:
-                    source_region = getSourceRegion(curr_read, panel_regions[curr_read.reference_name], args.anchor_offset)
+                    source_region = getSourceRegion(curr_read, panel_regions[curr_read.reference_name], args.anchor_offset, args.whole_region)
                 if source_region is None:
                     ct_by_category["out_target"] += 1
                 elif args.check_strand and not hasValidStrand(curr_read, source_region):
@@ -321,6 +341,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--check-strand', action='store_true', help='With this option the strand of amplicons is checked.')
     parser.add_argument('-m', '--single-mode', action='store_true', help='Process single-end alignments.')
     parser.add_argument('-l', '--anchor-offset', type=int, default=4, help='The alignment of the read can start at N nucleotids after the start of the primer. This parameter allows to take account the possible mismatches on the firsts read positions. [Default: %(default)s]')
+    parser.add_argument('-w', '--whole-region', action='store_true', help='The alignment of the read must match the whole region (start to end) more or less N (anchor_offset) nucleotides.')
     parser.add_argument('-z', '--min-zoi-cov', type=int, default=10, help='The minimum cumulative length of reads pair in zone of interest. If the number of nucleotids coming from R1 on ZOI + the number of nucleotids coming from R2 on ZOI is lower than this value the pair is counted in "only_primers". [Default: %(default)s]')
     parser.add_argument('-t', '--RG-tag', default='LB', help='RG tag used to store the area ID. [Default: %(default)s]')
     parser.add_argument('-v', '--version', action='version', version=__version__)
