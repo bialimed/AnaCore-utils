@@ -45,7 +45,7 @@ def getSourceRegion(read, regions, anchor_offset=0, whole_region=False):
                 break
             if ref_end <= curr_region.end + anchor_offset:
                 if ref_end >= curr_region.end - anchor_offset:
-                    if whole_amplicons :
+                    if whole_region :
                         if ref_start < (curr_region.start - anchor_offset):
                             continue
                         if ref_start <= (curr_region.start + anchor_offset):
@@ -62,7 +62,7 @@ def getSourceRegion(read, regions, anchor_offset=0, whole_region=False):
                 break
             if ref_start >= curr_region.start - anchor_offset:
                 if ref_start <= curr_region.start + anchor_offset:
-                    if whole_amplicons :
+                    if whole_region :
                         if ref_end > (curr_region.end + anchor_offset):
                             continue
                         if ref_end >= (curr_region.end - anchor_offset):
