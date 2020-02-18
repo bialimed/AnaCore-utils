@@ -14,6 +14,7 @@ import logging
 import argparse
 import itertools
 from anacore.vcf import VCFIO, HeaderInfoAttr, HeaderFormatAttr, getAlleleRecord
+from anacore.region import Region, RegionList, iterOverlappedByRegion
 
 
 ########################################################################
@@ -21,15 +22,6 @@ from anacore.vcf import VCFIO, HeaderInfoAttr, HeaderFormatAttr, getAlleleRecord
 # FUNCTIONS
 #
 ########################################################################
-def cmpUniqName(record):
-    alt = None
-    if record.alt[0].startswith("[") or record.alt[0].startswith("]"):
-        alt = "{}N".format(record.alt[0][:-1])
-    else:
-        alt = "N{}".format(record.alt[0][1:])
-    return "{}:{}={}".format(record.chrom, record.pos, alt)
-
-
 def getNewHeaderAttr(args):
     """
     Return renamed and new VCFHeader elements for the merged VCF.
@@ -39,9 +31,15 @@ def getNewHeaderAttr(args):
     :return: VCFHeader elements (filter, info, format, samples).
     :rtype: dict
     """
-    unchanged_info = {"MATEID", "RNA_FIRST", "SVTYPE", args.annotation_field}
+    unchanged_info = {"MATEID", "RNA_FIRST", "SVTYPE"}
     final_filter = {}
     final_info = {
+        "CIPOS": HeaderInfoAttr(
+            "CIPOS", type="Integer", number="2", description="Confidence interval around POS"
+        ),
+        "IDSRC": HeaderInfoAttr(
+            "IDSRC", type="String", number=".", description="ID of breakend by source"
+        ),
         "SRC": HeaderInfoAttr(
             "SRC", type="String", number=".", description="Fusions callers where the breakend is identified. Possible values: {}".format(
                 {name: "s" + str(idx) for idx, name in enumerate(args.calling_sources)}
@@ -103,6 +101,46 @@ def getNewHeaderAttr(args):
     }
 
 
+def getBNDInterval(record):
+    """
+    Return the start and end for BND record (CIPOS is taken into account).
+
+    :param record: The breakend record.
+    :type record: anacore.vcf.VCFRecord
+    :return: Start and end for BND record (CIPOS is taken into account).
+    :rtype: (int, int)
+    """
+    start = record.pos
+    end = record.pos
+    if "CIPOS" in record.info:
+        start += record.info["CIPOS"][0]
+        end += record.info["CIPOS"][1]
+    return start, end
+
+
+def getCount(data, field):
+    """
+    Return the value contained in the field specified for the first alternative variant.
+
+    :param data: Values contained in sample field of a VCFRecord..
+    :type data: dict
+    :param field: Field title for the count.
+    :type field: str
+    :return: The value contained in the field specified for the first alternative variant.
+    :rtype: int
+    """
+    val = 0
+    if field in data:
+        if not isinstance(data[field], list):
+            val = data[field]
+        else:
+            if len(data[field]) == 1:
+                val = data[field][0]
+            else:
+                val = data[field][1]
+    return val
+
+
 def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_filters):
     """
     Merge VCFRecords coming from several variant callers.
@@ -118,17 +156,23 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
     :return: Merged VCF records.
     :rtype: list
     """
-    unchanged_info = {"MATEID", "RNA_FIRST", "SVTYPE", annotation_field}
-    whole_by_name = {}
+    unchanged_info = {"MATEID", "RNA_FIRST", "SVTYPE"}
+    whole_fusions = {}  # fisrt bnd region by chromosome
     for idx_in, curr_in in enumerate(inputs_variants):
         curr_caller = calling_sources[idx_in]
         log.info("Process {}".format(curr_caller))
         # breakend by id
         bnd_by_id = {}
         with VCFIO(curr_in) as reader:
+            if "SR" in reader.info and reader.info["SR"].number == ".":
+                raise Exception('The number attribute for SR must be "A" or "R" or "1".')
+            if "PR" in reader.info and reader.info["PR"].number == ".":
+                raise Exception('The number attribute for PR must be "A" or "R" or "1".')
             for record in reader:
                 bnd_by_id[record.id] = record
         # Group by fusion
+        curr_caller_fusions = dict()
+        processed_fusions = set()
         fusion_by_name = {}
         for id, record in bnd_by_id.items():
             for alt_idx, alt in enumerate(record.alt):
@@ -143,21 +187,43 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                     first_idx = mate_record.info["MATEID"].index(alt_first_bnd.id)
                     alt_second_bnd = getAlleleRecord(mate_record, first_idx)
                     alt_second_bnd.info["MATEID"] = [mate_record.info["MATEID"][first_idx]]
-                if "RNA_FIRST" not in alt_first_bnd.info and "RNA_FIRST" not in alt_second_bnd.info:
-                    raise Exception("Tag RNA_FIRST must be present in one of the breakend {} or {}.".format(alt_first_bnd.id, mate_id))
-                if "RNA_FIRST" in alt_second_bnd.info:
-                    aux = alt_first_bnd
-                    alt_first_bnd = alt_second_bnd
-                    alt_second_bnd = aux
-                fusion_by_name[cmpUniqName(alt_first_bnd) + "@" + cmpUniqName(alt_second_bnd)] = (alt_first_bnd, alt_second_bnd)
+                fusion_id = " @@ ".join(sorted([alt_first_bnd.id, alt_second_bnd.id]))
+                if fusion_id not in processed_fusions:
+                    processed_fusions.add(fusion_id)
+                    if "RNA_FIRST" not in alt_first_bnd.info and "RNA_FIRST" not in alt_second_bnd.info:
+                        raise Exception("Tag RNA_FIRST must be present in one of the breakend {} or {}.".format(alt_first_bnd.id, mate_id))
+                    if "RNA_FIRST" in alt_second_bnd.info:
+                        aux = alt_first_bnd
+                        alt_first_bnd = alt_second_bnd
+                        alt_second_bnd = aux
+                    interval_first_bnd = getBNDInterval(alt_first_bnd)
+                    fusion_name = " @@ ".join(sorted([alt_first_bnd.getName(), alt_second_bnd.getName()]))
+                    if fusion_name not in fusion_by_name:
+                        region_first_bnd = Region(
+                            interval_first_bnd[0],
+                            interval_first_bnd[1],
+                            reference=alt_first_bnd.chrom,
+                            annot={"first": alt_first_bnd, "second": alt_second_bnd}
+                        )
+                        if alt_first_bnd.chrom not in curr_caller_fusions:
+                            curr_caller_fusions[alt_first_bnd.chrom] = RegionList()
+                        curr_caller_fusions[alt_first_bnd.chrom].append(region_first_bnd)
+                        fusion_by_name[fusion_name] = region_first_bnd
+                    else:  # Caller contains several entris for the same pair of breakends (same fusion but several anotations)
+                        fusion_by_name[fusion_name].annot["first"].info[annotation_field] += alt_first_bnd.info[annotation_field]
+                        fusion_by_name[fusion_name].annot["second"].info[annotation_field] += alt_second_bnd.info[annotation_field]
+        del(fusion_by_name)
+        del(processed_fusions)
         # Merge to other callers
-        for fusion_name, records in fusion_by_name.items():
+        new_fusions = []
+        for chrom, query, overlapped in iterOverlappedByRegion(curr_caller_fusions, whole_fusions):
+            records = (query.annot["first"], query.annot["second"])
             # Extract PR and SR
             support_by_spl = {}
             for spl, data in records[0].samples.items():
                 support_by_spl[spl] = {
-                    "PR": data["PR"] if "PR" in data else 0,
-                    "SR": data["SR"] if "SR" in data else 0
+                    "PR": getCount(data, "PR"),
+                    "SR": getCount(data, "SR")
                 }
             # Rename fields
             for curr_record in records:
@@ -191,11 +257,41 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                     curr_record.samples[spl_name] = renamed_info
             # Add to storage
             left_record, right_record = records
-            if fusion_name not in whole_by_name:
-                whole_by_name[fusion_name] = records
+            prev_records = None  # Get identical fusion from previous callers
+            if len(overlapped) > 0:
+                start_right_record, end_right_record = getBNDInterval(right_record)
+                for overlap_eval in overlapped:
+                    start_right_eval, end_right_eval = getBNDInterval(overlap_eval.annot["second"])
+                    if not start_right_record > end_right_eval and not end_right_record < start_right_eval:
+                        if prev_records is not None:
+                            raise Exception(
+                                "{} form {} has an overlap ambiguity between: {} and {}.".format(
+                                    left_record.getName(),
+                                    curr_caller,
+                                    prev_records[0].getName(),
+                                    overlap_eval.annot["first"].getName()
+                                )
+                            )
+                        prev_records = (overlap_eval.annot["first"], overlap_eval.annot["second"])
+                        log.debug(
+                            "Merge {} from {} with {} from {}.".format(
+                                left_record.getName(),
+                                " and ".join(prev_records[0].info["SRC"]),
+                                overlap_eval.annot["first"].getName(),
+                                curr_caller
+                            )
+                        )
+            if prev_records is None:
+                new_fusions.append(query)
                 for curr_record in records:
                     # Data source
                     curr_record.info["SRC"] = [curr_caller]
+                    curr_record.info["IDSRC"] = [curr_record.id]
+                    # CIPOS
+                    if "s{}_CIPOS".format(idx_in) in curr_record.info:  # For consistency, the position and cipos of the variant comes only from the first caller of the variant
+                        curr_record.info["CIPOS"] = curr_record.info["s{}_CIPOS".format(idx_in)]
+                    else:
+                        curr_record.info["CIPOS"] = [0, 0]
                     # Quality
                     if idx_in != 0:
                         curr_record.qual = None  # For consistency, the quality of the variant comes only from the first caller of the variant
@@ -210,15 +306,9 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                         spl_data["SRSRC"] = [support_by_spl[spl_name]["SR"]]
                         spl_data["PRSRC"] = [support_by_spl[spl_name]["PR"]]
             else:
-                prev_records = whole_by_name[fusion_name]
                 for prev_rec, curr_rec in zip(prev_records, records):
                     prev_rec.info["SRC"].append(curr_caller)
-                    # IDs
-                    if curr_rec.id is not None:
-                        prev_ids = prev_rec.id.split(";")
-                        prev_ids.extend(curr_rec.id.split(";"))
-                        prev_ids = sorted(list(set(prev_ids)))
-                        prev_rec.id = ";".join(prev_ids)
+                    prev_rec.info["IDSRC"].append(curr_rec.id)
                     # FILTERS
                     if curr_rec.filter is not None:
                         if prev_rec.filter is None:
@@ -233,7 +323,21 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                         spl_data.update(curr_rec.samples[spl_name])
                         spl_data["SRSRC"].append(support_by_spl[spl_name]["SR"])
                         spl_data["PRSRC"].append(support_by_spl[spl_name]["PR"])
-    return whole_by_name.values()
+        for curr in new_fusions:
+            if curr.reference.name not in whole_fusions:
+                whole_fusions[curr.reference.name] = RegionList()
+            whole_fusions[curr.reference.name].append(curr)
+        for chrom, fusions in whole_fusions.items():
+            whole_fusions[chrom] = RegionList(sorted(fusions, key=lambda x: (x.start, x.end)))
+    # Flatten fusions
+    returned_fusions = []
+    for chr, fusions in whole_fusions.items():
+        for fusion_region in fusions:
+            returned_fusions.append((
+                fusion_region.annot["first"],
+                fusion_region.annot["second"]
+            ))
+    return returned_fusions
 
 
 def logSupportVariance(fusions, log):
@@ -262,7 +366,7 @@ def logSupportVariance(fusions, log):
         if nb_var == 0:
             log.info("Differences between retained {} and others callers (without missing): 0 common variants".format(metric))
         else:
-            log.info("Differences between retained {} and others callers (without missing): median={:.1%}, upper_quartile={:.1%}, 90_persentile={:.1%} and max={:.1%} on {} variants".format(
+            log.info("Differences between retained {} and others callers (without missing): median={}, upper_quartile={}, 90_persentile={} and max={} on {} variants".format(
                 metric,
                 numpy.percentile(diff_by_metric[metric], 50, interpolation='midpoint'),
                 numpy.percentile(diff_by_metric[metric], 75, interpolation='midpoint'),
@@ -270,6 +374,24 @@ def logSupportVariance(fusions, log):
                 max(diff_by_metric[metric]),
                 nb_var
             ))
+
+
+class LoggerAction(argparse.Action):
+    """Manages logger level parameters (The value "INFO" becomes logging.info and so on)."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        log_level = None
+        if values == "DEBUG":
+            log_level = logging.DEBUG
+        elif values == "INFO":
+            log_level = logging.INFO
+        elif values == "WARNING":
+            log_level = logging.WARNING
+        elif values == "ERROR":
+            log_level = logging.ERROR
+        elif values == "CRITICAL":
+            log_level = logging.CRITICAL
+        setattr(namespace, self.dest, log_level)
 
 
 ########################################################################
@@ -281,8 +403,9 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Merge VCF coming from different fusions caller on same sample(s). It is strongly recommended to apply this script before annotation and filtering/tagging.')
     parser.add_argument('-a', '--annotation-field', default="ANN", help='Field used to store annotations. [Default: %(default)s]')
-    parser.add_argument('-s', '--shared-filters', nargs='*', default=[], help='Filters tags applying to the variant and independent of caller like filters on annotations. These filters are not renamed to add caller ID as suffix. [Default: %(default)s]')
     parser.add_argument('-c', '--calling-sources', required=True, nargs='+', help='Name of the source in same order of --inputs-variants.')
+    parser.add_argument('-l', '--logging-level', default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], action=LoggerAction, help='The logger level. [Default: %(default)s]')
+    parser.add_argument('-s', '--shared-filters', nargs='*', default=[], help='Filters tags applying to the variant and independent of caller like filters on annotations. These filters are not renamed to add caller ID as suffix. [Default: %(default)s]')
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-i', '--inputs-variants', required=True, nargs='+', help='Path to the variants files coming from different callers (format: VCF). The order determine the which SR and PR are retained: the first caller where it is found in this list.')
     group_output = parser.add_argument_group('Outputs')  # Outputs
@@ -293,7 +416,7 @@ if __name__ == "__main__":
     # Logger
     logging.basicConfig(format='%(asctime)s -- [%(filename)s][pid:%(process)d][%(levelname)s] -- %(message)s')
     log = logging.getLogger(os.path.basename(__file__))
-    log.setLevel(logging.INFO)
+    log.setLevel(args.logging_level)
     log.info("Command: " + " ".join(sys.argv))
 
     # Get merged records
