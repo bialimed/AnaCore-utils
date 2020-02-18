@@ -122,7 +122,7 @@ def getCount(data, field):
     """
     Return the value contained in the field specified for the first alternative variant.
 
-    :param data: Values contained in sample field of a VCFRecord..
+    :param data: Values contained in sample field of a VCFRecord.
     :type data: dict
     :param field: Field title for the count.
     :type field: str
@@ -141,6 +141,165 @@ def getCount(data, field):
     return val
 
 
+def loadBNDByID(in_vcf):
+    """
+    Return breakend by ID from a VCF file.
+
+    :param in_vcf: Path to the VCF containing BND coming from one fusion caller (format: VCF).
+    :type in_vcf: str
+    :return: Breakend by ID.
+    :rtype: dict
+    """
+    bnd_by_id = {}
+    with VCFIO(in_vcf) as reader:
+        if "SR" in reader.info and reader.info["SR"].number == ".":
+            raise Exception('The number attribute for SR must be "A" or "R" or "1".')
+        if "PR" in reader.info and reader.info["PR"].number == ".":
+            raise Exception('The number attribute for PR must be "A" or "R" or "1".')
+        for record in reader:
+            if record.info["SVTYPE"] == "BND":
+                bnd_by_id[record.id] = record
+    return bnd_by_id
+
+
+def groupBNDByFusions(bnd_by_id, annotation_field):
+    """
+    Return by chromosome the region of the first breakend in each fucion. The annotation of regions contains the two breakends (tags: first and second).
+
+    :param bnd_by_id: Breakend by ID coming from one fusion caller.
+    :type bnd_by_id: dict
+    :param annotation_field: Field used to store annotations.
+    :type annotation_field: str
+    :return: By chromosome the region of the first breakend in each fucion. The annotation of regions contains the two breakends (tags: first and second).
+    :rtype: dict
+    """
+    caller_fusions = dict()
+    processed_fusions = set()
+    fusion_by_name = {}
+    for id, record in bnd_by_id.items():
+        for alt_idx, alt in enumerate(record.alt):
+            alt_first_bnd = record
+            if len(record.alt) > 1:
+                alt_first_bnd = getAlleleRecord(record, alt_idx)
+                alt_first_bnd.info["MATEID"] = [record.info["MATEID"][alt_idx]]
+            mate_id = alt_first_bnd.info["MATEID"][0]
+            mate_record = bnd_by_id[mate_id]
+            alt_second_bnd = mate_record
+            if len(mate_record.alt) > 1:
+                first_idx = mate_record.info["MATEID"].index(alt_first_bnd.id)
+                alt_second_bnd = getAlleleRecord(mate_record, first_idx)
+                alt_second_bnd.info["MATEID"] = [mate_record.info["MATEID"][first_idx]]
+            fusion_id = " @@ ".join(sorted([alt_first_bnd.id, alt_second_bnd.id]))
+            if fusion_id not in processed_fusions:
+                processed_fusions.add(fusion_id)
+                if "RNA_FIRST" not in alt_first_bnd.info and "RNA_FIRST" not in alt_second_bnd.info:
+                    raise Exception("Tag RNA_FIRST must be present in one of the breakend {} or {}.".format(alt_first_bnd.id, mate_id))
+                if "RNA_FIRST" in alt_second_bnd.info:
+                    aux = alt_first_bnd
+                    alt_first_bnd = alt_second_bnd
+                    alt_second_bnd = aux
+                interval_first_bnd = getBNDInterval(alt_first_bnd)
+                fusion_name = " @@ ".join(sorted([alt_first_bnd.getName(), alt_second_bnd.getName()]))
+                if fusion_name not in fusion_by_name:
+                    region_first_bnd = Region(
+                        interval_first_bnd[0],
+                        interval_first_bnd[1],
+                        reference=alt_first_bnd.chrom,
+                        annot={"first": alt_first_bnd, "second": alt_second_bnd}
+                    )
+                    if alt_first_bnd.chrom not in caller_fusions:
+                        caller_fusions[alt_first_bnd.chrom] = RegionList()
+                    caller_fusions[alt_first_bnd.chrom].append(region_first_bnd)
+                    fusion_by_name[fusion_name] = region_first_bnd
+                else:  # Caller contains several entries for the same pair of breakends (same fusion but several anotations)
+                    fusion_by_name[fusion_name].annot["first"].info[annotation_field] += alt_first_bnd.info[annotation_field]
+                    fusion_by_name[fusion_name].annot["second"].info[annotation_field] += alt_second_bnd.info[annotation_field]
+    return caller_fusions
+
+
+def renameFields(bnd_record, caller_prefix, shared_filters):
+    """
+    Rename fields with prefix of the variant caller.
+
+    :param bnd_record: The breakend record.
+    :type bnd_record: anacore.vcf.VCFRecord
+    :param caller_prefix: Prefix added to field names.
+    :type caller_prefix: str
+    :param shared_filters: Filters tags applying to the variant and independent of caller like filters on annotations. These filters are not renamed to add caller ID as suffix.
+    :type shared_filters: set
+    """
+    unchanged_info = {"MATEID", "RNA_FIRST", "SVTYPE"}
+    # Rename filters
+    if bnd_record.filter is not None:
+        new_filter = []
+        for tag in bnd_record.filter:
+            if tag != "PASS":
+                if tag in shared_filters:  # Rename filters not based on caller
+                    new_filter.append(tag)
+                else:
+                    new_filter.append("{}_{}".format(caller_prefix, tag))
+        bnd_record.filter = new_filter
+    # Rename INFO
+    new_info = {}
+    for key, val in bnd_record.info.items():
+        if key in unchanged_info:
+            new_info[key] = val
+        else:
+            new_info["{}_{}".format(caller_prefix, key)] = val
+    bnd_record.info = new_info
+    # Backup quality
+    if bnd_record.qual is not None:
+        bnd_record.info["{}_VCQUAL".format(caller_prefix)] = bnd_record.qual
+    # Rename FORMAT
+    bnd_record.format = ["{}_{}".format(caller_prefix, curr_filter) for curr_filter in bnd_record.format]
+    for spl_name, spl_info in bnd_record.samples.items():
+        renamed_info = {}
+        for key, val in spl_info.items():
+            renamed_info["{}_{}".format(caller_prefix, key)] = val
+        bnd_record.samples[spl_name] = renamed_info
+
+
+def getPrevFusion(records_pair, overlapped, curr_caller):
+    """
+    Return fusion with same right breakpoint of evaluated fusion.
+
+    :param records_pair: Pair of breakends for the evaluated fusion.
+    :type records_pair: (anacore.vcf.VCFRecord, anacore.vcf.VCFRecord)
+    :param overlapped: List of breakends pairs with first breakend overlapping the first breakend of the evaluated fusion.
+    :type overlapped: list
+    :param curr_caller: Name of the caller used to produce evaluated fusion.
+    :type curr_caller: str
+    :return: Fusion with same right breakpoint of evaluated fusion.
+    :rtype: (anacore.vcf.VCFRecord, anacore.vcf.VCFRecord)
+    """
+    prev_records = None
+    left_record, right_record = records_pair
+    if len(overlapped) > 0:
+        start_right_record, end_right_record = getBNDInterval(right_record)
+        for overlap_eval in overlapped:
+            start_right_eval, end_right_eval = getBNDInterval(overlap_eval.annot["second"])
+            if not start_right_record > end_right_eval and not end_right_record < start_right_eval:
+                if prev_records is not None:
+                    raise Exception(
+                        "{} form {} has an overlap ambiguity between: {} and {}.".format(
+                            left_record.getName(),
+                            curr_caller,
+                            prev_records[0].getName(),
+                            overlap_eval.annot["first"].getName()
+                        )
+                    )
+                prev_records = (overlap_eval.annot["first"], overlap_eval.annot["second"])
+                log.debug(
+                    "Merge {} from {} with {} from {}.".format(
+                        left_record.getName(),
+                        " and ".join(prev_records[0].info["SRC"]),
+                        overlap_eval.annot["first"].getName(),
+                        curr_caller
+                    )
+                )
+    return prev_records
+
+
 def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_filters):
     """
     Merge VCFRecords coming from several variant callers.
@@ -156,64 +315,14 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
     :return: Merged VCF records.
     :rtype: list
     """
-    unchanged_info = {"MATEID", "RNA_FIRST", "SVTYPE"}
     whole_fusions = {}  # fisrt bnd region by chromosome
     for idx_in, curr_in in enumerate(inputs_variants):
         curr_caller = calling_sources[idx_in]
         log.info("Process {}".format(curr_caller))
         # breakend by id
-        bnd_by_id = {}
-        with VCFIO(curr_in) as reader:
-            if "SR" in reader.info and reader.info["SR"].number == ".":
-                raise Exception('The number attribute for SR must be "A" or "R" or "1".')
-            if "PR" in reader.info and reader.info["PR"].number == ".":
-                raise Exception('The number attribute for PR must be "A" or "R" or "1".')
-            for record in reader:
-                bnd_by_id[record.id] = record
+        bnd_by_id = loadBNDByID(curr_in)
         # Group by fusion
-        curr_caller_fusions = dict()
-        processed_fusions = set()
-        fusion_by_name = {}
-        for id, record in bnd_by_id.items():
-            for alt_idx, alt in enumerate(record.alt):
-                alt_first_bnd = record
-                if len(record.alt) > 1:
-                    alt_first_bnd = getAlleleRecord(record, alt_idx)
-                    alt_first_bnd.info["MATEID"] = [record.info["MATEID"][alt_idx]]
-                mate_id = alt_first_bnd.info["MATEID"][0]
-                mate_record = bnd_by_id[mate_id]
-                alt_second_bnd = mate_record
-                if len(mate_record.alt) > 1:
-                    first_idx = mate_record.info["MATEID"].index(alt_first_bnd.id)
-                    alt_second_bnd = getAlleleRecord(mate_record, first_idx)
-                    alt_second_bnd.info["MATEID"] = [mate_record.info["MATEID"][first_idx]]
-                fusion_id = " @@ ".join(sorted([alt_first_bnd.id, alt_second_bnd.id]))
-                if fusion_id not in processed_fusions:
-                    processed_fusions.add(fusion_id)
-                    if "RNA_FIRST" not in alt_first_bnd.info and "RNA_FIRST" not in alt_second_bnd.info:
-                        raise Exception("Tag RNA_FIRST must be present in one of the breakend {} or {}.".format(alt_first_bnd.id, mate_id))
-                    if "RNA_FIRST" in alt_second_bnd.info:
-                        aux = alt_first_bnd
-                        alt_first_bnd = alt_second_bnd
-                        alt_second_bnd = aux
-                    interval_first_bnd = getBNDInterval(alt_first_bnd)
-                    fusion_name = " @@ ".join(sorted([alt_first_bnd.getName(), alt_second_bnd.getName()]))
-                    if fusion_name not in fusion_by_name:
-                        region_first_bnd = Region(
-                            interval_first_bnd[0],
-                            interval_first_bnd[1],
-                            reference=alt_first_bnd.chrom,
-                            annot={"first": alt_first_bnd, "second": alt_second_bnd}
-                        )
-                        if alt_first_bnd.chrom not in curr_caller_fusions:
-                            curr_caller_fusions[alt_first_bnd.chrom] = RegionList()
-                        curr_caller_fusions[alt_first_bnd.chrom].append(region_first_bnd)
-                        fusion_by_name[fusion_name] = region_first_bnd
-                    else:  # Caller contains several entris for the same pair of breakends (same fusion but several anotations)
-                        fusion_by_name[fusion_name].annot["first"].info[annotation_field] += alt_first_bnd.info[annotation_field]
-                        fusion_by_name[fusion_name].annot["second"].info[annotation_field] += alt_second_bnd.info[annotation_field]
-        del(fusion_by_name)
-        del(processed_fusions)
+        curr_caller_fusions = groupBNDByFusions(bnd_by_id, annotation_field)
         # Merge to other callers
         new_fusions = []
         for chrom, query, overlapped in iterOverlappedByRegion(curr_caller_fusions, whole_fusions):
@@ -227,71 +336,18 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                 }
             # Rename fields
             for curr_record in records:
-                # Rename filters
-                if curr_record.filter is not None:
-                    new_filter = []
-                    for tag in curr_record.filter:
-                        if tag != "PASS":
-                            if tag in shared_filters:  # Rename filters not based on caller
-                                new_filter.append(tag)
-                            else:
-                                new_filter.append("s{}_{}".format(idx_in, tag))
-                    curr_record.filter = new_filter
-                # Rename INFO
-                new_info = {}
-                for key, val in curr_record.info.items():
-                    if key in unchanged_info:
-                        new_info[key] = val
-                    else:
-                        new_info["s{}_{}".format(idx_in, key)] = val
-                curr_record.info = new_info
-                # Backup quality
-                if curr_record.qual is not None:
-                    curr_record.info["s{}_VCQUAL".format(idx_in)] = curr_record.qual
-                # Rename FORMAT
-                curr_record.format = ["s{}_{}".format(idx_in, curr_filter) for curr_filter in curr_record.format]
-                for spl_name, spl_info in curr_record.samples.items():
-                    renamed_info = {}
-                    for key, val in spl_info.items():
-                        renamed_info["s{}_{}".format(idx_in, key)] = val
-                    curr_record.samples[spl_name] = renamed_info
+                renameFields(curr_record, "s{}".format(idx_in), shared_filters)
             # Add to storage
-            left_record, right_record = records
-            prev_records = None  # Get identical fusion from previous callers
-            if len(overlapped) > 0:
-                start_right_record, end_right_record = getBNDInterval(right_record)
-                for overlap_eval in overlapped:
-                    start_right_eval, end_right_eval = getBNDInterval(overlap_eval.annot["second"])
-                    if not start_right_record > end_right_eval and not end_right_record < start_right_eval:
-                        if prev_records is not None:
-                            raise Exception(
-                                "{} form {} has an overlap ambiguity between: {} and {}.".format(
-                                    left_record.getName(),
-                                    curr_caller,
-                                    prev_records[0].getName(),
-                                    overlap_eval.annot["first"].getName()
-                                )
-                            )
-                        prev_records = (overlap_eval.annot["first"], overlap_eval.annot["second"])
-                        log.debug(
-                            "Merge {} from {} with {} from {}.".format(
-                                left_record.getName(),
-                                " and ".join(prev_records[0].info["SRC"]),
-                                overlap_eval.annot["first"].getName(),
-                                curr_caller
-                            )
-                        )
-            if prev_records is None:
+            prev_records = getPrevFusion(records, overlapped, curr_caller)  # Get identical fusion from previous callers
+            if prev_records is None:  # Prepare new fusion
                 new_fusions.append(query)
                 for curr_record in records:
                     # Data source
                     curr_record.info["SRC"] = [curr_caller]
                     curr_record.info["IDSRC"] = [curr_record.id]
                     # CIPOS
-                    if "s{}_CIPOS".format(idx_in) in curr_record.info:  # For consistency, the position and cipos of the variant comes only from the first caller of the variant
+                    if "s{}_CIPOS".format(idx_in) in curr_record.info:
                         curr_record.info["CIPOS"] = curr_record.info["s{}_CIPOS".format(idx_in)]
-                    else:
-                        curr_record.info["CIPOS"] = [0, 0]
                     # Quality
                     if idx_in != 0:
                         curr_record.qual = None  # For consistency, the quality of the variant comes only from the first caller of the variant
@@ -305,7 +361,7 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                         spl_data["PR"] = support_by_spl[spl_name]["PR"]
                         spl_data["SRSRC"] = [support_by_spl[spl_name]["SR"]]
                         spl_data["PRSRC"] = [support_by_spl[spl_name]["PR"]]
-            else:
+            else:  # Update previous fusion
                 for prev_rec, curr_rec in zip(prev_records, records):
                     prev_rec.info["SRC"].append(curr_caller)
                     prev_rec.info["IDSRC"].append(curr_rec.id)
@@ -323,10 +379,12 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                         spl_data.update(curr_rec.samples[spl_name])
                         spl_data["SRSRC"].append(support_by_spl[spl_name]["SR"])
                         spl_data["PRSRC"].append(support_by_spl[spl_name]["PR"])
+        # Add new fusions in whole_fusions
         for curr in new_fusions:
             if curr.reference.name not in whole_fusions:
                 whole_fusions[curr.reference.name] = RegionList()
             whole_fusions[curr.reference.name].append(curr)
+        # Sort fusions by first breakend
         for chrom, fusions in whole_fusions.items():
             whole_fusions[chrom] = RegionList(sorted(fusions, key=lambda x: (x.start, x.end)))
     # Flatten fusions
