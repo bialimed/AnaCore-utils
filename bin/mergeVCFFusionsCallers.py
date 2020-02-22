@@ -281,7 +281,7 @@ def getPrevFusion(records_pair, overlapped, curr_caller):
             if not start_right_record > end_right_eval and not end_right_record < start_right_eval:
                 if prev_records is not None:
                     raise Exception(
-                        "{} form {} has an overlap ambiguity between: {} and {}.".format(
+                        "{} from {} has an overlap ambiguity between: {} and {}.".format(
                             left_record.getName(),
                             curr_caller,
                             prev_records[0].getName(),
@@ -291,9 +291,9 @@ def getPrevFusion(records_pair, overlapped, curr_caller):
                 prev_records = (overlap_eval.annot["first"], overlap_eval.annot["second"])
                 log.debug(
                     "Merge {} from {} with {} from {}.".format(
-                        left_record.getName(),
-                        " and ".join(prev_records[0].info["SRC"]),
                         overlap_eval.annot["first"].getName(),
+                        " and ".join(prev_records[0].info["SRC"]),
+                        left_record.getName(),
                         curr_caller
                     )
                 )
