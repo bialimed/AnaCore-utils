@@ -115,6 +115,8 @@ def getBNDInterval(record):
     if "CIPOS" in record.info:
         start += record.info["CIPOS"][0]
         end += record.info["CIPOS"][1]
+        if "IMPRECISE" in record.info:
+            start -= 1
     return start, end
 
 
