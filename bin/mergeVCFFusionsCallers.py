@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -376,7 +376,9 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                     # FORMAT
                     prev_rec.format.extend(curr_rec.format)
                     # INFO
+                    del(curr_rec.info["MATEID"])
                     prev_rec.info.update(curr_rec.info)
+                    # SAMPLES
                     for spl_name, spl_data in prev_rec.samples.items():
                         spl_data.update(curr_rec.samples[spl_name])
                         spl_data["SRSRC"].append(support_by_spl[spl_name]["SR"])
