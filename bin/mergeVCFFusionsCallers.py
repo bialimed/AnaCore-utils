@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -181,16 +181,24 @@ def groupBNDByFusions(bnd_by_id, annotation_field):
     for id, record in bnd_by_id.items():
         for alt_idx, alt in enumerate(record.alt):
             alt_first_bnd = record
+            first_new_id = alt_first_bnd.id
             if len(record.alt) > 1:
+                first_new_id += "_" + str(alt_idx)  # Record must be splitted for each mate
                 alt_first_bnd = getAlleleRecord(record, alt_idx)
                 alt_first_bnd.info["MATEID"] = [record.info["MATEID"][alt_idx]]
             mate_id = alt_first_bnd.info["MATEID"][0]
             mate_record = bnd_by_id[mate_id]
             alt_second_bnd = mate_record
+            second_new_id = alt_second_bnd.id
             if len(mate_record.alt) > 1:
                 first_idx = mate_record.info["MATEID"].index(alt_first_bnd.id)
+                second_new_id += "_" + first_idx  # Record must be splitted for each mate
                 alt_second_bnd = getAlleleRecord(mate_record, first_idx)
                 alt_second_bnd.info["MATEID"] = [mate_record.info["MATEID"][first_idx]]
+            alt_first_bnd.id = first_new_id
+            alt_first_bnd.info["MATEID"] = [second_new_id]
+            alt_second_bnd.id = second_new_id
+            alt_second_bnd.info["MATEID"] = [first_new_id]
             fusion_id = " @@ ".join(sorted([alt_first_bnd.id, alt_second_bnd.id]))
             if fusion_id not in processed_fusions:
                 processed_fusions.add(fusion_id)
