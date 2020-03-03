@@ -12,8 +12,10 @@ import sys
 import logging
 import argparse
 from anacore.gtf import loadModel
+from anacore.vcf import HeaderFilterAttr
 from anacore.region import Region, RegionList
-from anacore.annotVcf import AnnotVCFIO, HeaderFilterAttr
+from anacore.fusion import getStrand
+from anacore.fusionVcf import AnnotBreakendVCFIO, getBNDInterval
 
 
 ########################################################################
@@ -21,94 +23,6 @@ from anacore.annotVcf import AnnotVCFIO, HeaderFilterAttr
 # FUNCTIONS
 #
 ########################################################################
-def getBNDInterval(record):
-    """
-    Return the start and end for BND record (CIPOS is taken into account).
-
-    :param record: The breakend record.
-    :type record: anacore.vcf.VCFRecord
-    :return: Start and end for BND record (CIPOS is taken into account).
-    :rtype: (int, int)
-    """
-    start = record.pos
-    end = record.pos
-    if "CIPOS" in record.info:
-        start += record.info["CIPOS"][0]
-        end += record.info["CIPOS"][1]
-        if "IMPRECISE" in record.info:
-            start -= 1
-    return start, end
-
-
-class BNDAnnotVCFIO(AnnotVCFIO):
-    def __init__(self, filepath, mode="r", annot_field="ANN"):
-        super().__init__(filepath, mode)
-        self.index = {}
-        self.pick_reader = None
-        if mode == "r":
-            self.pick_reader = open(filepath, "r")
-            self.loadIndex()
-        self._iter_already_processed = set()
-
-    def loadIndex(self):
-        self.index = {}
-        next_start = 0
-        line_nb = 1
-        line = self.pick_reader.readline()
-        while line:
-            if not line.startswith("#"):
-                start = next_start
-                next_start = self.pick_reader.tell()
-                end = next_start - 1
-                id = line.split(None, 3)[2].strip()
-                self.index[id] = (start, end, line_nb)
-            line = self.pick_reader.readline()
-            line_nb += 1
-
-    def close(self):
-        super().close()
-        if self.pick_reader is not None:
-            self.pick_reader.close()
-
-    def get(self, id):
-        # Get current pos
-        current = {
-            "line": self.current_line,
-            "line_nb": self.current_line_nb,
-        }
-        # Get new record
-        start, end, line_nb = self.index[id]
-        self.pick_reader.seek(start)
-        self.current_line = self.pick_reader.read(end - start + 1)
-        self.current_line_nb = line_nb
-        record = self._parseLine()
-        # Jump to previous record
-        self.current_line = current["line"]
-        self.current_line_nb = current["line_nb"]
-        # Return
-        return record
-
-    def isRecordLine(self, line):
-        is_record = super().isRecordLine(line)
-        if is_record:
-            id = line.split(None, 3)[2].strip()
-            if id in self._iter_already_processed:
-                is_record = False
-        return is_record
-
-    def __iter__(self):
-        for record in super().__iter__():
-            mate = self.get(record.info["MATEID"][0])  ############################ pb with multi-mates
-            self._iter_already_processed.add(mate.id)  ############################# pb with multi-mates
-            # Order by transcript
-            first = record
-            second = mate
-            if "RNA_FIRST" in second.info:
-                first = mate
-                second = record
-            yield first, second
-
-
 class AnnotGetter:
     """Class to get genes regions from annotation file."""
 
@@ -198,8 +112,17 @@ def isInner(first, second, annotation_field):
     is_inner_gene = False
     record_gene = {annot["SYMBOL"] for annot in first.info[annotation_field]}
     mate_gene = {annot["SYMBOL"] for annot in second.info[annotation_field]}
-    if len(record_gene) > 0 and len(record_gene & mate_gene) > 0:
-        is_inner_gene = True
+    full_overlapping = record_gene & mate_gene
+    if len(full_overlapping) > 0:
+        first_strand = getStrand(first, True)
+        second_strand = getStrand(second, False)
+        if first_strand != second_strand:
+            is_inner_gene = True
+        else:
+            strand = "1" if first_strand == "+" else "-1"
+            genes_strands = {annot["STRAND"] for annot in first.info[annotation_field] + second.info[annotation_field] if annot["SYMBOL"] in full_overlapping}
+            if strand in genes_strands:
+                is_inner_gene = True
     return is_inner_gene
 
 
@@ -222,7 +145,9 @@ def isReadthrough(up, down, annotation_field, genes, rt_max_dist):
     """
     is_readthrough = False
     if up.chrom == down.chrom:
-        if (up.alt[0].endswith("[") and down.alt[0].startswith("]")) or (up.alt[0].startswith("]") and down.alt[0].endswith("[")):  # Readthrough are +/+ or -/-
+        up_strand = getStrand(up, True)
+        down_strand = getStrand(down, False)
+        if (up_strand == "+" and down_strand == "+") or (up_strand == "-" and down_strand == "-"):  # Readthrough are +/+ or -/-
             first = up
             second = down
             if first.pos > second.pos:
@@ -231,7 +156,7 @@ def isReadthrough(up, down, annotation_field, genes, rt_max_dist):
             first_start, first_end = getBNDInterval(first)
             second_start, second_end = getBNDInterval(second)
             interval_start = min(first_start, second_start)
-            interval_end = max(first_end, second_end)
+            interval_end = max(first_end, second_end) + 1
             if interval_end - interval_start <= rt_max_dist:
                 first_bp_gene = {annot["SYMBOL"] for annot in first.info[annotation_field]}
                 second_bp_gene = {annot["SYMBOL"] for annot in second.info[annotation_field]}
@@ -240,33 +165,24 @@ def isReadthrough(up, down, annotation_field, genes, rt_max_dist):
                 only_second_bp_gene = second_bp_gene - first_bp_gene
                 if len(only_first_bp_gene) != 0 and len(only_second_bp_gene) != 0:
                     strand_by_gene = {annot["SYMBOL"]: annot["STRAND"] for annot in first.info[annotation_field] + second.info[annotation_field]}
-                    only_first_bp_gene_fwd = {gene for gene in only_first_bp_gene if strand_by_gene[gene] == 1}
-                    only_first_bp_gene_rvs = {gene for gene in only_first_bp_gene if strand_by_gene[gene] == -1}
-                    only_second_bp_gene_fwd = {gene for gene in only_second_bp_gene if strand_by_gene[gene] == 1}
-                    only_second_bp_gene_rvs = {gene for gene in only_second_bp_gene if strand_by_gene[gene] == -1}
-                    possible_on_fwd = len(only_first_bp_gene_fwd) != 0 and len(only_second_bp_gene_fwd) != 0
-                    possible_on_rvs = len(only_first_bp_gene_rvs) != 0 and len(only_second_bp_gene_rvs) != 0
-                    if possible_on_fwd or possible_on_rvs:
-                        interval_region = Region(interval_start, interval_end, None, first.chrom)
+                    strand = "1" if up_strand == "+" else "-1"
+                    only_first_bp_gene = {gene for gene in only_first_bp_gene if strand_by_gene[gene] == strand}
+                    only_second_bp_gene = {gene for gene in only_second_bp_gene if strand_by_gene[gene] == strand}
+                    possible_on_strand = len(only_first_bp_gene) != 0 and len(only_second_bp_gene) != 0
+                    if possible_on_strand:
+                        interval_region = Region(interval_start, interval_end, up_strand, first.chrom)
                         overlapped_genes = genes.getChr(first.chrom).getOverlapped(interval_region)
-                        overlapped_genes = RegionList([gene for gene in overlapped_genes if gene.name not in full_overlapping_gene])
-                        overlapped_genes_fwd = RegionList([gene for gene in overlapped_genes if gene.strand == '+'])
-                        overlapped_genes_rvs = RegionList([gene for gene in overlapped_genes if gene.strand == '-'])
+                        overlapped_genes = RegionList([gene for gene in overlapped_genes if gene.name not in full_overlapping_gene and gene.strand == up_strand])
+                        overlapped_genes_by_name = {gene.name: gene for gene in overlapped_genes}
                         contradict_readthrough = False
-                        if possible_on_fwd:
-                            for start_gene in only_first_bp_gene_fwd:
-                                for end_gene in only_second_bp_gene_fwd:
-                                    for interval_gene in overlapped_genes_fwd:
-                                        if interval_gene.name != start_gene.name and interval_gene.name != end_gene.name:
-                                            if not interval_gene.overlap(start_gene) and not interval_gene.overlap(end_gene):
-                                                contradict_readthrough = True
-                        if possible_on_rvs and not contradict_readthrough:
-                            for start_gene in only_first_bp_gene_rvs:
-                                for end_gene in only_second_bp_gene_rvs:
-                                    for interval_gene in overlapped_genes_rvs:
-                                        if interval_gene.name != start_gene.name and interval_gene.name != end_gene.name:
-                                            if not interval_gene.overlap(start_gene) and not interval_gene.overlap(end_gene):
-                                                contradict_readthrough = True
+                        for start_gene_name in only_first_bp_gene:
+                            start_gene = overlapped_genes_by_name[start_gene_name]
+                            for end_gene_name in only_second_bp_gene:
+                                end_gene = overlapped_genes_by_name[end_gene_name]
+                                for interval_gene in overlapped_genes:
+                                    if interval_gene.name != start_gene.name and interval_gene.name != end_gene.name:
+                                        if not interval_gene.hasOverlap(start_gene) and not interval_gene.hasOverlap(end_gene):
+                                            contradict_readthrough = True
                         is_readthrough = not contradict_readthrough
     return is_readthrough
 
@@ -283,7 +199,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_filter = parser.add_argument_group('Filters')  # Filters
     group_filter.add_argument('-m', '--mode', default="tag", choices=["tag", "remove"], help='Select the filter mode. In mode "tag": a tag is added in FILTER field if the fusion fits a filter. In mode "remove": the fusion is removed from the output if it fits filter. [Default: %(default)s]')
-    group_filter.add_argument('-r', '--rt-max-dist', default=100000, type=int, help='Maximum distance to evaluate if the fusion is a readthrough. [Default: %(default)s]')
+    group_filter.add_argument('-r', '--rt-max-dist', default=50000, type=int, help='Maximum distance to evaluate if the fusion is a readthrough. [Default: %(default)s]')
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-i', '--input-variants', required=True, help='Path to the file containing variants annotated with anacore-utils/annotBND.py (format: VCF).')
     group_input.add_argument('-a', '--input-annotations', required=True, help='Path to the genome annotations file used with anacore-utils/annotBND.py (format: GTF).')
@@ -301,8 +217,8 @@ if __name__ == "__main__":
     nb_fusions = 0
     nb_filtered = 0
     genes = AnnotGetter(args.input_annotations)
-    with BNDAnnotVCFIO(args.input_variants, "r", args.annotation_field) as reader:
-        with AnnotVCFIO(args.output_variants, "w") as writer:
+    with AnnotBreakendVCFIO(args.input_variants, "r", args.annotation_field) as reader:
+        with AnnotBreakendVCFIO(args.output_variants, "w") as writer:
             # Header
             writer.copyHeader(reader)
             writer.filter["IG"] = HeaderFilterAttr("IG", "One breakend is located on immunoglobulin.")
