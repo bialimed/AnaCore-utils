@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -11,11 +11,11 @@ import os
 import sys
 import logging
 import argparse
+from itertools import product
 from anacore.gtf import loadModel
 from anacore.vcf import HeaderFilterAttr
 from anacore.region import Region, RegionList
-from anacore.fusion import getStrand
-from anacore.fusionVcf import AnnotBreakendVCFIO, getBNDInterval
+from anacore.fusion import AnnotBreakendVCFIO, getBNDInterval, getStrand
 
 
 ########################################################################
@@ -51,6 +51,47 @@ class AnnotGetter:
             genes = loadModel(self.filepath, "genes", chr)
             self.model[chr] = genes
         return self.model[chr]
+
+
+def loadNormalDb(databases):
+    """
+    Return the set of normal fusions from a list of databases.
+
+    :param databases: Pathes to recurrent chimeric fusion in non-cancer samples (format: TSV). First column contains the gene ID of the 5' gene in fusion and second column contains the gene ID of the 3' gene in fusion.
+    :type databases: list
+    :return: Set of normal fusions.
+    :rtype: set
+    """
+    normal_fusions = set()
+    for curr_db in databases:
+        with open(curr_db) as reader:
+            for line in reader:
+                normal_fusions.add(line.strip())
+    return normal_fusions
+
+
+def inNormal(first, second, annotation_field, normal_fusions):
+    """
+    Return True if one of the two breakends falls in a gene of immunoglobulin.
+
+    :param first: The breakend of the first shard in fusion.
+    :type first: anacore.vcf.VCFRecord
+    :param second: The breakend of the second shard in fusion.
+    :type second: anacore.vcf.VCFRecord
+    :param annotation_field: Field used to store annotations.
+    :type annotation_field: str
+    :param normal_fusions: Set of normal fusions. Each element has the following format: 5prim_gene_ID<tab>3prim_gene_ID. Genes ID  must be consistent with breakends annotations.
+    :type normal_fusions: set
+    :return: True if one of the two breakend falls in a gene of immunoglobulin.
+    :rtype: boolean
+    """
+    in_normal = False
+    first_genes = {annot["Gene"] for annot in first.info[annotation_field]}
+    second_genes = {annot["Gene"] for annot in second.info[annotation_field]}
+    for curr_first_gene, curr_second_gene in product(first_genes, second_genes):
+        if curr_first_gene + "\t" + curr_second_gene in normal_fusions:
+            in_normal = True
+    return in_normal
 
 
 def isIG(first, second, annotation_field):
@@ -196,6 +237,7 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Filter readthrough, inner fusions and fusions occuring on HLA or IG.')
     parser.add_argument('-f', '--annotation-field', default="ANN", help='Field used to store annotations. [Default: %(default)s]')
+    parser.add_argument('-s', '--normal-sources', help='Information on normal databases source and version to add on inNormal filter description.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_filter = parser.add_argument_group('Filters')  # Filters
     group_filter.add_argument('-m', '--mode', default="tag", choices=["tag", "remove"], help='Select the filter mode. In mode "tag": a tag is added in FILTER field if the fusion fits a filter. In mode "remove": the fusion is removed from the output if it fits filter. [Default: %(default)s]')
@@ -203,6 +245,7 @@ if __name__ == "__main__":
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-i', '--input-variants', required=True, help='Path to the file containing variants annotated with anacore-utils/annotBND.py (format: VCF).')
     group_input.add_argument('-a', '--input-annotations', required=True, help='Path to the genome annotations file used with anacore-utils/annotBND.py (format: GTF).')
+    group_input.add_argument('-n', '--inputs-normal', nargs='+', help="Pathes to recurrent chimeric fusion in non-cancer samples (format: TSV). First column contains the gene ID of the 5' gene in fusion and second column contains the gene ID of the 3' gene in fusion. Genes ID  must be consistent with annotations used in '--input-annotions'.")
     group_output = parser.add_argument_group('Outputs')  # Outputs
     group_output.add_argument('-o', '--output-variants', required=True, help='Path to the filtered file (format: VCF).')
     args = parser.parse_args()
@@ -216,6 +259,7 @@ if __name__ == "__main__":
     # Process
     nb_fusions = 0
     nb_filtered = 0
+    normal_fusions = None if len(args.inputs_normal) == 0 else loadNormalDb(args.inputs_normal)
     genes = AnnotGetter(args.input_annotations)
     with AnnotBreakendVCFIO(args.input_variants, "r", args.annotation_field) as reader:
         with AnnotBreakendVCFIO(args.output_variants, "w") as writer:
@@ -225,6 +269,14 @@ if __name__ == "__main__":
             writer.filter["HLA"] = HeaderFilterAttr("HLA", "One breakend is located on HLA.")
             writer.filter["Inner"] = HeaderFilterAttr("Inner", "The two breakends are located in the same gene.")
             writer.filter["Readthrough"] = HeaderFilterAttr("Readthrough", "The fusion is readthrough (it concerns the two following genes in the same strand in an interval <= {}).".format(args.rt_max_dist))
+            if args.inputs_normal:
+                source = "."
+                if args.normal_sources is not None:
+                    source = " [source: {}].".format(args.normal_sources)
+                writer.filter["inNormal"] = HeaderFilterAttr(
+                    "inNormal",
+                    "The fusion of these two genes are known in databases of normal samples" + source
+                )
             writer.writeHeader()
             # Records
             for first, second in reader:
@@ -239,9 +291,12 @@ if __name__ == "__main__":
                 # Inner gene
                 if isInner(first, second, args.annotation_field):
                     new_filters.add("Inner")
-                # # Readthrough
+                # Readthrough
                 if isReadthrough(first, second, args.annotation_field, genes, args.rt_max_dist):
                     new_filters.add("Readthrough")
+                # In normals databases
+                if inNormal(first, second, args.annotation_field, normal_fusions):
+                    new_filters.add("inNormal")
                 if len(new_filters) != 0:
                     nb_filtered += 1
                 # Write result
