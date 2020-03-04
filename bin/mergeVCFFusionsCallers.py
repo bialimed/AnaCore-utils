@@ -195,11 +195,11 @@ def groupBNDByFusions(bnd_by_id, annotation_field):
                 second_new_id += "_" + first_idx  # Record must be splitted for each mate
                 alt_second_bnd = getAlleleRecord(mate_record, first_idx)
                 alt_second_bnd.info["MATEID"] = [mate_record.info["MATEID"][first_idx]]
-            alt_first_bnd.id = first_new_id
-            alt_first_bnd.info["MATEID"] = [second_new_id]
-            alt_second_bnd.id = second_new_id
-            alt_second_bnd.info["MATEID"] = [first_new_id]
             fusion_id = " @@ ".join(sorted([alt_first_bnd.id, alt_second_bnd.id]))
+            alt_first_bnd.id = first_new_id
+            alt_second_bnd.info["MATEID"] = [first_new_id]
+            alt_second_bnd.id = second_new_id
+            alt_first_bnd.info["MATEID"] = [second_new_id]
             if fusion_id not in processed_fusions:
                 processed_fusions.add(fusion_id)
                 if "RNA_FIRST" not in alt_first_bnd.info and "RNA_FIRST" not in alt_second_bnd.info:

@@ -235,7 +235,7 @@ def isReadthrough(up, down, annotation_field, genes, rt_max_dist):
 ########################################################################
 if __name__ == "__main__":
     # Manage parameters
-    parser = argparse.ArgumentParser(description='Filter readthrough, inner fusions and fusions occuring on HLA or IG.')
+    parser = argparse.ArgumentParser(description='Filter fusions that are readthrough, within a gene, known in normal samples or occuring on HLA or IG.')
     parser.add_argument('-f', '--annotation-field', default="ANN", help='Field used to store annotations. [Default: %(default)s]')
     parser.add_argument('-s', '--normal-sources', help='Information on normal databases source and version to add on inNormal filter description.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
