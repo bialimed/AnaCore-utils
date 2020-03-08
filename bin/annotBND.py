@@ -89,8 +89,8 @@ def annotGeneShard(record, annotation_field):
 
     :param record: The annotated BND record. The BND is previously annotated by genomic regions (see getRegionGeneAnnot()).
     :type record: anacore.vcf.VCFRecord
-    :: #####################################################
-    :: #####################################################
+    :param annotation_field: Field used for store annotations.
+    :type annotation_field: str
     """
     # Get position relative to the break
     is_before_break = []
@@ -118,6 +118,7 @@ def annotGeneShard(record, annotation_field):
                 if not is_before_break:
                     annot["GENE_SHARD"] = "up"
 
+
 # def annotModel(first, second, annotation_field):
 #     for first_annot in first.info[annotation_field]:
 #         first_annot["model"] = []  # mate_transcript_id:break_type:frame_type
@@ -126,8 +127,17 @@ def annotGeneShard(record, annotation_field):
 #                 current_model = second_annot["Feature"]
 
 
-
 def exonsPos(record, genes_by_chr):
+    """
+    Return by positions of exons boundaries overlapped by the breakend, the number of alternative transcripts with this exon boundaries.
+
+    :param record: Breakdend record with CIPOS.
+    :type record: anacore.vcf.VCFRecord
+    :param genes_by_chr: By chromosomes a tree where nodes are genes, transcripts, protein, exons and CDS.
+    :type genes_by_chr: dict
+    :return: By positions of exons boundaries overlapped by the breakend, the number of alternative transcripts with this exon boundaries.
+    :rtype: dict
+    """
     record_strand = getStrand(record)
     exons_pos = {}
     start, end = getBNDInterval(record)
@@ -145,41 +155,93 @@ def exonsPos(record, genes_by_chr):
                             else:
                                 exons_pos[subregion.start] += 1
                         if interval_region.start <= subregion.end and interval_region.end >= subregion.end:
-                            if subregion.start not in exons_pos:
+                            if subregion.end not in exons_pos:
                                 exons_pos[subregion.end] = 1
                             else:
                                 exons_pos[subregion.end] += 1
     return exons_pos
 
 
-def selectedPos(first, first_exons_pos, second, second_exons_pos):
-    if len(first_exons_pos) == 0 and len(second_exons_pos) == 0:  # No shard contain an exon at breakend pos
+def getMostSupported(exons_sup_by_pos):
+    """
+    Return the position of the most supported exon boundaries.
+
+    :param exons_sup_by_pos: By positions of exons boundaries overlapped by the breakend, the number of alternative transcripts with this exon boundaries.
+    :type exons_sup_by_pos: dict
+    :return: The position of the most supported exon boundaries.
+    :rtype: int
+    """
+    selected_pos = None
+    max_support = 0
+    for curr_pos, curr_support in sorted(exons_sup_by_pos.items()):
+        if curr_support > max_support:
+            max_support = curr_support
+            selected_pos = curr_pos
+    return selected_pos
+
+
+def selectedPos(first, first_exons_sup_by_pos, second, second_exons_sup_by_pos):
+    """
+    Return retained spot positions for the first and the second breakend when they contain CIPOS. Choice is based on placement on exons boundaries contained in CIPOS interval.
+
+    :param first: Breakend of the 5' shard of the fusion.
+    :type first: anacore.vcf.VCFRecord
+    :param first_exons_sup_by_pos: By positions of exons boundaries overlapped by the first breakend, the number of alternative transcripts with this exon boundaries.
+    :type first_exons_sup_by_pos: dict
+    :param second: Breakend of the 3' shard of the fusion.
+    :type second: anacore.vcf.VCFRecord
+    :param second_exons_sup_by_pos: By positions of exons boundaries overlapped by the second breakend, the number of alternative transcripts with this exon boundaries.
+    :type second_exons_sup_by_pos: dict
+    :return: Retained spot positions for the first and the second breakend when they contain CIPOS.
+    :rtype: (int, int)
+    """
+    if len(first_exons_sup_by_pos) == 0 and len(second_exons_sup_by_pos) == 0:  # No shard contain an exon at breakend pos
         return (first.pos, second.pos)
     else:
-        first_exons_pos = list(first_exons_pos)
-        second_exons_pos = list(second_exons_pos)
-        if len(second_exons_pos) == 0:  # Only the 5' shard contains at least one exon at breakend pos
-            if len(first_exons_pos) != 1:
-                first_exons_pos = [min(first_exons_pos)]
-            offset = first_exons_pos[0] - first.pos
-            return (first_exons_pos[0], second.pos + offset)
-        elif len(first_exons_pos) == 0:  # Only the 3' shard contains at least one exon at breakend pos
-            if len(second_exons_pos) != 1:
-                second_exons_pos = [min(second_exons_pos)]
-            offset = second_exons_pos[0] - second.pos
-            return (first.pos + offset, second_exons_pos[0])
+        if len(second_exons_sup_by_pos) == 0:  # Only the 5' shard contains at least one exon at breakend pos: the most supported exon boundary for the first breakend is retained
+            selected_pos = getMostSupported(first_exons_sup_by_pos)
+            offset = selected_pos - first.pos
+            return (selected_pos, second.pos + offset)
+        elif len(first_exons_sup_by_pos) == 0:  # Only the 3' shard contains at least one exon at breakend pos: the most supported exon boundary for the second breakend is retained
+            selected_pos = getMostSupported(second_exons_sup_by_pos)
+            offset = selected_pos - second.pos
+            return (first.pos + offset, selected_pos)
         else:  # The two shards contain at least one exon at breakend pos
-            first_offsets = {pos - first.pos for pos in first_exons_pos}
-            second_offsets = {pos - second.pos for pos in second_exons_pos}
+            first_offsets = {pos - first.pos for pos in first_exons_sup_by_pos}
+            second_offsets = {pos - second.pos for pos in second_exons_sup_by_pos}
             common = first_offsets & second_offsets
-            if len(common) >= 1:
+            if len(common) == 1:  # Only one common offset between two breakends
                 offset = min(common)
-            else:
-                offset = min(first_offsets)
+            elif len(common) > 1:  # Several common offsets between two breakends: the offset with the most sum of support (exons first + exons second) is retained
+                supp_by_offset = {}
+                for pos, support in first_exons_sup_by_pos.items():
+                    offset = pos - first.pos
+                    if offset in common:
+                        supp_by_offset[offset] = support
+                for pos, support in second_exons_sup_by_pos.items():
+                    offset = pos - first.pos
+                    if offset in common:
+                        supp_by_offset[offset] += support
+                offset = getMostSupported(supp_by_offset)
+            else:  # No common offset between two breakends: the most supported exon boundary for the first breakend is retained
+                selected_pos = getMostSupported(first_exons_sup_by_pos)
+                offset = selected_pos - first.pos
             return (first.pos + offset, second.pos + offset)
 
 
 def annot(first, second, genes_by_chr, annotation_field):
+    """
+    Annot breakends by overlapping transcripts. In breakends with CIPOS, the spot position of the annotation is previously determined by search of exons boundaries in interval (This position is stor in ANNOT_POS).
+
+    :param first: Breakend of the 5' shard of the fusion.
+    :type first: anacore.vcf.VCFRecord
+    :param second: Breakend of the 3' shard of the fusion.
+    :type second: anacore.vcf.VCFRecord
+    :param genes_by_chr: By chromosomes a tree where nodes are genes, transcripts, protein, exons and CDS.
+    :type genes_by_chr: dict
+    :param annotation_field: Field used for store annotations.
+    :type annotation_field: str
+    """
     first_start, first_end = getBNDInterval(first)
     if first_start == first_end:
         first.info["ANNOT_POS"] = first.pos
@@ -200,8 +262,8 @@ def annot(first, second, genes_by_chr, annotation_field):
         second_exons_pos = exonsPos(second, genes_by_chr)
         # print("", first_exons_pos, second_exons_pos)
         if "IMPRECISE" in first.info:
-            first_selected_pos = first.pos if len(first_exons_pos) == 0 else min(first_exons_pos)
-            second_selected_pos = second.pos if len(second_exons_pos) == 0 else min(second_exons_pos)
+            first_selected_pos = first.pos if len(first_exons_pos) == 0 else getMostSupported(first_exons_pos)
+            second_selected_pos = second.pos if len(second_exons_pos) == 0 else getMostSupported(second_exons_pos)
         else:
             first_selected_pos, second_selected_pos = selectedPos(first, first_exons_pos, second, second_exons_pos)
         # print("", first_selected_pos, second_selected_pos)
@@ -243,27 +305,27 @@ if __name__ == "__main__":
 
     # Annot variants
     log.info("Annot variants in {}.".format(args.input_variants))
-    with AnnotVCFIO(args.output_variants, "w") as FH_out:
-        with BreakendVCFIO(args.input_variants) as FH_in:
+    with AnnotVCFIO(args.output_variants, "w") as writer:
+        with BreakendVCFIO(args.input_variants) as reader:
             # Header
-            FH_out.copyHeader(FH_in)
-            FH_out.ANN_titles = ["SYMBOL", "Gene", "Feature", "Feature_type", "STRAND", "EXON", "INTRON", "CDS_position", "Protein_position", "GENE_SHARD"]
-            FH_out.info[args.annotation_field] = HeaderInfoAttr(
+            writer.copyHeader(reader)
+            writer.ANN_titles = ["SYMBOL", "Gene", "Feature", "Feature_type", "STRAND", "EXON", "INTRON", "CDS_position", "Protein_position", "GENE_SHARD"]
+            writer.info[args.annotation_field] = HeaderInfoAttr(
                 id=args.annotation_field,
                 type="String",
                 number=".",
-                description="Consequence annotations. Format: " + "|".join(FH_out.ANN_titles)
+                description="Consequence annotations. Format: " + "|".join(writer.ANN_titles)
             )
-            FH_out.info["ANNOT_POS"] = HeaderInfoAttr(
+            writer.info["ANNOT_POS"] = HeaderInfoAttr(
                 id="ANNOT_POS",
                 type="Integer",
                 number="1",
                 description="Breakend position used in annotation. It take into account CIPOS to give priority to a breakend on exon boundaries."
             )
-            FH_out.writeHeader()
+            writer.writeHeader()
             # Records
-            for first, second in FH_in:
+            for first, second in reader:
                 annot(first, second, genes_by_chr, args.annotation_field)
-                FH_out.write(first)
-                FH_out.write(second)
+                writer.write(first)
+                writer.write(second)
     log.info("End of job")
