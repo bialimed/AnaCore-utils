@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.2'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -31,7 +31,7 @@ def getNewHeaderAttr(args):
     :return: VCFHeader elements (filter, info, format, samples).
     :rtype: dict
     """
-    unchanged_info = {"MATEID", "RNA_FIRST", "SVTYPE"}
+    unchanged_info = {"MATEID", "RNA_FIRST", "SVTYPE", "IMPRECISE"}
     final_filter = {}
     final_info = {
         "CIPOS": HeaderInfoAttr(
@@ -238,17 +238,16 @@ def renameFields(bnd_record, caller_prefix, shared_filters):
     :param shared_filters: Filters tags applying to the variant and independent of caller like filters on annotations. These filters are not renamed to add caller ID as suffix.
     :type shared_filters: set
     """
-    unchanged_info = {"MATEID", "RNA_FIRST", "SVTYPE"}
+    unchanged_info = {"MATEID", "RNA_FIRST", "SVTYPE", "IMPRECISE"}
     # Rename filters
-    if bnd_record.filter is not None:
-        new_filter = []
-        for tag in bnd_record.filter:
-            if tag != "PASS":
-                if tag in shared_filters:  # Rename filters not based on caller
-                    new_filter.append(tag)
-                else:
-                    new_filter.append("{}_{}".format(caller_prefix, tag))
-        bnd_record.filter = new_filter
+    new_filter = []
+    for tag in bnd_record.filter:
+        if tag != "PASS":
+            if tag in shared_filters:  # Rename filters not based on caller
+                new_filter.append(tag)
+            else:
+                new_filter.append("{}_{}".format(caller_prefix, tag))
+    bnd_record.filter = new_filter
     # Rename INFO
     new_info = {}
     for key, val in bnd_record.info.items():
@@ -376,15 +375,14 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                     prev_rec.info["SRC"].append(curr_caller)
                     prev_rec.info["IDSRC"].append(curr_rec.id)
                     # FILTERS
-                    if curr_rec.filter is not None:
-                        if prev_rec.filter is None:
-                            prev_rec.filter = curr_rec.filter
-                        else:
-                            prev_rec.filter = list(set(prev_rec.filter) or set(curr_rec.filter))
+                    new_filters = set(curr_rec.filter) - {"Imprecise"}  # Imprecise is take into accout only for the first caller to keep consistency with CIPOS
+                    prev_rec.filter = list(set(prev_rec.filter) or new_filters)
                     # FORMAT
                     prev_rec.format.extend(curr_rec.format)
                     # INFO
                     del(curr_rec.info["MATEID"])
+                    if "IMPRECISE" in curr_rec.info:
+                        del(curr_rec.info["IMPRECISE"])  # Imprecise is take into accout only for the first caller to keep consistency with CIPOS
                     prev_rec.info.update(curr_rec.info)
                     # SAMPLES
                     for spl_name, spl_data in prev_rec.samples.items():
@@ -507,7 +505,7 @@ if __name__ == "__main__":
         writer.writeHeader()
         # Records
         for record in sorted(breakends, key=lambda record: (record.chrom, record.refStart(), record.refEnd())):
-            if record.filter is not None and len(record.filter) == 0:
+            if len(record.filter) == 0:
                 record.filter = ["PASS"]
             writer.write(record)
 
