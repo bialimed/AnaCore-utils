@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -71,8 +71,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "ANN": [
-                    {"SYMBOL": "GENE_N01", "Gene": "GENE_ID01", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "Gene": "GENE_ID04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N01", "Gene": "GENE_ID01", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "Gene": "GENE_ID04", "STRAND": "+"}
                 ]
             }
         )
@@ -81,7 +81,7 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "ANN": [
-                    {"SYMBOL": "GENE_N02", "Gene": "GENE_ID02", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N02", "Gene": "GENE_ID02", "STRAND": "+"}
                 ]
             }
         )
@@ -92,8 +92,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "ANN": [
-                    {"SYMBOL": "GENE_N01", "Gene": "GENE_ID01", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "Gene": "GENE_ID04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N01", "Gene": "GENE_ID01", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "Gene": "GENE_ID04", "STRAND": "+"}
                 ]
             }
         )
@@ -102,8 +102,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "ANN": [
-                    {"SYMBOL": "GENE_N03", "Gene": "GENE_ID03", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N06", "Gene": "GENE_ID06", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N03", "Gene": "GENE_ID03", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N06", "Gene": "GENE_ID06", "STRAND": "-"}
                 ]
             }
         )
@@ -113,8 +113,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_02",
                 "ANN": [
-                    {"SYMBOL": "GENE_N01", "Gene": "GENE_ID01", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "Gene": "GENE_ID04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N01", "Gene": "GENE_ID01", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "Gene": "GENE_ID04", "STRAND": "+"}
                 ]
             }
         )
@@ -124,8 +124,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_01",
                 "ANN": [
-                    {"SYMBOL": "GENE_N03", "Gene": "GENE_ID03", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N06", "Gene": "GENE_ID06", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N03", "Gene": "GENE_ID03", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N06", "Gene": "GENE_ID06", "STRAND": "-"}
                 ]
             }
         )
@@ -138,8 +138,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N01", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N01", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -148,8 +148,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N03", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N03", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"}
                 ]
             }
         )
@@ -160,8 +160,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N01", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N01", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -170,8 +170,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N02", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N02", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -182,7 +182,7 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"}
                 ]
             }
         )
@@ -191,8 +191,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"},
-                    {"SYMBOL": "GENE_N03", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"},
+                    {"SYMBOL": "GENE_N03", "STRAND": "+"}
                 ]
             }
         )
@@ -203,7 +203,7 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"}
                 ]
             }
         )
@@ -212,8 +212,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"},
-                    {"SYMBOL": "GENE_N03", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"},
+                    {"SYMBOL": "GENE_N03", "STRAND": "+"}
                 ]
             }
         )
@@ -224,7 +224,7 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"}
                 ]
             }
         )
@@ -233,8 +233,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"},
-                    {"SYMBOL": "GENE_N03", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"},
+                    {"SYMBOL": "GENE_N03", "STRAND": "+"}
                 ]
             }
         )
@@ -247,7 +247,7 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "IGH", "STRAND": "1"}
+                    {"SYMBOL": "IGH", "STRAND": "+"}
                 ]
             }
         )
@@ -256,8 +256,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N02", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N02", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -268,7 +268,7 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "IGH", "STRAND": "1"}
+                    {"SYMBOL": "IGH", "STRAND": "+"}
                 ]
             }
         )
@@ -302,7 +302,7 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "IGF2", "STRAND": "1"}
+                    {"SYMBOL": "IGF2", "STRAND": "+"}
                 ]
             }
         )
@@ -311,8 +311,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N02", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N02", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -326,8 +326,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "HLA-DRB1", "STRAND": "1"},
-                    {"SYMBOL": "HLA-DMB", "STRAND": "1"}
+                    {"SYMBOL": "HLA-DRB1", "STRAND": "+"},
+                    {"SYMBOL": "HLA-DMB", "STRAND": "+"}
                 ]
             }
         )
@@ -336,8 +336,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N02", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N02", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -348,8 +348,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "HLA-DRB1", "STRAND": "1"},
-                    {"SYMBOL": "HLA-DMB", "STRAND": "1"}
+                    {"SYMBOL": "HLA-DRB1", "STRAND": "+"},
+                    {"SYMBOL": "HLA-DMB", "STRAND": "+"}
                 ]
             }
         )
@@ -383,8 +383,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N01", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N01", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -393,8 +393,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "TESTANN": [
-                    {"SYMBOL": "HLAN02", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "HLAN02", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -412,8 +412,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_02",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N01", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N01", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -426,8 +426,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_01",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N02", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N02", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -442,8 +442,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_04",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N01", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N01", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -456,8 +456,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_03",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N03", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N03", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"}
                 ]
             }
         )
@@ -472,8 +472,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_06",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N01", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N01", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"}
                 ]
             }
         )
@@ -486,7 +486,7 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_05",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N02", "STRAND": "1"}
+                    {"SYMBOL": "GENE_N02", "STRAND": "+"}
                 ]
             }
         )
@@ -501,7 +501,7 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_08",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"}
                 ]
             }
         )
@@ -514,8 +514,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_07",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N05", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N05", "STRAND": "-"}
                 ]
             }
         )
@@ -530,8 +530,8 @@ GENE_ID02	GENE_ID05""")
                 "RNA_FIRST": True,
                 "MATEID": "id_10",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N01", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"},
+                    {"SYMBOL": "GENE_N01", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"},
                 ]
             }
         )
@@ -544,8 +544,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_09",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N03", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N03", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"}
                 ]
             }
         )
@@ -561,7 +561,7 @@ GENE_ID02	GENE_ID05""")
                 "CIPOS": [0, 4],
                 "MATEID": "id_12",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N06", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N06", "STRAND": "-"}
                 ]
             }
         )
@@ -574,8 +574,8 @@ GENE_ID02	GENE_ID05""")
             info={
                 "MATEID": "id_11",
                 "TESTANN": [
-                    {"SYMBOL": "GENE_N04", "STRAND": "1"},
-                    {"SYMBOL": "GENE_N05", "STRAND": "-1"}
+                    {"SYMBOL": "GENE_N04", "STRAND": "+"},
+                    {"SYMBOL": "GENE_N05", "STRAND": "-"}
                 ]
             }
         )

@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -86,8 +86,8 @@ def inNormal(first, second, annotation_field, normal_fusions):
     :rtype: boolean
     """
     in_normal = False
-    first_genes = {annot["Gene"] for annot in first.info[annotation_field]}
-    second_genes = {annot["Gene"] for annot in second.info[annotation_field]}
+    first_genes = {annot["Gene"].split(".")[0] for annot in first.info[annotation_field]}
+    second_genes = {annot["Gene"].split(".")[0] for annot in second.info[annotation_field]}
     for curr_first_gene, curr_second_gene in product(first_genes, second_genes):
         if curr_first_gene + "\t" + curr_second_gene in normal_fusions:
             in_normal = True
@@ -160,9 +160,8 @@ def isInner(first, second, annotation_field):
         if first_strand != second_strand:
             is_inner_gene = True
         else:
-            strand = "1" if first_strand == "+" else "-1"
             genes_strands = {annot["STRAND"] for annot in first.info[annotation_field] + second.info[annotation_field] if annot["SYMBOL"] in full_overlapping}
-            if strand in genes_strands:
+            if first_strand in genes_strands:
                 is_inner_gene = True
     return is_inner_gene
 
@@ -206,9 +205,8 @@ def isReadthrough(up, down, annotation_field, genes, rt_max_dist):
                 only_second_bp_gene = second_bp_gene - first_bp_gene
                 if len(only_first_bp_gene) != 0 and len(only_second_bp_gene) != 0:
                     strand_by_gene = {annot["SYMBOL"]: annot["STRAND"] for annot in first.info[annotation_field] + second.info[annotation_field]}
-                    strand = "1" if up_strand == "+" else "-1"
-                    only_first_bp_gene = {gene for gene in only_first_bp_gene if strand_by_gene[gene] == strand}
-                    only_second_bp_gene = {gene for gene in only_second_bp_gene if strand_by_gene[gene] == strand}
+                    only_first_bp_gene = {gene for gene in only_first_bp_gene if strand_by_gene[gene] == up_strand}
+                    only_second_bp_gene = {gene for gene in only_second_bp_gene if strand_by_gene[gene] == up_strand}
                     possible_on_strand = len(only_first_bp_gene) != 0 and len(only_second_bp_gene) != 0
                     if possible_on_strand:
                         interval_region = Region(interval_start, interval_end, up_strand, first.chrom)
