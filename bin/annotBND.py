@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.1'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -25,6 +25,14 @@ from anacore.region import Region, splittedByRef
 #
 ########################################################################
 def shardIsBeforeBND(record):
+    """
+    Return True if the fused shard is before the breakend.
+
+    :param record: The BND record.
+    :type record: anacore.vcf.VCFRecord
+    :return: True if the fused shard is before the breakend.
+    :rtype: boolean
+    """
     # Get position relative to the break
     is_before_break = []
     for bnd_idx, alt in enumerate(record.alt):
@@ -41,62 +49,85 @@ def shardIsBeforeBND(record):
     return is_before_break[0]
 
 
-def getDistBeforeCDS(pos, protein):
+def getDistBeforeCDSForward(pos, protein):
+    """
+    Return exonic distance between breakend and CDS for a breakend in 5'UTR of a protein on forward strand.
+
+    :param pos: Position of the breakend.
+    :type pos: int
+    :param protein: The protein object.
+    :type protein: anacore.genomicRegion.Protein
+    :return: Exonic distance between breakend and CDS for breakend in 5'UTR.
+    :rtype: int
+    """
     cds_dist = 0
-    if protein.strand == "+":
-        if protein.start > pos:
-            cds_start = protein.getCDSFromTranscript()[0].start
-            exons = protein.transcript.children
-            cds_found = False
-            curr_exon = exons[0]
-            curr_exon_idx = 0
-            while not cds_found:
-                if curr_exon.end < pos:  # if exon is before breakend
+    if protein.start > pos:
+        cds_start = protein.getCDSFromTranscript()[0].start
+        exons = protein.transcript.children
+        cds_found = False
+        curr_exon = exons[0]
+        curr_exon_idx = 0
+        while not cds_found:
+            if curr_exon.end < pos:  # if exon is before breakend
+                curr_exon_idx += 1
+                curr_exon = exons[curr_exon_idx]
+            elif curr_exon.start <= pos:  # if exon contains the breakend
+                if curr_exon.end >= cds_start:  # if exon contains the breakend and the CDS
+                    cds_dist = cds_start - pos
+                    cds_found = True
+                else:  # if exon contains the breakend and the CDS in other exon
+                    cds_dist += curr_exon.end - pos + 1
                     curr_exon_idx += 1
                     curr_exon = exons[curr_exon_idx]
-                elif curr_exon.start <= pos:  # if exon contains the breakend
-                    if curr_exon.end >= cds_start:  # if exon contains the breakend and the CDS
-                        cds_dist = cds_start - pos
-                        cds_found = True
-                    else:  # if exon contains the breakend and the CDS in other exon
-                        cds_dist += curr_exon.end - pos + 1
-                        curr_exon_idx += 1
-                        curr_exon = exons[curr_exon_idx]
-                else:  # if exon is after breakend
-                    if curr_exon.end < cds_start:  # if exon is after breakend and before CDS
-                        cds_dist += curr_exon.length()
-                        curr_exon_idx += 1
-                        curr_exon = exons[curr_exon_idx]
-                    else:  # if exon is after breakend and contains CDS
-                        cds_dist += cds_start - curr_exon.start
-                        cds_found = True
-    else:
-        if protein.end < pos:
-            cds_end = protein.getCDSFromTranscript()[0].end
-            exons = protein.transcript.children
-            cds_found = False
-            curr_exon = exons[-1]
-            curr_exon_idx = len(exons) - 1
-            while not cds_found:
-                if curr_exon.start > pos:  # if exon is before breakend
+            else:  # if exon is after breakend
+                if curr_exon.end < cds_start:  # if exon is after breakend and before CDS
+                    cds_dist += curr_exon.length()
+                    curr_exon_idx += 1
+                    curr_exon = exons[curr_exon_idx]
+                else:  # if exon is after breakend and contains CDS
+                    cds_dist += cds_start - curr_exon.start
+                    cds_found = True
+    return cds_dist
+
+
+def getDistBeforeCDSReverse(pos, protein):
+    """
+    Return exonic distance between breakend and CDS for a breakend in 5'UTR of a protein on reverse strand.
+
+    :param pos: Position of the breakend.
+    :type pos: int
+    :param protein: The protein object.
+    :type protein: anacore.genomicRegion.Protein
+    :return: Exonic distance between breakend and CDS for breakend in 5'UTR.
+    :rtype: int
+    """
+    cds_dist = 0
+    if protein.end < pos:
+        cds_end = protein.getCDSFromTranscript()[0].end
+        exons = protein.transcript.children
+        cds_found = False
+        curr_exon = exons[-1]
+        curr_exon_idx = len(exons) - 1
+        while not cds_found:
+            if curr_exon.start > pos:  # if exon is before breakend
+                curr_exon_idx -= 1
+                curr_exon = exons[curr_exon_idx]
+            elif curr_exon.end >= pos:  # if exon contains the breakend
+                if curr_exon.start >= cds_end:  # if exon contains the breakend and the CDS
+                    cds_dist = pos - cds_end
+                    cds_found = True
+                else:  # if exon contains the breakend and the CDS in other exon
+                    cds_dist += pos - curr_exon.start + 1
                     curr_exon_idx -= 1
                     curr_exon = exons[curr_exon_idx]
-                elif curr_exon.end >= pos:  # if exon contains the breakend
-                    if curr_exon.start >= cds_end:  # if exon contains the breakend and the CDS
-                        cds_dist = pos - cds_end
-                        cds_found = True
-                    else:  # if exon contains the breakend and the CDS in other exon
-                        cds_dist += pos - curr_exon.start + 1
-                        curr_exon_idx -= 1
-                        curr_exon = exons[curr_exon_idx]
-                else:  # if exon is after breakend
-                    if curr_exon.start > cds_end:  # if exon is after breakend and before CDS
-                        cds_dist += curr_exon.length()
-                        curr_exon_idx -= 1
-                        curr_exon = exons[curr_exon_idx]
-                    else:  # if exon is after breakend and contains CDS
-                        cds_dist += curr_exon.end - cds_end
-                        cds_found = True
+            else:  # if exon is after breakend
+                if curr_exon.start > cds_end:  # if exon is after breakend and before CDS
+                    cds_dist += curr_exon.length()
+                    curr_exon_idx -= 1
+                    curr_exon = exons[curr_exon_idx]
+                else:  # if exon is after breakend and contains CDS
+                    cds_dist += curr_exon.end - cds_end
+                    cds_found = True
     return cds_dist
 
 
@@ -164,8 +195,12 @@ def getGeneAnnot(record, genes_by_chr):
                                 curr_annot["RNA_ELT_TYPE"] += "&utr"
                                 if curr_transcript.proteins[0].strand == "+":
                                     curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_transcript.proteins[0].start > bnd_region.start else "3prim")
+                                    if curr_transcript.proteins[0].start > bnd_region.start:
+                                        curr_annot["CDS_DIST"] = getDistBeforeCDSForward(bnd_region.start, curr_transcript.proteins[0])
                                 else:
                                     curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_transcript.proteins[0].end < bnd_region.start else "3prim")
+                                    if curr_transcript.proteins[0].end < bnd_region.start:
+                                        curr_annot["CDS_DIST"] = getDistBeforeCDSReverse(bnd_region.start, curr_transcript.proteins[0])
                             else:
                                 curr_annot["Protein_position"], curr_annot["Codon_position"] = curr_transcript.proteins[0].getPosOnRegion(ref_pos)
                     else:  # On exon
@@ -186,11 +221,11 @@ def getGeneAnnot(record, genes_by_chr):
                                 if curr_transcript.proteins[0].strand == "+":
                                     curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_transcript.proteins[0].start > bnd_region.start else "3prim")
                                     if curr_transcript.proteins[0].start > bnd_region.start:
-                                        curr_annot["CDS_DIST"] = getDistBeforeCDS(bnd_region.start, curr_transcript.proteins[0])
+                                        curr_annot["CDS_DIST"] = getDistBeforeCDSForward(bnd_region.start, curr_transcript.proteins[0])
                                 else:
                                     curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_transcript.proteins[0].end < bnd_region.start else "3prim")
                                     if curr_transcript.proteins[0].end < bnd_region.start:
-                                        curr_annot["CDS_DIST"] = getDistBeforeCDS(bnd_region.start, curr_transcript.proteins[0])
+                                        curr_annot["CDS_DIST"] = getDistBeforeCDSReverse(bnd_region.start, curr_transcript.proteins[0])
                             # Protein position
                             else:
                                 curr_annot["Protein_position"], curr_annot["Codon_position"] = curr_transcript.proteins[0].getPosOnRegion(bnd_region.start)
@@ -250,12 +285,13 @@ def annotModel(first, second, annotation_field):
     """
     annotGeneShard(first, annotation_field)
     annotGeneShard(second, annotation_field)
+    for second_annot in second.info[annotation_field]:
+        if "IN_FRAME" not in second_annot:
+            second_annot["IN_FRAME"] = []
     for first_annot in first.info[annotation_field]:
         if "IN_FRAME" not in first_annot:
             first_annot["IN_FRAME"] = []
         for second_annot in second.info[annotation_field]:
-            if "IN_FRAME" not in second_annot:
-                second_annot["IN_FRAME"] = []
             inframe = "0"
             if first_annot["GENE_SHARD"] == "up" and second_annot["GENE_SHARD"] == "down":
                 if second_annot["Protein"] != "":  # The second RNA is coding
@@ -273,13 +309,7 @@ def annotModel(first, second, annotation_field):
                                     inframe = "1"
                             elif not first_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: CDS and second: UTR
                                 if second_annot["RNA_ELT_POS"].endswith("5prim"):
-                                    if first_annot["RNA_ELT_TYPE"].startswith("intron"):
-                                        if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"]:
-                                            inframe = "0"
-                                            first_and_utr_codon_pos = first_annot["Codon_position"] + (second_annot["CDS_DIST"] % 3)
-                                            if first_and_utr_codon_pos == 3:
-                                                inframe = "1"
-                                    elif "spliceDonor" in first_annot["RNA_ELT_TYPE"]:
+                                    if first_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceDonor" in first_annot["RNA_ELT_TYPE"]:
                                         if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"]:
                                             inframe = "0"
                                             first_and_utr_codon_pos = first_annot["Codon_position"] + (second_annot["CDS_DIST"] % 3)
@@ -295,13 +325,12 @@ def annotModel(first, second, annotation_field):
                             elif "spliceDonor" in first_annot["RNA_ELT_TYPE"]:
                                 if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first on splice donor to second 5'UTR in intron or on splice acceptor
                                     inframe = "1"
-            model = "{}_{}:{}".format(
-                first_annot["Feature"],
-                second_annot["Feature"],
-                inframe
+            first_annot["IN_FRAME"].append(
+                "{}:{}".format(second_annot["Feature"], inframe)
             )
-            first_annot["IN_FRAME"].append(model)
-            second_annot["IN_FRAME"].append(model)
+            second_annot["IN_FRAME"].append(
+                "{}:{}".format(first_annot["Feature"], inframe)
+            )
     for first_annot in first.info[annotation_field]:
         first_annot["IN_FRAME"] = "&".join(first_annot["IN_FRAME"])
     for second_annot in second.info[annotation_field]:
@@ -363,7 +392,7 @@ def getMostSupported(exons_sup_by_pos):
 
 def selectedPos(first, first_exons_sup_by_pos, second, second_exons_sup_by_pos):
     """
-    Return retained spot positions for the first and the second breakend when they contain CIPOS. Choice is based on placement on exons boundaries contained in CIPOS interval.
+    Return retained spot positions for the first and the second breakend when they contain CIPOS (exception for imprecise). Choice is based on placement on exons boundaries contained in CIPOS interval.
 
     :param first: Breakend of the 5' shard of the fusion.
     :type first: anacore.vcf.VCFRecord
@@ -376,20 +405,33 @@ def selectedPos(first, first_exons_sup_by_pos, second, second_exons_sup_by_pos):
     :return: Retained spot positions for the first and the second breakend when they contain CIPOS.
     :rtype: (int, int)
     """
+    first_strand = getStrand(first, True)
+    second_strand = getStrand(second, False)
     if len(first_exons_sup_by_pos) == 0 and len(second_exons_sup_by_pos) == 0:  # No shard contain an exon at breakend pos
         return (first.pos, second.pos)
     else:
         if len(second_exons_sup_by_pos) == 0:  # Only the 5' shard contains at least one exon at breakend pos: the most supported exon boundary for the first breakend is retained
             selected_pos = getMostSupported(first_exons_sup_by_pos)
             offset = selected_pos - first.pos
-            return (selected_pos, second.pos + offset)
+            if first_strand == second_strand:
+                return (selected_pos, second.pos + offset)
+            else:
+                cipos = 0 if "CIPOS" not in second.info else second.info["CIPOS"][1]
+                return (selected_pos, second.pos + cipos - offset)
         elif len(first_exons_sup_by_pos) == 0:  # Only the 3' shard contains at least one exon at breakend pos: the most supported exon boundary for the second breakend is retained
             selected_pos = getMostSupported(second_exons_sup_by_pos)
             offset = selected_pos - second.pos
-            return (first.pos + offset, selected_pos)
+            if first_strand == second_strand:
+                return (first.pos + offset, selected_pos)
+            else:
+                cipos = 0 if "CIPOS" not in first.info else first.info["CIPOS"][1]
+                return (first.pos + cipos - offset, selected_pos)
         else:  # The two shards contain at least one exon at breakend pos
             first_offsets = {pos - first.pos for pos in first_exons_sup_by_pos}
             second_offsets = {pos - second.pos for pos in second_exons_sup_by_pos}
+            second_cipos = 0 if "CIPOS" not in second.info else second.info["CIPOS"][1]
+            if first_strand != second_strand:
+                second_offsets = {abs(second_cipos - offset) for offset in second_offsets}
             common = first_offsets & second_offsets
             if len(common) == 1:  # Only one common offset between two breakends
                 offset = min(common)
@@ -400,14 +442,19 @@ def selectedPos(first, first_exons_sup_by_pos, second, second_exons_sup_by_pos):
                     if offset in common:
                         supp_by_offset[offset] = support
                 for pos, support in second_exons_sup_by_pos.items():
-                    offset = pos - first.pos
+                    offset = pos - second.pos
+                    if first_strand != second_strand:
+                        offset = abs(second_cipos - offset)
                     if offset in common:
                         supp_by_offset[offset] += support
                 offset = getMostSupported(supp_by_offset)
             else:  # No common offset between two breakends: the most supported exon boundary for the first breakend is retained
                 selected_pos = getMostSupported(first_exons_sup_by_pos)
                 offset = selected_pos - first.pos
-            return (first.pos + offset, second.pos + offset)
+            if first_strand == second_strand:
+                return (first.pos + offset, second.pos + offset)
+            else:
+                return (first.pos + offset, second.pos + second_cipos - offset)
 
 
 def annot(first, second, genes_by_chr, annotation_field):
@@ -428,26 +475,14 @@ def annot(first, second, genes_by_chr, annotation_field):
         first.info["ANNOT_POS"] = first.pos
         second.info["ANNOT_POS"] = second.pos
     else:
-        # print("fit positions to exons for {}:{} {}:{} ({}/{}) {}from {}".format(
-        #     first.chrom,
-        #     first.pos,
-        #     second.chrom,
-        #     second.pos,
-        #     getStrand(first, True),
-        #     getStrand(second, False),
-        #     "IMPRECISE " if "IMPRECISE" in first.info else "",
-        #     first.info["SRC"]
-        # ))
         # Try to fit positions to exons boundaries
         first_exons_pos = exonsPos(first, genes_by_chr)
         second_exons_pos = exonsPos(second, genes_by_chr)
-        # print("", first_exons_pos, second_exons_pos)
         if "IMPRECISE" in first.info:
             first_selected_pos = first.pos if len(first_exons_pos) == 0 else getMostSupported(first_exons_pos)
             second_selected_pos = second.pos if len(second_exons_pos) == 0 else getMostSupported(second_exons_pos)
         else:
             first_selected_pos, second_selected_pos = selectedPos(first, first_exons_pos, second, second_exons_pos)
-        # print("", first_selected_pos, second_selected_pos)
         first.info["ANNOT_POS"] = first_selected_pos
         second.info["ANNOT_POS"] = second_selected_pos
     first.info[annotation_field] = getGeneAnnot(first, genes_by_chr)
