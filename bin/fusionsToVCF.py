@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     # Process
     with AnnotVCFIO(args.output_fusions, "w", args.annotation_field) as writer:
-        with FusionFileReader.factory(args.input_fusions, "r", args.sample_name, args.annotation_field) as reader:
+        with FusionFileReader.factory(args.input_fusions, "r", args.annotation_field, args.sample_name) as reader:
             # Header
             reader.__class__.setVCFHeader(writer, args.annotation_field)
             writer.samples = [args.sample_name]

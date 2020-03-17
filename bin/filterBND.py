@@ -15,7 +15,7 @@ from itertools import product
 from anacore.gtf import loadModel
 from anacore.vcf import HeaderFilterAttr
 from anacore.region import Region, RegionList
-from anacore.fusion import AnnotBreakendVCFIO, getBNDInterval, getStrand
+from anacore.fusion import BreakendVCFIO, getBNDInterval, getStrand
 
 
 ########################################################################
@@ -259,8 +259,8 @@ if __name__ == "__main__":
     nb_filtered = 0
     normal_fusions = None if len(args.inputs_normal) == 0 else loadNormalDb(args.inputs_normal)
     genes = AnnotGetter(args.input_annotations)
-    with AnnotBreakendVCFIO(args.input_variants, "r", args.annotation_field) as reader:
-        with AnnotBreakendVCFIO(args.output_variants, "w") as writer:
+    with BreakendVCFIO(args.input_variants, "r", args.annotation_field) as reader:
+        with BreakendVCFIO(args.output_variants, "w", args.annotation_field) as writer:
             # Header
             writer.copyHeader(reader)
             writer.filter["IG"] = HeaderFilterAttr("IG", "One breakend is located on immunoglobulin.")
@@ -306,12 +306,12 @@ if __name__ == "__main__":
                         record.filter = sorted(filters)
                         if len(record.filter) == 0:
                             record.filter = ["PASS"]
-                        writer.write(record)
+                    writer.write(first, second)
                 elif len(new_filters) == 0:  # Filter mode and is tagged
                     for record in (first, second):
                         if len(record.filter) == 0:
                             record.filter = ["PASS"]
-                        writer.write(record)
+                    writer.write(first, second)
 
     # Log process
     log.info(

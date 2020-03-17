@@ -15,7 +15,7 @@ import argparse
 from anacore.gtf import loadModel
 from anacore.genomicRegion import Intron, Exon
 from anacore.fusion import BreakendVCFIO, getBNDInterval, getStrand
-from anacore.annotVcf import AnnotVCFIO, HeaderInfoAttr
+from anacore.vcf import HeaderInfoAttr
 from anacore.region import Region, splittedByRef
 
 
@@ -520,7 +520,7 @@ if __name__ == "__main__":
 
     # Annot variants
     log.info("Annot variants in {}.".format(args.input_variants))
-    with AnnotVCFIO(args.output_variants, "w") as writer:
+    with BreakendVCFIO(args.output_variants, "w", args.annotation_field) as writer:
         with BreakendVCFIO(args.input_variants) as reader:
             # Header
             writer.copyHeader(reader)
@@ -541,6 +541,5 @@ if __name__ == "__main__":
             # Records
             for first, second in reader:
                 annot(first, second, genes_by_chr, args.annotation_field)
-                writer.write(first)
-                writer.write(second)
+                writer.write(first, second)
     log.info("End of job")
