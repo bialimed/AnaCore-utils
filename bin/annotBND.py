@@ -75,7 +75,7 @@ def getDistBeforeCDSForward(pos, protein):
                 if curr_exon.end >= cds_start:  # if exon contains the breakend and the CDS
                     cds_dist = cds_start - pos
                     cds_found = True
-                else:  # if exon contains the breakend and the CDS in other exon
+                else:  # if exon contains the breakend and the CDS is in another exon
                     cds_dist += curr_exon.end - pos + 1
                     curr_exon_idx += 1
                     curr_exon = exons[curr_exon_idx]
@@ -104,7 +104,7 @@ def getDistBeforeCDSReverse(pos, protein):
     cds_dist = 0
     if protein.end < pos:
         cds_end = protein.getCDSFromTranscript()[0].end
-        exons = protein.transcript.children
+        exons = protein.transcript.children[::-1]
         cds_found = False
         curr_exon = exons[-1]
         curr_exon_idx = len(exons) - 1
@@ -113,10 +113,10 @@ def getDistBeforeCDSReverse(pos, protein):
                 curr_exon_idx -= 1
                 curr_exon = exons[curr_exon_idx]
             elif curr_exon.end >= pos:  # if exon contains the breakend
-                if curr_exon.start >= cds_end:  # if exon contains the breakend and the CDS
+                if curr_exon.start <= cds_end:  # if exon contains the breakend and the CDS
                     cds_dist = pos - cds_end
                     cds_found = True
-                else:  # if exon contains the breakend and the CDS in other exon
+                else:  # if exon contains the breakend and the CDS is in another exon
                     cds_dist += pos - curr_exon.start + 1
                     curr_exon_idx -= 1
                     curr_exon = exons[curr_exon_idx]
