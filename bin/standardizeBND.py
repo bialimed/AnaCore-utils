@@ -8,7 +8,6 @@ __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
 import os
-import re
 import sys
 import logging
 import argparse
@@ -51,15 +50,10 @@ def replaceUnknownNt(record, seq_handler):
     """
     if record.ref == "N":
         record.ref = seq_handler.getSub(record.chrom, record.pos, record.pos)
-    if "N" in record.alt[0]:
-        matches = re.search("[\[\]](.+):(\d+)[\[\]]", record.alt[0])
-        mate_chrom = matches.group(1)
-        mate_pos = int(matches.group(2))
-        mate_nt = seq_handler.getSub(mate_chrom, mate_pos, mate_pos)
-        record.alt[0] = record.alt[0].replace("N", mate_nt)
+    record.alt[0] = record.alt[0].replace("N", record.ref)
 
 
-def fastStandardize(first, second, seq_handler, padding=100):
+def fastStandardize(first, second, seq_handler, padding=50):
     """
     Each breakend of the pair is placed at the left most position, and the uncertainty is represented with the CIPOS tag. The ALT string is then constructed assuming this choice.
 
@@ -69,7 +63,7 @@ def fastStandardize(first, second, seq_handler, padding=100):
     :type second: anacore.vcf.VCFRecord
     :param seq_handler: Indexed reader for the reference genome used in fusion calling.
     :type seq_handler: anacore.sequenceIO.IdxFastaIO
-    :param padding: *******************************
+    :param padding: Number of nucleotids to inspect before and after the breakends: upstream and downstream movements are limited to this number of nucleotids.
     :type padding: int
     """
     first_strand = getStrand(first, True)
@@ -113,12 +107,17 @@ def fastStandardize(first, second, seq_handler, padding=100):
                 getCoordStr(first, True),
                 getCoordStr(second, False)
             )
+            first.alt[0].replace("N", first.ref)
+            second.alt[0].replace("N", second.ref)
     else:  # Different strand
         before_second = getComplement(before_second)
         after_second = getComplement(after_second)
         # Move before first cointaining breakend and after second excluding breakend
         before_first_seq = before_first
         after_second_seq = after_second[1:]
+        if first_strand == "-":
+            before_first_seq = before_first[:-1]
+            after_second_seq = after_second
         for nt_first, nt_second in zip(before_first_seq[::-1], after_second_seq):
             if nt_first != nt_second:
                 break
@@ -126,6 +125,9 @@ def fastStandardize(first, second, seq_handler, padding=100):
         # Move before second cointaining breakend and after first excluding breakend
         after_first_seq = after_first[1:]
         before_second_seq = before_second
+        if first_strand == "-":
+            after_first_seq = after_first
+            before_second_seq = before_second[:-1]
         for nt_first, nt_second in zip(after_first_seq, before_second_seq[::-1]):
             if nt_first != nt_second:
                 break
@@ -143,11 +145,13 @@ def fastStandardize(first, second, seq_handler, padding=100):
                 getCoordStr(first, True),
                 {"chrom": second.chrom, "pos": second_down_pos, "strand": second_strand}
             )
+            first.alt[0].replace("N", first.ref)
             first_down_pos = first.pos + (cipos_end - cipos_start)
             trach, second.alt[0] = getAltFromCoord(
                 {"chrom": first.chrom, "pos": first_down_pos, "strand": first_strand},
                 getCoordStr(second, False)
             )
+            second.alt[0].replace("N", second.ref)
 
 
 ########################################################################
@@ -158,6 +162,7 @@ def fastStandardize(first, second, seq_handler, padding=100):
 if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Replace N in alt and ref by the convenient nucleotid and move each breakend in pair at the left most position and add uncertainty iin CIPOS tag.')
+    parser.add_argument('-p', '--sequence-padding', type=int, default=100, help='Number of nucleotids to inspect before and after the breakends: upstream and downstream movements are limited to this number of nucleotids. [Default: %(default)s]')
     parser.add_argument('-t', '--trace-unstandard', action='store_true', help='Use this option to add "UNSTD" tag in record INFO. This tag contains the trace of the variant before standardization: chromosome:position=reference/alternative.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs
@@ -186,8 +191,8 @@ if __name__ == "__main__":
                     if args.trace_unstandard:
                         first.info["UNSTD"] = "{}:{}={}/{}".format(first.chrom, first.pos, first.ref, "/".join(first.alt))
                         second.info["UNSTD"] = "{}:{}={}/{}".format(second.chrom, second.pos, second.ref, "/".join(second.alt))
-                    if "Imprecise" not in set(first.filter):
-                        fastStandardize(first, second, genome_reader)
+                    if "IMPRECISE" not in set(first.info):
+                        fastStandardize(first, second, genome_reader, args.sequence_padding)
                     replaceUnknownNt(first, genome_reader)
                     replaceUnknownNt(second, genome_reader)
                     writer.write(first, second)
