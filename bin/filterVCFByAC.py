@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.2.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
                         new_filters.add("lowAF")
                     if record.getPopAltAD()[0] < args.min_AD:
                         new_filters.add("lowAD")
-                    if record.getPopDP()[0] < args.min_DP:
+                    if record.getPopDP() < args.min_DP:
                         new_filters.add("lowDP")
                 if len(new_filters) > 0:
                     nb_filtered += 1
