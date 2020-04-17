@@ -47,8 +47,8 @@ def getSupportMergedSources(record, id_by_src):
             "quality": (record.info["{}_VCQUAL".format(src_id)] if "{}_VCQUAL".format(src_id) in record.info else None),
             "libraries": [
                 {
-                    "spanning_read": sample["SRSRC"][curr_idx],
-                    "spanning_pair": sample["PRSRC"][curr_idx],
+                    "spanning_reads": sample["SRSRC"][curr_idx],
+                    "spanning_pairs": sample["PRSRC"][curr_idx],
                     "name": name
                 } for name, sample in record.samples.items()
             ],
@@ -62,8 +62,8 @@ def getSupportUniqSource(record, calling_source=None):
         "quality": record.qual,
         "libraries": [
             {
-                "spanning_read": sample["SR"],
-                "spanning_pair": sample["PR"],
+                "spanning_reads": sample["SR"],
+                "spanning_pairs": sample["PR"],
                 "name": name
             } for name, sample in record.samples.items()
         ],
