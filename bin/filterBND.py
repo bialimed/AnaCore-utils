@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -68,6 +68,27 @@ def loadNormalDb(databases):
             for line in reader:
                 normal_fusions.add(line.strip())
     return normal_fusions
+
+
+def hasLowSupport(record, min_support):
+    """
+    Return True if the fusion has an insufficient number of supporting reads (sum of spanning reads + spanning pairs from all samples).
+
+    :param record: One breakend of the fusion.
+    :type record: anacore.vcf.VCFRecord
+    :param min_support: The minimum number of supporting reads.
+    :type min_support: int
+    :return: True if the fusion has an unsufficient number of supporting reads.
+    :rtype: boolean
+    """
+    has_low_support = False
+    if min_support != 0:
+        support = 0
+        for name, spl in record.samples.items():
+            support += spl["SR"] + spl["PR"]
+        if support < min_support:
+            has_low_support = True
+    return has_low_support
 
 
 def inNormal(first, second, annotation_field, normal_fusions):
@@ -240,6 +261,7 @@ if __name__ == "__main__":
     group_filter = parser.add_argument_group('Filters')  # Filters
     group_filter.add_argument('-m', '--mode', default="tag", choices=["tag", "remove"], help='Select the filter mode. In mode "tag": a tag is added in FILTER field if the fusion fits a filter. In mode "remove": the fusion is removed from the output if it fits filter. [Default: %(default)s]')
     group_filter.add_argument('-r', '--rt-max-dist', default=50000, type=int, help='Maximum distance to evaluate if the fusion is a readthrough. [Default: %(default)s]')
+    group_filter.add_argument('-u', '--min-support', default=4, type=int, help='Minimum number of supporting reads (sum of spanning reads + spanning pairs from all samples). Use 0 to skip filter. [Default: %(default)s]')
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-i', '--input-variants', required=True, help='Path to the file containing variants annotated with anacore-utils/annotBND.py (format: VCF).')
     group_input.add_argument('-a', '--input-annotations', required=True, help='Path to the genome annotations file used with anacore-utils/annotBND.py (format: GTF).')
@@ -263,9 +285,11 @@ if __name__ == "__main__":
         with BreakendVCFIO(args.output_variants, "w", args.annotation_field) as writer:
             # Header
             writer.copyHeader(reader)
-            writer.filter["IG"] = HeaderFilterAttr("IG", "One breakend is located on immunoglobulin.")
             writer.filter["HLA"] = HeaderFilterAttr("HLA", "One breakend is located on HLA.")
+            writer.filter["IG"] = HeaderFilterAttr("IG", "One breakend is located on immunoglobulin.")
             writer.filter["Inner"] = HeaderFilterAttr("Inner", "The two breakends are located in the same gene.")
+            if args.min_support != 0:
+                writer.filter["lowSupport"] = HeaderFilterAttr("lowSupport", "Fusions has spanning_reads + spanning_pairs < {}.".format(args.min_support))
             writer.filter["Readthrough"] = HeaderFilterAttr("Readthrough", "The fusion is readthrough (it concerns the two following genes in the same strand in an interval <= {}).".format(args.rt_max_dist))
             if args.inputs_normal:
                 source = "."
@@ -295,6 +319,9 @@ if __name__ == "__main__":
                 # In normals databases
                 if inNormal(first, second, args.annotation_field, normal_fusions):
                     new_filters.add("inNormal")
+                # Has low support
+                if hasLowSupport(first, args.min_support):
+                    new_filters.add("lowSupport")
                 if len(new_filters) != 0:
                     nb_filtered += 1
                 # Write result

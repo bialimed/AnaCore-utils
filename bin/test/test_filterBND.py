@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -18,7 +18,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.dirname(CURRENT_DIR)
 sys.path.append(BIN_DIR)
 
-from filterBND import AnnotGetter, inNormal, isHLA, isIG, isInner, isReadthrough, loadNormalDb
+from filterBND import AnnotGetter, hasLowSupport, inNormal, isHLA, isIG, isInner, isReadthrough, loadNormalDb
 
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
@@ -62,6 +62,46 @@ GENE_ID02	GENE_ID05""")
         expected = {"GENE_ID01	GENE_ID03", "GENE_ID01	GENE_ID04", "GENE_ID02	GENE_ID05"}
         observed = loadNormalDb([self.tmp_normal_db1, self.tmp_normal_db2])
         self.assertEqual(observed, expected)
+
+    def testHasLowSupport(self):
+        up = VCFRecord(
+            "chr1", 140, "id_01", "A", ["A[chr1:199["],
+            pFormat=["PR", "SR"],
+            samples={
+                "splA": {"PR": 9, "SR": 3}
+            }
+        )
+        self.assertTrue(not hasLowSupport(up, 10))
+        up = VCFRecord(
+            "chr1", 140, "id_02", "A", ["A[chr1:199["],
+            pFormat=["PR", "SR"],
+            samples={
+                "splA": {"PR": 9, "SR": 0}
+            }
+        )
+        self.assertTrue(hasLowSupport(up, 10))
+        up = VCFRecord(
+            "chr1", 140, "id_03", "A", ["A[chr1:199["],
+            pFormat=["PR", "SR"],
+            samples={
+                "splA": {"PR": 4, "SR": 2},
+                "splB": {"PR": 3, "SR": 3},
+            }
+        )
+        self.assertTrue(not hasLowSupport(up, 10))
+        up = VCFRecord(
+            "chr1", 140, "id_04", "A", ["A[chr1:199["],
+            pFormat=["PR", "SR"],
+            samples={
+                "splA": {"PR": 1, "SR": 2},
+                "splB": {"PR": 3, "SR": 3},
+            }
+        )
+        self.assertTrue(hasLowSupport(up, 10))
+        up = VCFRecord(
+            "chr1", 140, "id_05", "A", ["A[chr1:199["]
+        )
+        self.assertTrue(not hasLowSupport(up, 0))  # No test
 
     def testInNormal(self):
         normal_fusions = {"GENE_ID01	GENE_ID02", "GENE_ID02	GENE_ID03"}
