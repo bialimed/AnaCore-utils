@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.1.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -268,6 +268,25 @@ def renameFields(bnd_record, caller_prefix, shared_filters):
         bnd_record.samples[spl_name] = renamed_info
 
 
+def getUniqId(first, second):
+    """
+    Return an unique ID for the fusion. It contains breakends locations and CIPOS.
+
+    :param first: First breakend in pair.
+    :type first: anacore.vcf.VCFRecord
+    :param second: Second breakend in pair.
+    :type second: anacore.vcf.VCFRecord
+    :return: The unique ID for the fusion. It contains breakends locations and CIPOS.
+    :rtype: str
+    """
+    return "{} {} @@ {} {}".format(
+        first.getName(),
+        "" if "CIPOS" not in first.info else first.info["CIPOS"],
+        second.getName(),
+        "" if "CIPOS" not in second.info else second.info["CIPOS"],
+    )
+
+
 def getPrevFusion(records_pair, overlapped, curr_caller):
     """
     Return fusion with same right breakpoint of evaluated fusion.
@@ -289,23 +308,43 @@ def getPrevFusion(records_pair, overlapped, curr_caller):
             start_right_eval, end_right_eval = getBNDInterval(overlap_eval.annot["second"])
             if not start_right_record > end_right_eval and not end_right_record < start_right_eval:
                 if prev_records is not None:
-                    raise Exception(
-                        "{} from {} has an overlap ambiguity between: {} and {}.".format(
+                    ambiguity = True
+                    curr_id = getUniqId(left_record, right_record)
+                    prev_id = getUniqId(prev_records[0], prev_records[1])
+                    over_id = getUniqId(overlap_eval.annot["first"], overlap_eval.annot["second"])
+                    if prev_id != over_id:  # Try to solve ambiguity (keep the stricly same breakends)
+                        if prev_id == curr_id:
+                            ambiguity = False
+                        elif over_id == curr_id:
+                            ambiguity = False
+                            prev_records = (overlap_eval.annot["first"], overlap_eval.annot["second"])
+                            log.debug(
+                                "Second merge {} from {} with {} from {}.".format(
+                                    overlap_eval.annot["first"].getName(),
+                                    " and ".join(prev_records[0].info["SRC"]),
+                                    left_record.getName(),
+                                    curr_caller
+                                )
+                            )
+                    if ambiguity:
+                        raise Exception(
+                            "{} from {} has an overlap ambiguity between: {} and {}.".format(
+                                left_record.getName(),
+                                curr_caller,
+                                prev_records[0].getName(),
+                                overlap_eval.annot["first"].getName()
+                            )
+                        )
+                else:
+                    prev_records = (overlap_eval.annot["first"], overlap_eval.annot["second"])
+                    log.debug(
+                        "Merge {} from {} with {} from {}.".format(
+                            overlap_eval.annot["first"].getName(),
+                            " and ".join(prev_records[0].info["SRC"]),
                             left_record.getName(),
-                            curr_caller,
-                            prev_records[0].getName(),
-                            overlap_eval.annot["first"].getName()
+                            curr_caller
                         )
                     )
-                prev_records = (overlap_eval.annot["first"], overlap_eval.annot["second"])
-                log.debug(
-                    "Merge {} from {} with {} from {}.".format(
-                        overlap_eval.annot["first"].getName(),
-                        " and ".join(prev_records[0].info["SRC"]),
-                        left_record.getName(),
-                        curr_caller
-                    )
-                )
     return prev_records
 
 
@@ -324,7 +363,7 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
     :return: Merged VCF records.
     :rtype: list
     """
-    whole_fusions = {}  # fisrt bnd region by chromosome
+    whole_fusions = {}  # first bnd region by chromosome
     for idx_in, curr_in in enumerate(inputs_variants):
         curr_caller = calling_sources[idx_in]
         log.info("Process {}".format(curr_caller))
@@ -343,11 +382,12 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                     "PR": getCount(data, "PR"),
                     "SR": getCount(data, "SR")
                 }
+            # Get identical fusion from previous callers
+            prev_records = getPrevFusion(records, overlapped, curr_caller)
             # Rename fields
             for curr_record in records:
                 renameFields(curr_record, "s{}".format(idx_in), shared_filters)
             # Add to storage
-            prev_records = getPrevFusion(records, overlapped, curr_caller)  # Get identical fusion from previous callers
             if prev_records is None:  # Prepare new fusion
                 new_fusions.append(query)
                 for curr_record in records:
