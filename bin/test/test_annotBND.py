@@ -20,7 +20,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.dirname(CURRENT_DIR)
 sys.path.append(BIN_DIR)
 
-from annotBND import annotGeneShard, exonsPos, getMostSupported, shardIsBeforeBND
+from annotBND import annotGeneShard, exonsPos, getGeneAnnot, getMostSupported, shardIsBeforeBND
 
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
@@ -38,24 +38,36 @@ class TestAnnotBND(unittest.TestCase):
         with open(self.tmp_annot, "w") as writer:
             """
             Model:
-                              10     40       80 90    140  150   170 180 190      220 230    250
+                              10     40       80 90    140  150   170 180 189      220 230    250
                               |      |        |  |      |   |       |  |  |         |  |      |
-            gene 2 tr 3                          >>>>>>>>                              >>>>>>>>
-            gene 2 tr 4                          >>>>>>>>>>>>          >>>>            >>>>>>>>
+            gene 2 tr 3                          >>>>>>>>                           >>>>>>>>>>>
+                   pr 3                                ..                           .......
+            gene 2 tr 4                          >>>>>>>>>>>>          >>>>         >>>>>>>>>>>
+                   pr 4                                ......          ....         .......
                            --------------------------------------------------------------------
-            gene 1 tr 1       <<<<<<<<        <<<<<<<<<<<<<<<       <<<<<<<<<<<<<<<<<
-            gene 1 tr 2       <<<<<<<<                              <<<<<<<<<<<<<<<<<
+            gene 1 tr 1       <<<<<<<<        <<<<<<<<<<<<<<<       <<<<<<<<<<<<<<<<<<<<
+                   pr 1       ........        ......
+            gene 1 tr 2       <<<<<<<<                              <<<<<<<<<<<<<<<<<<<<
+                   pr 2       ........
             """
             writer.write("""1	simulation	exon	10	40	.	-	.	gene_id "GENE_I01"; transcript_id "TR_01"; exon_number "3"; gene_name "GENE_N01";
+1	simulation	CDS	10	40	.	-	.	gene_id "GENE_I01"; protein_id "PROT_01"; transcript_id "TR_01"; exon_number "3"; gene_name "GENE_N01";
 1	simulation	exon	10	40	.	-	.	gene_id "GENE_I01"; transcript_id "TR_02"; exon_number "2"; gene_name "GENE_N01";
+1	simulation	CDS	10	40	.	-	.	gene_id "GENE_I01"; protein_id "PROT_02"; transcript_id "TR_02"; exon_number "2"; gene_name "GENE_N01";
 1	simulation	exon	80	150	.	-	.	gene_id "GENE_I01"; transcript_id "TR_01"; exon_number "2"; gene_name "GENE_N01";
+1	simulation	CDS	80	100	.	-	.	gene_id "GENE_I01"; protein_id "PROT_01"; transcript_id "TR_01"; exon_number "2"; gene_name "GENE_N01";
 1	simulation	exon	90	140	.	+	.	gene_id "GENE_I02"; transcript_id "TR_03"; exon_number "1"; gene_name "GENE_N02";
+1	simulation	CDS	135	140	.	+	.	gene_id "GENE_I02"; protein_id "PROT_03"; transcript_id "TR_03"; exon_number "1"; gene_name "GENE_N02";
 1	simulation	exon	90	150	.	+	.	gene_id "GENE_I02"; transcript_id "TR_04"; exon_number "1"; gene_name "GENE_N02";
+1	simulation	CDS	135	150	.	+	.	gene_id "GENE_I02"; protein_id "PROT_04"; transcript_id "TR_04"; exon_number "1"; gene_name "GENE_N02";
 1	simulation	exon	170	230	.	-	.	gene_id "GENE_I01"; transcript_id "TR_01"; exon_number "1"; gene_name "GENE_N01";
 1	simulation	exon	170	230	.	-	.	gene_id "GENE_I01"; transcript_id "TR_02"; exon_number "1"; gene_name "GENE_N01";
-1	simulation	exon	180	190	.	+	.	gene_id "GENE_I02"; transcript_id "TR_04"; exon_number "2"; gene_name "GENE_N02";
-1	simulation	exon	220	250	.	+	.	gene_id "GENE_I02"; transcript_id "TR_04"; exon_number "2"; gene_name "GENE_N02";
-1	simulation	exon	220	250	.	+	.	gene_id "GENE_I02"; transcript_id "TR_04"; exon_number "3"; gene_name "GENE_N02";""")
+1	simulation	exon	180	189	.	+	.	gene_id "GENE_I02"; transcript_id "TR_04"; exon_number "2"; gene_name "GENE_N02";
+1	simulation	CDS	180	189	.	+	.	gene_id "GENE_I02"; protein_id "PROT_04"; transcript_id "TR_04"; exon_number "2"; gene_name "GENE_N02";
+1	simulation	exon	220	250	.	+	.	gene_id "GENE_I02"; transcript_id "TR_03"; exon_number "2"; gene_name "GENE_N02";
+1	simulation	CDS	220	240	.	+	.	gene_id "GENE_I02"; protein_id "PROT_03"; transcript_id "TR_03"; exon_number "2"; gene_name "GENE_N02";
+1	simulation	exon	220	250	.	+	.	gene_id "GENE_I02"; transcript_id "TR_04"; exon_number "3"; gene_name "GENE_N02";
+1	simulation	CDS	220	240	.	+	.	gene_id "GENE_I02"; protein_id "PROT_04"; transcript_id "TR_04"; exon_number "3"; gene_name "GENE_N02";""")
 
     def tearDown(self):
         # Clean temporary files
@@ -232,8 +244,931 @@ class TestAnnotBND(unittest.TestCase):
         )
         self.assertEqual(exonsPos(record, genes_by_chr), {90: 2})
 
-    # def test_getGeneAnnot(self):
-    #     genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
+    def test_getGeneAnnot(self):
+        genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
+        # Strand +, intergenic, before breakend
+        record = VCFRecord(
+            "1", 5, "id_01", "A", ["A[2:100["],
+            info={"ANNOT_POS": 5, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            getGeneAnnot(record, genes_by_chr),
+            []
+        )
+        # Strand -, intergenic, after breakend
+        record = VCFRecord(
+            "1", 5, "id_02", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 5, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            getGeneAnnot(record, genes_by_chr),
+            []
+        )
+        # Strand +, intergenic, after breakend
+        record = VCFRecord(
+            "1", 5, "id_03", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 5, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            getGeneAnnot(record, genes_by_chr),
+            []
+        )
+        # Strand -, intergenic, before breakend
+        record = VCFRecord(
+            "1", 5, "id_04", "A", ["A[2:100["],
+            info={"ANNOT_POS": 5, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            getGeneAnnot(record, genes_by_chr),
+            []
+        )
+        # Strand +, intron, before breakend
+        record = VCFRecord(
+            "1", 50, "id_05", "A", ["A[2:100["],
+            info={"ANNOT_POS": 50, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "2/2",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                }
+            ]
+        )
+        # Strand -, intron, after breakend
+        record = VCFRecord(
+            "1", 50, "id_06", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 50, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "2/2",
+                    "CDS_position": 21,
+                    "Protein_position": 7,
+                    "Codon_position": 3
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "intron&utr",
+                    "RNA_ELT_POS": "1/1&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 0
+                }
+            ]
+        )
+        # Strand +, intron, after breakend
+        record = VCFRecord(
+            "1", 50, "id_07", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 50, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "2/2",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                }
+            ]
+        )
+        # Strand -, intron, before breakend
+        record = VCFRecord(
+            "1", 50, "id_08", "A", ["A[2:100["],
+            info={"ANNOT_POS": 50, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "2/2",
+                    "CDS_position": 22,
+                    "Protein_position": 8,
+                    "Codon_position": 1
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "intron&utr",
+                    "RNA_ELT_POS": "1/1&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 0
+                }
+            ]
+        )
+        # Strand -, exon spliceDonnor, after breakend
+        record = VCFRecord(
+            "1", 80, "id_09", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 80, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&spliceDonor",
+                    "RNA_ELT_POS": "2/3",
+                    "CDS_position": 21,
+                    "Protein_position": 7,
+                    "Codon_position": 3
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "intron&utr",
+                    "RNA_ELT_POS": "1/1&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 0
+                }
+            ]
+        )
+        # Strand -, exon spliceAcceptor, after breakend
+        record = VCFRecord(
+            "1", 40, "id_10", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 40, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&spliceAcceptor",
+                    "RNA_ELT_POS": "3/3",
+                    "CDS_position": 22,
+                    "Protein_position": 8,
+                    "Codon_position": 1
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "exon&spliceAcceptor",
+                    "RNA_ELT_POS": "2/2",
+                    "CDS_position": 1,
+                    "Protein_position": 1,
+                    "Codon_position": 1
+                }
+            ]
+        )
+        # Strand +, exon spliceDonnor, before breakend
+        record = VCFRecord(
+            "1", 189, "id_11", "A", ["A[2:100["],
+            info={"ANNOT_POS": 189, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 70
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/2&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 20
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": 6,
+                    "Protein_position": 2,
+                    "Codon_position": 3
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon&spliceDonor",
+                    "RNA_ELT_POS": "2/3",
+                    "CDS_position": 26,
+                    "Protein_position": 9,
+                    "Codon_position": 2
+                }
+            ]
+        )
+        # Strand +, exon spliceAcceptor, after breakend
+        record = VCFRecord(
+            "1", 220, "id_12", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 220, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 101
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/2&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 51
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "exon&spliceAcceptor",
+                    "RNA_ELT_POS": "2/2",
+                    "CDS_position": 7,
+                    "Protein_position": 3,
+                    "Codon_position": 1
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon&spliceAcceptor",
+                    "RNA_ELT_POS": "3/3",
+                    "CDS_position": 27,
+                    "Protein_position": 9,
+                    "Codon_position": 3
+                }
+            ]
+        )
+        # Strand +, exon transcriptStart on strand -, after breakend
+        record = VCFRecord(
+            "1", 230, "id_13", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 230, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&transcriptStart&utr",
+                    "RNA_ELT_POS": "1/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 111
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "exon&transcriptStart&utr",
+                    "RNA_ELT_POS": "1/2&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 61
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "2/2",
+                    "CDS_position": 17,
+                    "Protein_position": 6,
+                    "Codon_position": 2
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "3/3",
+                    "CDS_position": 37,
+                    "Protein_position": 13,
+                    "Codon_position": 1
+                }
+            ]
+        )
+        # Strand +, exon transcriptStart, before breakend
+        record = VCFRecord(
+            "1", 90, "id_14", "A", ["A]2:100]"],
+            info={"ANNOT_POS": 90, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "2/3",
+                    "CDS_position": 11,
+                    "Protein_position": 4,
+                    "Codon_position": 2
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "intron&utr",
+                    "RNA_ELT_POS": "1/1&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 0
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "exon&transcriptStart&utr",
+                    "RNA_ELT_POS": "1/2&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 45
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon&transcriptStart&utr",
+                    "RNA_ELT_POS": "1/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 45
+                }
+            ]
+        )
+        # Strand -, exon, after breakend
+        record = VCFRecord(
+            "1", 39, "id_15", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 39, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "3/3",
+                    "CDS_position": 23,
+                    "Protein_position": 8,
+                    "Codon_position": 2
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "2/2",
+                    "CDS_position": 2,
+                    "Protein_position": 1,
+                    "Codon_position": 2
+                }
+            ]
+        )
+        # Strand -, exon, after breakend
+        record = VCFRecord(
+            "1", 92, "id_16", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 92, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                 {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "2/3",
+                    "CDS_position": 9,
+                    "Protein_position": 3,
+                    "Codon_position": 3
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "intron&utr",
+                    "RNA_ELT_POS": "1/1&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 0
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/2&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 43
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 43
+                }
+            ]
+        )
+        # Strand +, exon, before breakend
+        record = VCFRecord(
+            "1", 92, "id_17", "A", ["A[2:100["],
+            info={"ANNOT_POS": 92, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                 {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "2/3",
+                    "CDS_position": 9,
+                    "Protein_position": 3,
+                    "Codon_position": 3
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/2&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 43
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 43
+                }
+            ]
+        )
+        # Strand +, exon, before breakend
+        record = VCFRecord(
+            "1", 138, "id_18", "A", ["A[2:100["],
+            info={"ANNOT_POS": 138, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                 {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "2/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 38
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "1/2",
+                    "CDS_position": 4,
+                    "Protein_position": 2,
+                    "Codon_position": 1
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "1/3",
+                    "CDS_position": 4,
+                    "Protein_position": 2,
+                    "Codon_position": 1
+                }
+            ]
+        )
+        # Strand +, exon
+        record = VCFRecord(
+            "1", 143, "id_19", "A", ["A[2:100["],
+            info={"ANNOT_POS": 143, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                 {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "2/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 43
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": 6,
+                    "Protein_position": 2,
+                    "Codon_position": 3
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "1/3",
+                    "CDS_position": 9,
+                    "Protein_position": 3,
+                    "Codon_position": 3
+                }
+            ]
+        )
+        # Strand +, exon, before breakend
+        record = VCFRecord(
+            "1", 183, "id_20", "A", ["A[2:100["],
+            info={"ANNOT_POS": 183, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                 {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 64
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/2&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 14
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": 6,
+                    "Protein_position": 2,
+                    "Codon_position": 3
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "2/3",
+                    "CDS_position": 20,
+                    "Protein_position": 7,
+                    "Codon_position": 2
+                }
+            ]
+        )
+        # Strand -, exon, after breakend
+        record = VCFRecord(
+            "1", 183, "id_21", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 183, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                 {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 64
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/2&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 14
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "2/3",
+                    "CDS_position": 20,
+                    "Protein_position": 7,
+                    "Codon_position": 2
+                }
+            ]
+        )
+        # Strand +, exon, after breakend
+        record = VCFRecord(
+            "1", 183, "id_22", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 183, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                 {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 64
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/2&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 14
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": 7,
+                    "Protein_position": 3,
+                    "Codon_position": 1
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "2/3",
+                    "CDS_position": 20,
+                    "Protein_position": 7,
+                    "Codon_position": 2
+                }
+            ]
+        )
+        # Strand -, exon, before breakend
+        record = VCFRecord(
+            "1", 183, "id_23", "A", ["A[2:100["],
+            info={"ANNOT_POS": 183, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                 {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/3&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 64
+                },
+                {
+                    "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
+                    "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "1/2&5prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None,
+                    "CDS_DIST": 14
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "intron",
+                    "RNA_ELT_POS": "1/1",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon",
+                    "RNA_ELT_POS": "2/3",
+                    "CDS_position": 20,
+                    "Protein_position": 7,
+                    "Codon_position": 2
+                }
+            ]
+        )
+        # Strand +, exon, before breakend
+        record = VCFRecord(
+            "1", 241, "id_24", "A", ["A[2:100["],
+            info={"ANNOT_POS": 241, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "2/2&3prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "3/3&3prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                }
+            ]
+        )
+        # Strand -, exon, after breakend
+        record = VCFRecord(
+            "1", 241, "id_25", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 241, "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "2/2&3prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "3/3&3prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                }
+            ]
+        )
+        # Strand +, exon, after breakend
+        record = VCFRecord(
+            "1", 241, "id_26", "A", ["]2:100]A"],
+            info={"ANNOT_POS": 241, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "2/2&3prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "3/3&3prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                }
+            ]
+        )
+        # Strand -, exon, before breakend
+        record = VCFRecord(
+            "1", 241, "id_27", "A", ["A[2:100["],
+            info={"ANNOT_POS": 241, "MATEID": "id_02"}
+        )
+        self.assertEqual(
+            sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
+            [
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "2/2&3prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                },
+                {
+                    "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
+                    "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
+                    "RNA_ELT_TYPE": "exon&utr",
+                    "RNA_ELT_POS": "3/3&3prim",
+                    "CDS_position": None,
+                    "Protein_position": None,
+                    "Codon_position": None
+                }
+            ]
+        )
 
     def test_getMostSupported(self):
         self.assertEqual(getMostSupported({}), None)

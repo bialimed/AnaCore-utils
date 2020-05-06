@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -186,49 +186,60 @@ def getGeneAnnot(record, genes_by_chr):
                             len(curr_transcript.children) - 1
                         )
                         if len(curr_transcript.proteins) > 0 and curr_transcript.strand == record_strand:
+                            curr_protein = curr_transcript.proteins[0]
                             # Get CDS on last implicated exon for first shard and first implicated exon on second shard
                             ref_pos = subregion.end + 1
                             if shard_before_bnd:
                                 ref_pos = subregion.start - 1
-                            curr_annot["CDS_position"] = curr_transcript.proteins[0].getNtPosFromRefPos(ref_pos)
-                            if curr_annot["CDS_position"] is None:
+                            curr_annot["CDS_position"] = curr_protein.getNtPosFromRefPos(ref_pos)
+                            if curr_annot["CDS_position"] is None or curr_annot["CDS_position"] == 1 or curr_annot["CDS_position"] == curr_protein.length:
+                                curr_annot["CDS_position"] = None
                                 curr_annot["RNA_ELT_TYPE"] += "&utr"
-                                if curr_transcript.proteins[0].strand == "+":
-                                    curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_transcript.proteins[0].start > bnd_region.start else "3prim")
-                                    if curr_transcript.proteins[0].start > bnd_region.start:
-                                        curr_annot["CDS_DIST"] = getDistBeforeCDSForward(bnd_region.start, curr_transcript.proteins[0])
+                                if curr_protein.strand == "+":
+                                    curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_protein.start > bnd_region.start else "3prim")
+                                    if curr_protein.start > bnd_region.start:
+                                        curr_annot["CDS_DIST"] = getDistBeforeCDSForward(bnd_region.start, curr_protein)
                                 else:
-                                    curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_transcript.proteins[0].end < bnd_region.start else "3prim")
-                                    if curr_transcript.proteins[0].end < bnd_region.start:
-                                        curr_annot["CDS_DIST"] = getDistBeforeCDSReverse(bnd_region.start, curr_transcript.proteins[0])
+                                    curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_protein.end < bnd_region.start else "3prim")
+                                    if curr_protein.end < bnd_region.start:
+                                        curr_annot["CDS_DIST"] = getDistBeforeCDSReverse(bnd_region.start, curr_protein)
                             else:
-                                curr_annot["Protein_position"], curr_annot["Codon_position"] = curr_transcript.proteins[0].getPosOnRegion(ref_pos)
+                                curr_annot["Protein_position"], curr_annot["Codon_position"] = curr_protein.getPosOnRegion(ref_pos)
                     else:  # On exon
+                        nb_exon = len(curr_transcript.children)
                         curr_annot["RNA_ELT_TYPE"] = "exon"
-                        curr_annot["RNA_ELT_POS"] = "{}/{}".format(
-                            subregion_idx,
-                            len(curr_transcript.children)
-                        )
+                        curr_annot["RNA_ELT_POS"] = "{}/{}".format(subregion_idx, nb_exon)
                         if bnd_region.start == subregion.start:
-                            curr_annot["RNA_ELT_TYPE"] += "&splice" + ("Acceptor" if subregion.strand == "+" else "Donor")
+                            if subregion_idx == 1 and subregion.strand == "+":  # Start of the first exon
+                                curr_annot["RNA_ELT_TYPE"] += "&transcriptStart"
+                            elif subregion_idx == nb_exon and subregion.strand == "-":   # End of the last exon
+                                curr_annot["RNA_ELT_TYPE"] += "&transcriptEnd"
+                            else:
+                                curr_annot["RNA_ELT_TYPE"] += "&splice" + ("Acceptor" if subregion.strand == "+" else "Donor")
                         elif bnd_region.start == subregion.end:
-                            curr_annot["RNA_ELT_TYPE"] += "&splice" + ("Acceptor" if subregion.strand == "-" else "Donor")
+                            if subregion_idx == 1 and subregion.strand == "-":  # Start of the first exon
+                                curr_annot["RNA_ELT_TYPE"] += "&transcriptStart"
+                            elif subregion_idx == nb_exon and subregion.strand == "+":   # End of the last exon
+                                curr_annot["RNA_ELT_TYPE"] += "&transcriptEnd"
+                            else:
+                                curr_annot["RNA_ELT_TYPE"] += "&splice" + ("Acceptor" if subregion.strand == "-" else "Donor")
                         if len(curr_transcript.proteins) > 0:
-                            curr_annot["CDS_position"] = curr_transcript.proteins[0].getNtPosFromRefPos(bnd_region.start)
+                            curr_protein = curr_transcript.proteins[0]
+                            curr_annot["CDS_position"] = curr_protein.getNtPosFromRefPos(bnd_region.start)
                             # UTR
                             if curr_annot["CDS_position"] is None:
                                 curr_annot["RNA_ELT_TYPE"] += "&utr"
                                 if curr_transcript.proteins[0].strand == "+":
-                                    curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_transcript.proteins[0].start > bnd_region.start else "3prim")
-                                    if curr_transcript.proteins[0].start > bnd_region.start:
-                                        curr_annot["CDS_DIST"] = getDistBeforeCDSForward(bnd_region.start, curr_transcript.proteins[0])
+                                    curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_protein.start > bnd_region.start else "3prim")
+                                    if curr_protein.start > bnd_region.start:
+                                        curr_annot["CDS_DIST"] = getDistBeforeCDSForward(bnd_region.start, curr_protein)
                                 else:
-                                    curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_transcript.proteins[0].end < bnd_region.start else "3prim")
-                                    if curr_transcript.proteins[0].end < bnd_region.start:
-                                        curr_annot["CDS_DIST"] = getDistBeforeCDSReverse(bnd_region.start, curr_transcript.proteins[0])
+                                    curr_annot["RNA_ELT_POS"] += "&" + ("5prim" if curr_protein.end < bnd_region.start else "3prim")
+                                    if curr_protein.end < bnd_region.start:
+                                        curr_annot["CDS_DIST"] = getDistBeforeCDSReverse(bnd_region.start, curr_protein)
                             # Protein position
                             else:
-                                curr_annot["Protein_position"], curr_annot["Codon_position"] = curr_transcript.proteins[0].getPosOnRegion(bnd_region.start)
+                                curr_annot["Protein_position"], curr_annot["Codon_position"] = curr_protein.getPosOnRegion(bnd_region.start)
                     # Add to annotations
                     annotations.append(curr_annot)
     return annotations
@@ -309,8 +320,8 @@ def annotModel(first, second, annotation_field):
                                     inframe = "1"
                             elif not first_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: CDS and second: UTR
                                 if second_annot["RNA_ELT_POS"].endswith("5prim"):
-                                    if first_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceDonor" in first_annot["RNA_ELT_TYPE"]:
-                                        if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"]:
+                                    if first_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceDonor" in first_annot["RNA_ELT_TYPE"] or "transcriptEnd" in first_annot["RNA_ELT_TYPE"]:
+                                        if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"] or "transcriptStart" in first_annot["RNA_ELT_TYPE"]:
                                             inframe = "0"
                                             first_and_utr_codon_pos = first_annot["Codon_position"] + (second_annot["CDS_DIST"] % 3)
                                             if first_and_utr_codon_pos == 3:
@@ -320,10 +331,10 @@ def annotModel(first, second, annotation_field):
                             inframe = "0"
                         elif second_annot["RNA_ELT_POS"].endswith("5prim"):  # first: non-coding and second: 5'UTR
                             if first_annot["RNA_ELT_TYPE"].startswith("intron"):
-                                if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first in intron to second 5'UTR in intron or on splice acceptor
+                                if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"] or "transcriptStart" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first in intron to second 5'UTR in intron or on splice acceptor
                                     inframe = "1"
-                            elif "spliceDonor" in first_annot["RNA_ELT_TYPE"]:
-                                if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first on splice donor to second 5'UTR in intron or on splice acceptor
+                            elif "spliceDonor" in first_annot["RNA_ELT_TYPE"] or "transcriptEnd" in first_annot["RNA_ELT_TYPE"]:
+                                if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"] or "transcriptStart" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first on splice donor to second 5'UTR in intron or on splice acceptor
                                     inframe = "1"
             first_annot["IN_FRAME"].append(
                 "{}:{}".format(second_annot["Feature"], inframe)
