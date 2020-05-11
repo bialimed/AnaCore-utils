@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.3.0'
+__version__ = '1.4.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -267,15 +267,17 @@ def annotGeneShard(record, annotation_field):
                     annot["GENE_SHARD"] = "up"
 
 
-def annotModel(first, second, annotation_field):
+def annotModelRetIntron(first, second, annotation_field):
     """
-    Add GENE_SHARD and IN_FRAME in annotations. GENE_SHARD determines if the part
-    of the transcript implicated on the fusion RNA is the 5' of the original (up)
-    or the 3' (down). IN_FRAME determines if the transcript in the 3' shard of
-    the fusion transcript express a part of the original protein: 5' shard
-    imports promoter and start of the first transcript in right strand, 3' shard
-    imports the end of the second transcript in right strand and the phase of the
-    second transcript is kept.
+    Add GENE_SHARD and IN_FRAME in annotations in a context where introns may
+    have been retained.
+    GENE_SHARD determines if the part of the transcript implicated on the fusion
+    RNA is the 5' of the original (up) or the 3' (down).
+    IN_FRAME determines if the transcript in the 3' shard of the fusion transcript
+    express a part of the original protein: 5' shard imports promoter and start
+    of the first transcript in right strand, 3' shard imports the end of the
+    second transcript in right strand and the phase of the second transcript is
+    kept.
     The following table details IN_FRAME values for all the analysed configurations:
     5' shard     3' shard   Inframe   Note
     5'UTR        5'UTR      1         The first does not start
@@ -294,6 +296,8 @@ def annotModel(first, second, annotation_field):
     :param annotation_field: Field used for store annotations.
     :type annotation_field: str
     """
+    first_strand = getStrand(first, True)
+    second_strand = getStrand(second, False)
     annotGeneShard(first, annotation_field)
     annotGeneShard(second, annotation_field)
     for second_annot in second.info[annotation_field]:
@@ -305,37 +309,53 @@ def annotModel(first, second, annotation_field):
         for second_annot in second.info[annotation_field]:
             inframe = "0"
             if first_annot["GENE_SHARD"] == "up" and second_annot["GENE_SHARD"] == "down":
-                if second_annot["Protein"] != "":  # The second RNA is coding
-                    inframe = "."
-                    if first_annot["Protein"] != "":  # First and second transcripts are coding
-                        if not first_annot["RNA_ELT_TYPE"].endswith("utr") and not second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: CDS and second: CDS
-                            inframe = "0"
-                            if (first_annot["Codon_position"] == 3 and second_annot["Codon_position"] == 1) or (second_annot["Codon_position"] - first_annot["Codon_position"] == 1):
-                                inframe = "1"
-                        else:  # At least one breakend falls in UTR
-                            if second_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_POS"].endswith("3prim"):  # first: * and second: 3'UTR
-                                inframe = "0"
-                            elif first_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: UTR and second: UTR
-                                if first_annot["RNA_ELT_POS"].endswith("5prim") and second_annot["RNA_ELT_POS"].endswith("5prim"):  # first: 5'UTR and second: 5'UTR
-                                    inframe = "1"
-                            elif not first_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: CDS and second: UTR
-                                if second_annot["RNA_ELT_POS"].endswith("5prim"):
-                                    if first_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceDonor" in first_annot["RNA_ELT_TYPE"] or "transcriptEnd" in first_annot["RNA_ELT_TYPE"]:
-                                        if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"] or "transcriptStart" in first_annot["RNA_ELT_TYPE"]:
+                if first_strand == first_annot["STRAND"] and second_strand == second_annot["STRAND"]:
+                    if second_annot["Protein"] != "":  # The second RNA is coding
+                        inframe = "."
+                        if first_annot["Protein"] != "":  # First and second transcripts are coding
+                            if not first_annot["RNA_ELT_TYPE"].endswith("utr") and not second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: CDS and second: CDS
+                                is_intron_jct = "intron" in first_annot["RNA_ELT_TYPE"] and "intron" in second_annot["RNA_ELT_TYPE"]
+                                is_exon_jct = None
+                                if not is_intron_jct:
+                                    is_exon_jct = "exon" in first_annot["RNA_ELT_TYPE"] and "exon" in second_annot["RNA_ELT_TYPE"]
+                                if is_intron_jct or is_exon_jct:
+                                    # ################## TODO: check stop codon ?
+                                    inframe = "0"
+                                    if (first_annot["Codon_position"] == 3 and second_annot["Codon_position"] == 1) or (second_annot["Codon_position"] - first_annot["Codon_position"] == 1):
+                                        inframe = "1"
+                            else:  # At least one breakend falls in UTR
+                                if second_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_POS"].endswith("3prim"):  # first: * and second: 3'UTR
+                                    inframe = "0"
+                                elif first_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: UTR and second: UTR
+                                    if first_annot["RNA_ELT_POS"].endswith("5prim") and second_annot["RNA_ELT_POS"].endswith("5prim"):  # first: 5'UTR and second: 5'UTR
+                                        inframe = "1"
+                                elif not first_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: CDS and second: UTR
+                                    if second_annot["RNA_ELT_POS"].endswith("5prim"):  # first: CDS and second: 5'UTR
+                                        skip = False
+                                        if "exon" in first_annot["RNA_ELT_TYPE"] and "intron" in second_annot["RNA_ELT_TYPE"]:
+                                            skip = True
+                                            if "spliceDonor" in first_annot["RNA_ELT_TYPE"] or "transcriptEnd" in first_annot["RNA_ELT_TYPE"]:
+                                                skip = False
+                                        elif "intron" in first_annot["RNA_ELT_TYPE"] and "exon" in second_annot["RNA_ELT_TYPE"]:
+                                            skip = True
+                                            if "spliceAcceptor" in first_annot["RNA_ELT_TYPE"] or "transcriptStart" in first_annot["RNA_ELT_TYPE"]:
+                                                skip = False
+                                        if not skip:
                                             inframe = "0"
                                             first_and_utr_codon_pos = first_annot["Codon_position"] + (second_annot["CDS_DIST"] % 3)
+                                            # ################## TODO: check stop codon ?
                                             if first_and_utr_codon_pos == 3:
                                                 inframe = "1"
-                    else:  # First is not coding
-                        if second_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_POS"].endswith("3prim"):  # first: * and second: 3'UTR
-                            inframe = "0"
-                        elif second_annot["RNA_ELT_POS"].endswith("5prim"):  # first: non-coding and second: 5'UTR
-                            if first_annot["RNA_ELT_TYPE"].startswith("intron"):
-                                if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"] or "transcriptStart" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first in intron to second 5'UTR in intron or on splice acceptor
-                                    inframe = "1"
-                            elif "spliceDonor" in first_annot["RNA_ELT_TYPE"] or "transcriptEnd" in first_annot["RNA_ELT_TYPE"]:
-                                if second_annot["RNA_ELT_TYPE"].startswith("intron") or "spliceAcceptor" in second_annot["RNA_ELT_TYPE"] or "transcriptStart" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first on splice donor to second 5'UTR in intron or on splice acceptor
-                                    inframe = "1"
+                        else:  # First is not coding
+                            if second_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_POS"].endswith("3prim"):  # first: * and second: 3'UTR
+                                inframe = "0"
+                            elif second_annot["RNA_ELT_POS"].endswith("5prim"):  # first: non-coding and second: 5'UTR
+                                if first_annot["RNA_ELT_TYPE"].startswith("intron"):
+                                    if second_annot["RNA_ELT_TYPE"].startswith("intron"):  # from non-coding first in intron to second 5'UTR in intron
+                                        inframe = "1"
+                                elif "spliceDonor" in first_annot["RNA_ELT_TYPE"] or "transcriptEnd" in first_annot["RNA_ELT_TYPE"]:
+                                    if "spliceAcceptor" in second_annot["RNA_ELT_TYPE"] or "transcriptStart" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first on splice donor to second 5'UTR on splice acceptor
+                                        inframe = "1"
             first_annot["IN_FRAME"].append(
                 "{}:{}".format(second_annot["Feature"], inframe)
             )
@@ -498,7 +518,7 @@ def annot(first, second, genes_by_chr, annotation_field):
         second.info["ANNOT_POS"] = second_selected_pos
     first.info[annotation_field] = getGeneAnnot(first, genes_by_chr)
     second.info[annotation_field] = getGeneAnnot(second, genes_by_chr)
-    annotModel(first, second, annotation_field)
+    annotModelRetIntron(first, second, annotation_field)
 
 
 ########################################################################

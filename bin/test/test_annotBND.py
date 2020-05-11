@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -20,7 +20,8 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.dirname(CURRENT_DIR)
 sys.path.append(BIN_DIR)
 
-from annotBND import annotGeneShard, exonsPos, getGeneAnnot, getMostSupported, shardIsBeforeBND
+from annotBND import annotGeneShard, annotModelRetIntron, exonsPos, getGeneAnnot, getMostSupported, shardIsBeforeBND
+# todo: annot getDistBeforeCDSForward getDistBeforeCDSReverse selectedPos
 
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
@@ -67,7 +68,9 @@ class TestAnnotBND(unittest.TestCase):
 1	simulation	exon	220	250	.	+	.	gene_id "GENE_I02"; transcript_id "TR_03"; exon_number "2"; gene_name "GENE_N02";
 1	simulation	CDS	220	240	.	+	.	gene_id "GENE_I02"; protein_id "PROT_03"; transcript_id "TR_03"; exon_number "2"; gene_name "GENE_N02";
 1	simulation	exon	220	250	.	+	.	gene_id "GENE_I02"; transcript_id "TR_04"; exon_number "3"; gene_name "GENE_N02";
-1	simulation	CDS	220	240	.	+	.	gene_id "GENE_I02"; protein_id "PROT_04"; transcript_id "TR_04"; exon_number "3"; gene_name "GENE_N02";""")
+1	simulation	CDS	220	240	.	+	.	gene_id "GENE_I02"; protein_id "PROT_04"; transcript_id "TR_04"; exon_number "3"; gene_name "GENE_N02";
+2	simulation	exon	50	100	.	-	.	gene_id "GENE_I03"; transcript_id "TR_05"; exon_number "2"; gene_name "GENE_N03";
+2	simulation	exon	150	200	.	-	.	gene_id "GENE_I03"; transcript_id "TR_05"; exon_number "1"; gene_name "GENE_N03";""")
 
     def tearDown(self):
         # Clean temporary files
@@ -243,6 +246,264 @@ class TestAnnotBND(unittest.TestCase):
             info={"CIPOS": [-30, 20], "RNA_FIRST": True, "MATEID": "id_02"}
         )
         self.assertEqual(exonsPos(record, genes_by_chr), {90: 2})
+
+    def test_annotModelRetIntron(self):
+        genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
+        # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->spliceAcceptor&CDS undetermined
+        # tr4->tr1&tr2: spliceDonor&CDS->spliceAcceptor&CDS frameshift
+        record = VCFRecord("1", 189, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 189, "RNA_FIRST": True})
+        mate = VCFRecord("1", 40, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 40})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:.&TR_02:.'),
+                ('TR_04', 'TR_01:0&TR_02:0')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:.&TR_04:0'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:.&TR_04:0')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: spliceDonor&CDS->spliceAcceptor&CDS in_frame
+        # tr4->tr1&tr2: CDS->spliceAcceptor&CDS in_frame
+        record = VCFRecord("1", 140, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
+        mate = VCFRecord("1", 40, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 40})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:1&TR_02:1'),
+                ('TR_04', 'TR_01:1&TR_02:1')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:1&TR_04:1'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:1&TR_04:1')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->CDS undetermined, intron&CDS->intron&UTR in_frame
+        # tr4->tr1&tr2: CDS->CDS in_frame, CDS->intron&UTR undetermined
+        record = VCFRecord("1", 188, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 188, "RNA_FIRST": True})
+        mate = VCFRecord("1", 84, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 84})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:.&TR_02:1'),
+                ('TR_04', 'TR_01:1&TR_02:.')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:.&TR_04:1'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:1&TR_04:.')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->intron&CDS in_frame, intron&CDS->intron&UTR in_frame
+        # tr4->tr1&tr2: intron&CDS->intron&CDS frameshift, intron&CDS->intron&UTR frameshift
+        record = VCFRecord("1", 195, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 195, "RNA_FIRST": True})
+        mate = VCFRecord("1", 60, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 60})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:1&TR_02:1'),
+                ('TR_04', 'TR_01:0&TR_02:0')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:1&TR_04:0'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:1&TR_04:0')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: spliceDonor&CDS->spliceAcceptor&UTR in_frame, spliceDonor&CDS->spliceAcceptor&UTR frameshift
+        # tr4->tr1&tr2: CDS->spliceAcceptor&UTR in_frame, CDS->spliceAcceptor&UTR frameshift
+        record = VCFRecord("1", 140, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
+        mate = VCFRecord("1", 230, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 230})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_03', 'TR_01:1&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_04', 'TR_01:1&TR_02:0&TR_03:0&TR_04:0')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:1&TR_04:1'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_03', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_04', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: 3'UTR->CDS undetermined, 3'UTR->intron undetermined
+        # tr4->tr1&tr2: 3'UTR->CDS undetermined, 3'UTR->intron undetermined
+        record = VCFRecord("1", 245, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 245, "RNA_FIRST": True})
+        mate = VCFRecord("1", 83, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 83})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_03', 'TR_01:.&TR_02:.'),
+                ('TR_04', 'TR_01:.&TR_02:.')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_03:.&TR_04:.'),
+                ('TR_02', 'TR_03:.&TR_04:.')
+            ]
+        )
+        # Fragments -/-
+        # tr5->tr1&tr2: intron&untranslated->intron&5'UTR in_frame
+        record = VCFRecord("2", 120, "id_01", "A", ["]1:160]A"], info={"ANNOT_POS": 120, "RNA_FIRST": True})
+        mate = VCFRecord("1", 160, "id_02", "A", ["A]2:120]"], info={"ANNOT_POS": 160})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_05', 'TR_01:1&TR_02:1&TR_03:0&TR_04:0')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_05:1'),
+                ('TR_02', 'TR_05:1'),
+                ('TR_03', 'TR_05:0'),
+                ('TR_04', 'TR_05:0')
+            ]
+        )
+        # Fragments -/-
+        # tr5->tr1&tr2: exon&spliceDonor&untranslated->exon&spliceAcceptor&5'UTR in_frame,
+        #               exon&spliceDonor&untranslated->intron&5'UTR undetermined
+        record = VCFRecord("2", 150, "id_01", "A", ["]1:150]A"], info={"ANNOT_POS": 150, "RNA_FIRST": True})
+        mate = VCFRecord("1", 150, "id_02", "A", ["A]2:150]"], info={"ANNOT_POS": 150})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_05', 'TR_01:1&TR_02:.&TR_03:0&TR_04:0')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_05:1'),
+                ('TR_02', 'TR_05:.'),
+                ('TR_03', 'TR_05:0'),
+                ('TR_04', 'TR_05:0')
+            ]
+        )
+        # Fragments -/-
+        # tr5->tr1&tr2: exon&spliceDonor&untranslated->exon&5'UTR undetermined,
+        #               exon&spliceDonor&untranslated->exon&5'UTR undetermined
+        record = VCFRecord("2", 150, "id_01", "A", ["]1:190]A"], info={"ANNOT_POS": 150, "RNA_FIRST": True})
+        mate = VCFRecord("1", 190, "id_02", "A", ["A]2:150]"], info={"ANNOT_POS": 190})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_05', 'TR_01:.&TR_02:.&TR_03:0&TR_04:0')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_05:.'),
+                ('TR_02', 'TR_05:.'),
+                ('TR_03', 'TR_05:0'),
+                ('TR_04', 'TR_05:0')
+            ]
+        )
+        # Fragments -/+
+        # tr5->tr1&tr2: exon&spliceDonor&untranslated->exon&3'UTR no_frame,
+        #               exon&spliceDonor&untranslated->exon&3'UTR no_frame
+        record = VCFRecord("2", 150, "id_01", "A", ["]1:241]A"], info={"ANNOT_POS": 150, "RNA_FIRST": True})
+        mate = VCFRecord("1", 241, "id_02", "A", ["]2:150]A"], info={"ANNOT_POS": 241})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_05', 'TR_03:0&TR_04:0')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_03', 'TR_05:0'),
+                ('TR_04', 'TR_05:0')
+            ]
+        )
+        # Fragments -/+
+        # tr5->tr1&tr2: exon&spliceDonor&untranslated->exon&CDS undetermined,
+        #               exon&spliceDonor&untranslated->exon&CDS undetermined
+        record = VCFRecord("2", 150, "id_01", "A", ["]1:235]A"], info={"ANNOT_POS": 150, "RNA_FIRST": True})
+        mate = VCFRecord("1", 235, "id_02", "A", ["]2:150]A"], info={"ANNOT_POS": 235})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRetIntron(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_05', 'TR_03:.&TR_04:.')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_03', 'TR_05:.'),
+                ('TR_04', 'TR_05:.')
+            ]
+        )
+
 
     def test_getGeneAnnot(self):
         genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
