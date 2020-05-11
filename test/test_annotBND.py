@@ -16,14 +16,14 @@ from anacore.vcf import VCFRecord
 from anacore.gtf import loadModel
 from anacore.region import splittedByRef
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BIN_DIR = os.path.dirname(CURRENT_DIR)
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+APP_DIR = os.path.dirname(TEST_DIR)
+BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
+os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
 from annotBND import annotGeneShard, annotModelRetIntron, exonsPos, getGeneAnnot, getMostSupported, shardIsBeforeBND
 # todo: annot getDistBeforeCDSForward getDistBeforeCDSReverse selectedPos
-
-os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
 
 ########################################################################

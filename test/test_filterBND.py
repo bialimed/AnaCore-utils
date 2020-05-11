@@ -17,10 +17,9 @@ from anacore.vcf import VCFRecord
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.dirname(CURRENT_DIR)
 sys.path.append(BIN_DIR)
+os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
 from filterBND import AnnotGetter, hasLowSupport, inNormal, isHLA, isIG, isInner, isReadthrough, loadNormalDb
-
-os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
 
 ########################################################################
@@ -357,7 +356,6 @@ GENE_ID02	GENE_ID05""")
             }
         )
         self.assertTrue(not isIG(up, down, "TESTANN"))
-
 
     def testIsHLA(self):
         up = VCFRecord(

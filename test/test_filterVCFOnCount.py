@@ -1,20 +1,4 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2017 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
@@ -24,20 +8,14 @@ __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
 import os
-import sys
 import uuid
 import tempfile
 import unittest
 import subprocess
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-APP_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
-LIB_DIR = os.path.join(APP_DIR, "lib")
-sys.path.append(LIB_DIR)
-
-from anacore.vcf import VCFIO, VCFRecord
-
-BIN_DIR = os.path.dirname(CURRENT_DIR)
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+APP_DIR = os.path.dirname(TEST_DIR)
+BIN_DIR = os.path.join(APP_DIR, "bin")
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
 
@@ -52,8 +30,8 @@ class FilterVCFPrimers(unittest.TestCase):
         unique_id = str(uuid.uuid1())
 
         # Temporary files
-        self.tmp_variants = os.path.join( tmp_folder, unique_id + ".vcf")
-        self.tmp_output = os.path.join( tmp_folder, unique_id + "_out.vcf")
+        self.tmp_variants = os.path.join(tmp_folder, unique_id + ".vcf")
+        self.tmp_output = os.path.join(tmp_folder, unique_id + "_out.vcf")
 
         # Exec command
         self.cmd = [
@@ -132,8 +110,8 @@ class FilterVCFPrimers(unittest.TestCase):
         with open(self.tmp_output) as FH_results:
             observed = FH_results.read().strip().split("\n")
         self.assertEqual(
-            expected[1:], # skip file format version
-            observed[1:] # skip file format version
+            expected[1:],  # skip file format version
+            observed[1:]  # skip file format version
         )
 
 

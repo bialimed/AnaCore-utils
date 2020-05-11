@@ -1,20 +1,4 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2018 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
@@ -26,20 +10,16 @@ __status__ = 'prod'
 import os
 import sys
 import unittest
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BIN_DIR = os.path.dirname(CURRENT_DIR)
-APP_DIR = os.path.dirname(os.path.dirname(CURRENT_DIR))
-LIB_DIR = os.path.join(APP_DIR, "lib")
-sys.path.append(LIB_DIR)
-sys.path.append(BIN_DIR)
-
 from anacore.region import Region
 from anacore.genomicRegion import CDS, Exon, Gene, Protein, Transcript
-from shallowsAnalysis import getTranscriptsAnnot
 
-BIN_DIR = os.path.dirname(CURRENT_DIR)
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+APP_DIR = os.path.dirname(TEST_DIR)
+BIN_DIR = os.path.join(APP_DIR, "bin")
+sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
+
+from shallowsAnalysis import getTranscriptsAnnot
 
 
 ########################################################################

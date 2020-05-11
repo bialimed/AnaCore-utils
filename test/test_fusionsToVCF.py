@@ -14,8 +14,9 @@ import tempfile
 import unittest
 import subprocess
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BIN_DIR = os.path.dirname(CURRENT_DIR)
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+APP_DIR = os.path.dirname(TEST_DIR)
+BIN_DIR = os.path.join(APP_DIR, "bin")
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
 
@@ -53,13 +54,11 @@ MN1	BEND2	oncogene,cancer,tumor,exon-exon	0	40	19	30	BOWTIE;BOWTIE+BLAT;BOWTIE+S
         with open(self.tmp_input, "w") as FH_out:
             FH_out.write(content)
 
-
     def tearDown(self):
         # Clean temporary files
         for curr_file in [self.tmp_input, self.tmp_output]:
             if os.path.exists(curr_file):
                 os.remove(curr_file)
-
 
     def testResults(self):
         # Execute command

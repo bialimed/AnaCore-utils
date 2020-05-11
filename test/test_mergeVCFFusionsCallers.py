@@ -13,8 +13,9 @@ import tempfile
 import unittest
 import subprocess
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BIN_DIR = os.path.dirname(CURRENT_DIR)
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+APP_DIR = os.path.dirname(TEST_DIR)
+BIN_DIR = os.path.join(APP_DIR, "bin")
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
 
@@ -204,13 +205,11 @@ X	118791837	dca7f41e-6ab1-4bea-a1aa-6ac00f10e7f9	N	N]7:140777046]	.	PASS	MATEID=
         with open(self.tmp_in_arriba, "w") as writer:
             writer.write(content)
 
-
     def tearDown(self):
         # Clean temporary files
         for curr_file in [self.tmp_in_arriba, self.tmp_in_manta, self.tmp_in_starfusion, self.tmp_output]:
             if os.path.exists(curr_file):
                 os.remove(curr_file)
-
 
     def testResults(self):
         # Execute command

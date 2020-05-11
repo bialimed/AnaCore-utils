@@ -8,16 +8,14 @@ __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
 import os
-import sys
 import uuid
 import tempfile
 import unittest
 import subprocess
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BIN_DIR = os.path.dirname(CURRENT_DIR)
-sys.path.append(BIN_DIR)
-
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+APP_DIR = os.path.dirname(TEST_DIR)
+BIN_DIR = os.path.join(APP_DIR, "bin")
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
 
