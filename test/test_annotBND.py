@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -380,8 +380,8 @@ class TestAnnotBND(unittest.TestCase):
     def test_annotModelRetIntron(self):
         genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
         # Fragments +/-
-        # tr3->tr1&tr2: intron&CDS->spliceAcceptor&CDS undetermined
-        # tr4->tr1&tr2: spliceDonor&CDS->spliceAcceptor&CDS frameshift
+        # tr3->tr1&tr2: intron&CDS->spliceEnd&CDS undetermined
+        # tr4->tr1&tr2: spliceStart&CDS->spliceEnd&CDS frameshift
         record = VCFRecord("1", 189, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 189, "RNA_FIRST": True})
         mate = VCFRecord("1", 40, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 40})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
@@ -404,8 +404,8 @@ class TestAnnotBND(unittest.TestCase):
             ]
         )
         # Fragments +/-
-        # tr3->tr1&tr2: spliceDonor&CDS->spliceAcceptor&CDS in_frame
-        # tr4->tr1&tr2: CDS->spliceAcceptor&CDS in_frame
+        # tr3->tr1&tr2: spliceStart&CDS->spliceEnd&CDS in_frame
+        # tr4->tr1&tr2: CDS->spliceEnd&CDS in_frame
         record = VCFRecord("1", 140, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
         mate = VCFRecord("1", 40, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 40})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
@@ -476,8 +476,8 @@ class TestAnnotBND(unittest.TestCase):
             ]
         )
         # Fragments +/-
-        # tr3->tr1&tr2: spliceDonor&CDS->spliceAcceptor&UTR in_frame, spliceDonor&CDS->spliceAcceptor&UTR frameshift
-        # tr4->tr1&tr2: CDS->spliceAcceptor&UTR in_frame, CDS->spliceAcceptor&UTR frameshift
+        # tr3->tr1&tr2: spliceStart&CDS->spliceEnd&UTR in_frame, spliceStart&CDS->spliceEnd&UTR frameshift
+        # tr4->tr1&tr2: CDS->spliceEnd&UTR in_frame, CDS->spliceEnd&UTR frameshift
         record = VCFRecord("1", 140, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
         mate = VCFRecord("1", 230, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 230})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
@@ -546,8 +546,8 @@ class TestAnnotBND(unittest.TestCase):
             ]
         )
         # Fragments -/-
-        # tr5->tr1&tr2: exon&spliceDonor&untranslated->exon&spliceAcceptor&5'UTR in_frame,
-        #               exon&spliceDonor&untranslated->intron&5'UTR undetermined
+        # tr5->tr1&tr2: exon&spliceStart&untranslated->exon&spliceEnd&5'UTR in_frame,
+        #               exon&spliceStart&untranslated->intron&5'UTR undetermined
         record = VCFRecord("2", 150, "id_01", "A", ["]1:150]A"], info={"ANNOT_POS": 150, "RNA_FIRST": True})
         mate = VCFRecord("1", 150, "id_02", "A", ["A]2:150]"], info={"ANNOT_POS": 150})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
@@ -569,8 +569,8 @@ class TestAnnotBND(unittest.TestCase):
             ]
         )
         # Fragments -/-
-        # tr5->tr1&tr2: exon&spliceDonor&untranslated->exon&5'UTR undetermined,
-        #               exon&spliceDonor&untranslated->exon&5'UTR undetermined
+        # tr5->tr1&tr2: exon&spliceStart&untranslated->exon&5'UTR undetermined,
+        #               exon&spliceStart&untranslated->exon&5'UTR undetermined
         record = VCFRecord("2", 150, "id_01", "A", ["]1:190]A"], info={"ANNOT_POS": 150, "RNA_FIRST": True})
         mate = VCFRecord("1", 190, "id_02", "A", ["A]2:150]"], info={"ANNOT_POS": 190})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
@@ -592,8 +592,8 @@ class TestAnnotBND(unittest.TestCase):
             ]
         )
         # Fragments -/+
-        # tr5->tr1&tr2: exon&spliceDonor&untranslated->exon&3'UTR no_frame,
-        #               exon&spliceDonor&untranslated->exon&3'UTR no_frame
+        # tr5->tr1&tr2: exon&spliceStart&untranslated->exon&3'UTR no_frame,
+        #               exon&spliceStart&untranslated->exon&3'UTR no_frame
         record = VCFRecord("2", 150, "id_01", "A", ["]1:241]A"], info={"ANNOT_POS": 150, "RNA_FIRST": True})
         mate = VCFRecord("1", 241, "id_02", "A", ["]2:150]A"], info={"ANNOT_POS": 241})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
@@ -613,8 +613,8 @@ class TestAnnotBND(unittest.TestCase):
             ]
         )
         # Fragments -/+
-        # tr5->tr1&tr2: exon&spliceDonor&untranslated->exon&CDS undetermined,
-        #               exon&spliceDonor&untranslated->exon&CDS undetermined
+        # tr5->tr1&tr2: exon&spliceStart&untranslated->exon&CDS undetermined,
+        #               exon&spliceStart&untranslated->exon&CDS undetermined
         record = VCFRecord("2", 150, "id_01", "A", ["]1:235]A"], info={"ANNOT_POS": 150, "RNA_FIRST": True})
         mate = VCFRecord("1", 235, "id_02", "A", ["]2:150]A"], info={"ANNOT_POS": 235})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
@@ -798,7 +798,7 @@ class TestAnnotBND(unittest.TestCase):
                 {
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
-                    "RNA_ELT_TYPE": "exon&spliceDonor",
+                    "RNA_ELT_TYPE": "exon&spliceStart",
                     "RNA_ELT_POS": "2/3",
                     "CDS_position": 21,
                     "Protein_position": 7,
@@ -816,7 +816,7 @@ class TestAnnotBND(unittest.TestCase):
                 }
             ]
         )
-        # Strand -, exon spliceAcceptor, after breakend
+        # Strand -, exon spliceEnd, after breakend
         record = VCFRecord(
             "1", 40, "id_10", "A", ["]2:100]A"],
             info={"ANNOT_POS": 40, "RNA_FIRST": True, "MATEID": "id_02"}
@@ -827,7 +827,7 @@ class TestAnnotBND(unittest.TestCase):
                 {
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
-                    "RNA_ELT_TYPE": "exon&spliceAcceptor",
+                    "RNA_ELT_TYPE": "exon&spliceEnd",
                     "RNA_ELT_POS": "3/3",
                     "CDS_position": 22,
                     "Protein_position": 8,
@@ -836,7 +836,7 @@ class TestAnnotBND(unittest.TestCase):
                 {
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
-                    "RNA_ELT_TYPE": "exon&spliceAcceptor",
+                    "RNA_ELT_TYPE": "exon&spliceEnd",
                     "RNA_ELT_POS": "2/2",
                     "CDS_position": 1,
                     "Protein_position": 1,
@@ -884,7 +884,7 @@ class TestAnnotBND(unittest.TestCase):
                 {
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
-                    "RNA_ELT_TYPE": "exon&spliceDonor",
+                    "RNA_ELT_TYPE": "exon&spliceStart",
                     "RNA_ELT_POS": "2/3",
                     "CDS_position": 26,
                     "Protein_position": 9,
@@ -892,7 +892,7 @@ class TestAnnotBND(unittest.TestCase):
                 }
             ]
         )
-        # Strand +, exon spliceAcceptor, after breakend
+        # Strand +, exon spliceEnd, after breakend
         record = VCFRecord(
             "1", 220, "id_12", "A", ["]2:100]A"],
             info={"ANNOT_POS": 220, "MATEID": "id_02"}
@@ -923,7 +923,7 @@ class TestAnnotBND(unittest.TestCase):
                 {
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
-                    "RNA_ELT_TYPE": "exon&spliceAcceptor",
+                    "RNA_ELT_TYPE": "exon&spliceEnd",
                     "RNA_ELT_POS": "2/2",
                     "CDS_position": 7,
                     "Protein_position": 3,
@@ -932,7 +932,7 @@ class TestAnnotBND(unittest.TestCase):
                 {
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
-                    "RNA_ELT_TYPE": "exon&spliceAcceptor",
+                    "RNA_ELT_TYPE": "exon&spliceEnd",
                     "RNA_ELT_POS": "3/3",
                     "CDS_position": 27,
                     "Protein_position": 9,

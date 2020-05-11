@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.0'
+__version__ = '1.5.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -215,14 +215,14 @@ def getGeneAnnot(record, genes_by_chr):
                             elif subregion_idx == nb_exon and subregion.strand == "-":   # End of the last exon
                                 curr_annot["RNA_ELT_TYPE"] += "&transcriptEnd"
                             else:
-                                curr_annot["RNA_ELT_TYPE"] += "&splice" + ("Acceptor" if subregion.strand == "+" else "Donor")
+                                curr_annot["RNA_ELT_TYPE"] += "&splice" + ("End" if subregion.strand == "+" else "Start")
                         elif bnd_region.start == subregion.end:
                             if subregion_idx == 1 and subregion.strand == "-":  # Start of the first exon
                                 curr_annot["RNA_ELT_TYPE"] += "&transcriptStart"
                             elif subregion_idx == nb_exon and subregion.strand == "+":   # End of the last exon
                                 curr_annot["RNA_ELT_TYPE"] += "&transcriptEnd"
                             else:
-                                curr_annot["RNA_ELT_TYPE"] += "&splice" + ("Acceptor" if subregion.strand == "-" else "Donor")
+                                curr_annot["RNA_ELT_TYPE"] += "&splice" + ("End" if subregion.strand == "-" else "Start")
                         if len(curr_transcript.proteins) > 0:
                             curr_protein = curr_transcript.proteins[0]
                             curr_annot["CDS_position"] = curr_protein.getNtPosFromRefPos(bnd_region.start)
@@ -334,11 +334,11 @@ def annotModelRetIntron(first, second, annotation_field):
                                         skip = False
                                         if "exon" in first_annot["RNA_ELT_TYPE"] and "intron" in second_annot["RNA_ELT_TYPE"]:
                                             skip = True
-                                            if "spliceDonor" in first_annot["RNA_ELT_TYPE"] or "transcriptEnd" in first_annot["RNA_ELT_TYPE"]:
+                                            if "spliceStart" in first_annot["RNA_ELT_TYPE"] or "transcriptEnd" in first_annot["RNA_ELT_TYPE"]:
                                                 skip = False
                                         elif "intron" in first_annot["RNA_ELT_TYPE"] and "exon" in second_annot["RNA_ELT_TYPE"]:
                                             skip = True
-                                            if "spliceAcceptor" in first_annot["RNA_ELT_TYPE"] or "transcriptStart" in first_annot["RNA_ELT_TYPE"]:
+                                            if "spliceEnd" in first_annot["RNA_ELT_TYPE"] or "transcriptStart" in first_annot["RNA_ELT_TYPE"]:
                                                 skip = False
                                         if not skip:
                                             inframe = "0"
@@ -353,8 +353,8 @@ def annotModelRetIntron(first, second, annotation_field):
                                 if first_annot["RNA_ELT_TYPE"].startswith("intron"):
                                     if second_annot["RNA_ELT_TYPE"].startswith("intron"):  # from non-coding first in intron to second 5'UTR in intron
                                         inframe = "1"
-                                elif "spliceDonor" in first_annot["RNA_ELT_TYPE"] or "transcriptEnd" in first_annot["RNA_ELT_TYPE"]:
-                                    if "spliceAcceptor" in second_annot["RNA_ELT_TYPE"] or "transcriptStart" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first on splice donor to second 5'UTR on splice acceptor
+                                elif "spliceStart" in first_annot["RNA_ELT_TYPE"] or "transcriptEnd" in first_annot["RNA_ELT_TYPE"]:
+                                    if "spliceEnd" in second_annot["RNA_ELT_TYPE"] or "transcriptStart" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first on splice donor to second 5'UTR on splice acceptor
                                         inframe = "1"
             first_annot["IN_FRAME"].append(
                 "{}:{}".format(second_annot["Feature"], inframe)
