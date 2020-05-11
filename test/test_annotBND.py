@@ -22,8 +22,8 @@ BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
-from annotBND import annotGeneShard, annotModelRetIntron, exonsPos, getGeneAnnot, getMostSupported, shardIsBeforeBND
-# todo: annot getDistBeforeCDSForward getDistBeforeCDSReverse selectedPos
+from annotBND import annotGeneShard, annotModelRetIntron, exonsPos, getGeneAnnot, getMostSupported, selectedPos, shardIsBeforeBND
+# todo: annot getDistBeforeCDSForward getDistBeforeCDSReverse
 
 
 ########################################################################
@@ -201,6 +201,122 @@ class TestAnnotBND(unittest.TestCase):
             record.info["ANN"],
             [{"STRAND": '+', "GENE_SHARD": 'down'}, {"STRAND": '-', "GENE_SHARD": 'up'}]
         )
+
+    def test_selectedPos(self):
+        genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
+        # strand +/+ without exon boundary overlap
+        first = VCFRecord(
+            "1", 295, "id_01", "A", ["[1:395[A"],
+            info={"CIPOS": [0, 6], "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        second = VCFRecord(
+            "1", 395, "id_02", "A", ["A]1:295]"],
+            info={"CIPOS": [0, 6], "MATEID": "id_01"}
+        )
+        observed = selectedPos(
+            first, exonsPos(first, genes_by_chr),
+            second, exonsPos(second, genes_by_chr)
+        )
+        self.assertEqual(observed, (295, 395))
+        # strand -/-
+        first = VCFRecord(
+            "2", 95, "id_01", "A", ["[1:145[A"],
+            info={"CIPOS": [0, 6], "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        second = VCFRecord(
+            "1", 145, "id_02", "A", ["A]2:95]"],
+            info={"CIPOS": [0, 6], "MATEID": "id_01"}
+        )
+        observed = selectedPos(
+            first, exonsPos(first, genes_by_chr),
+            second, exonsPos(second, genes_by_chr)
+        )
+        self.assertEqual(observed, (100, 150))
+        genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
+        # strand +/+
+        first = VCFRecord(
+            "1", 135, "id_01", "A", ["A[1:215["],
+            info={"CIPOS": [0, 6], "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        second = VCFRecord(
+            "1", 215, "id_02", "A", ["[1:135[A"],
+            info={"CIPOS": [0, 6], "MATEID": "id_01"}
+        )
+        observed = selectedPos(
+            first, exonsPos(first, genes_by_chr),
+            second, exonsPos(second, genes_by_chr)
+        )
+        self.assertEqual(observed, (140, 220))
+        # strand +/-
+        first = VCFRecord(
+            "1", 135, "id_01", "A", ["A]1:45]"],
+            info={"CIPOS": [0, 10], "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        second = VCFRecord(
+            "1", 35, "id_02", "A", ["A]1:145]"],
+            info={"CIPOS": [0, 10], "MATEID": "id_01"}
+        )
+        observed = selectedPos(
+            first, exonsPos(first, genes_by_chr),
+            second, exonsPos(second, genes_by_chr)
+        )
+        self.assertEqual(observed, (140, 40))
+        # strand +/- no common => arbitrary selection of first
+        first = VCFRecord(
+            "1", 135, "id_01", "A", ["A]1:41]"],
+            info={"CIPOS": [0, 6], "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        second = VCFRecord(
+            "1", 35, "id_02", "A", ["A]1:141]"],
+            info={"CIPOS": [0, 6], "MATEID": "id_01"}
+        )
+        observed = selectedPos(
+            first, exonsPos(first, genes_by_chr),
+            second, exonsPos(second, genes_by_chr)
+        )
+        self.assertEqual(observed, (140, 36))
+        # strand +/- only first has exon boundary in cipos
+        first = VCFRecord(
+            "1", 135, "id_01", "A", ["A]1:401]"],
+            info={"CIPOS": [0, 6], "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        second = VCFRecord(
+            "1", 395, "id_02", "A", ["A]1:141]"],
+            info={"CIPOS": [0, 6], "MATEID": "id_01"}
+        )
+        observed = selectedPos(
+            first, exonsPos(first, genes_by_chr),
+            second, exonsPos(second, genes_by_chr)
+        )
+        self.assertEqual(observed, (140, 396))
+        # strand +/+ only first has exon boundary in cipos
+        first = VCFRecord(
+            "1", 135, "id_01", "A", ["A[1:395["],
+            info={"CIPOS": [0, 6], "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        second = VCFRecord(
+            "1", 395, "id_02", "A", ["]1:135]A"],
+            info={"CIPOS": [0, 6], "MATEID": "id_01"}
+        )
+        observed = selectedPos(
+            first, exonsPos(first, genes_by_chr),
+            second, exonsPos(second, genes_by_chr)
+        )
+        self.assertEqual(observed, (140, 400))
+        # strand +/- only second has exon boundary in cipos
+        first = VCFRecord(
+            "1", 5, "id_01", "A", ["A[1:41["],
+            info={"CIPOS": [0, 6], "RNA_FIRST": True, "MATEID": "id_02"}
+        )
+        second = VCFRecord(
+            "1", 35, "id_02", "A", ["A]1:11]"],
+            info={"CIPOS": [0, 6], "MATEID": "id_01"}
+        )
+        observed = selectedPos(
+            first, exonsPos(first, genes_by_chr),
+            second, exonsPos(second, genes_by_chr)
+        )
+        self.assertEqual(observed, (6, 40))
 
     def test_exonsPos(self):
         genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
