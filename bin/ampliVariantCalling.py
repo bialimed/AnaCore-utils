@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.3.0'
+__version__ = '1.4.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -32,14 +32,17 @@ class Cmd:
 
     def __init__(self, program, description, exec_parameters, version_parameters=None, interpreter=None):
         """
-        @param exec_parameters: [str] The parameters to execute the program. Two possibles syntaxes.
-                                If the parameter contains the string '##PROGRAM##', this tag will be replaced by the program parameter before submit.
-                                Otherwise the parameters will be added after the program in command line.
-        @param version_parameters: [str] The parameters to get the program version. Two possibles syntaxes.
-                                   If the parameter contains the string '##PROGRAM##', this tag will be replaced by the program parameter before submit.
-                                   Otherwise the parameters will be added after the program in command line.
-        @param interpreter: [str] The specific interpreter used to call program. For example '/home/user/venv/bin/python3' for a python script with
-                                  dependencies installed in the virtual environment /home/user/venv.
+        :param exec_parameters: The parameters to execute the program. Two possibles syntaxes.
+        If the parameter contains the string '##PROGRAM##', this tag will be replaced by the program parameter before submit.
+        Otherwise the parameters will be added after the program in command line.
+        :type exec_parameters: str
+        :param version_parameters: The parameters to get the program version. Two possibles syntaxes.
+        If the parameter contains the string '##PROGRAM##', this tag will be replaced by the program parameter before submit.
+        Otherwise the parameters will be added after the program in command line.
+        :type version_parameters: str
+        :param interpreter: The specific interpreter used to call program. For example '/home/user/venv/bin/python3' for a python script with
+        dependencies installed in the virtual environment /home/user/venv.
+        :type interpreter: str
         """
         self.program = program
         self.description = description
@@ -51,7 +54,8 @@ class Cmd:
         """
         Return the command line.
 
-        @return : [str] The command line.
+        :return: The command line.
+        :rtype: str
         """
         exec_call = self.program
         if self.interpreter is not None:
@@ -67,8 +71,10 @@ class Cmd:
         """
         Return the program version number.
 
-        @param location : [str] If the version command returns the version number on 'stdout' or on 'stderr'.
-        @return : [str] version number if this is possible, otherwise this method return 'unknown'.
+        :param location: If the version command returns the version number on 'stdout' or on 'stderr'.
+        :type location: str
+        :return: Version number if this is possible, otherwise this method return 'unknown'.
+        :rtype: str
         """
         if self.version_parameters is None:
             return "unknown"
@@ -90,7 +96,8 @@ class Cmd:
         """
         Parse the command results to add information in log_file.
 
-        @log_file : [str] Path to the sample process log file.
+        :param log_file: Path to the sample process log file.
+        :type log_file: str
         """
         pass
 
@@ -98,7 +105,8 @@ class Cmd:
         """
         Launch command, trace this action in log and parse results.
 
-        @log_file : [str] Path to the sample process log file.
+        :param log_file: Path to the sample process log file.
+        :type log_file: str
         """
         # Log
         if log_file is not None:
@@ -128,7 +136,8 @@ class Logger:
 
     def __init__(self, filepath=None):
         """
-        @param filepath: [str] The log filepath. [default : STDOUT]
+        :param filepath: The log filepath. [default : STDOUT]
+        :type filepath: str
         """
         self.filepath = filepath
         self.file_handle = None
@@ -152,7 +161,8 @@ class Logger:
         """
         Write msg on file.
 
-        @param msg: [str] The message to write.
+        :param msg: The message to write.
+        :type msg: str
         """
         self.file_handle.write(msg)
 
@@ -161,8 +171,10 @@ class Logger:
         """
         Write msg on file.
 
-        @param filepath: [str] The log filepath. [default : STDOUT]
-        @param msg: [str] The message to write.
+        :param filepath: The log filepath. [default : STDOUT]
+        :type filepath: str
+        :param msg: The message to write.
+        :type msg: str
         """
         if filepath is not None and filepath is not sys.stdout:
             FH_log = open(filepath, "a")
@@ -174,7 +186,7 @@ class Logger:
 
 class TmpFiles:
     """
-    Manager for temporary files.
+    Manage temporary files.
 
     :copyright: FROGS's team INRA.
     :note:
@@ -188,10 +200,13 @@ class TmpFiles:
         finaly:
             tmpFiles.deleteAll()
     """
+
     def __init__(self, tmp_dir, prefix=None):
         """
-        @param tmp_dir: [str] The temporary directory path.
-        @param prefix: [str] The prefix added to each temporary file [default: <TIMESTAMP>_<PID>].
+        :param tmp_dir: The temporary directory path.
+        :type tmp_dir: str
+        :param prefix: The prefix added to each temporary file [default: <TIMESTAMP>_<PID>].
+        :type prefix: str
         """
         if prefix is None:
             prefix = str(time.time()) + "_" + str(os.getpid())
@@ -201,11 +216,16 @@ class TmpFiles:
 
     def add(self, filename, prefix=None, dir=None):
         """
-        @summary: Add a temporary file.
-        @param filename: The filename without prefix.
-        @param prefix: The prefix added [default: TmpFiles.prefix].
-        @param dir: The directory path [default: TmpFiles.tmp_dir].
-        @return: [str] The filepath.
+        Add a temporary file.
+
+        :param filename: The filename without prefix.
+        :type filename: str
+        :param prefix: The prefix added [default: TmpFiles.prefix].
+        :type prefix: str
+        :param dir: The directory path [default: TmpFiles.tmp_dir].
+        :type dir: str
+        :return: The filepath.
+        :rtype: str
         """
         # Default
         if prefix is None:
@@ -219,16 +239,17 @@ class TmpFiles:
 
     def delete(self, filepath):
         """
-        @summary: Deletes the specified temporary file.
-        @param filepath: [str] The file path to delete.
+        Delete the specified temporary file.
+
+        :param filepath: The file path to delete.
+        :type filepath: str
         """
         self.files.remove(filepath)
-        if os.path.exists(filepath): os.remove(filepath)
+        if os.path.exists(filepath):
+            os.remove(filepath)
 
     def deleteAll(self):
-        """
-        @summary: Deletes all temporary files.
-        """
+        """Delete all temporary files."""
         all_tmp_files = [tmp_file for tmp_file in self.files]
         for tmp_file in all_tmp_files:
             self.delete(tmp_file)
@@ -239,59 +260,69 @@ class SamtoolsIndex(Cmd):
 
     def __init__(self, in_aln):
         """
-        @param in_aln: [str] Path to the alignment file (format: BAM).
+        :param in_aln: Path to the alignment file (format: BAM).
+        :type in_aln: str
         """
         cmd_param = "" + \
             " index" + \
             " " + in_aln
 
-        Cmd.__init__( self,
-                      "samtools",
-                      "Index alignment.",
-                      cmd_param,
-                      "--version" )
+        Cmd.__init__(self,
+                     "samtools",
+                     "Index alignment.",
+                     cmd_param,
+                     "--version")
 
     def get_version(self):
         """
-        @summary: Returns the program version number.
-        @return: version number if this is possible, otherwise this method return 'unknown'.
+        Return the program version number.
+
+        :return: version number if this is possible, otherwise this method return 'unknown'.
+        :rtype: str
         """
         output = Cmd.get_version(self)
         return output.split("\n")[0].split(" ")[1].strip()
 
 
 class SplitBAMByRG(Cmd):
-    """
-    @summary: Splits BAM by groups of non-overlapping amplicons.
-    """
+    """Split BAM by groups of non-overlapping amplicons."""
+
     def __init__(self, in_design, in_aln, out_pattern):
         """
-        @param in_design: [str] Path to the amplicons description file (format: BED).
-        @param in_aln: [str] Path to the alignment file (format: BAM).
-        @param out_pattern: [str] The path pattern for the outputted alignments files (format: BAM). In this path the keyword "{GP}" is replace by the group name for each group.
+        :param in_design: Path to the amplicons description file (format: BED).
+        :type in_design: str
+        :param in_aln: Path to the alignment file (format: BAM).
+        :type in_aln: str
+        :param out_pattern: The path pattern for the outputted alignments files (format: BAM). In this path the keyword "{GP}" is replace by the group name for each group.
+        :type out_pattern: str
         """
         cmd_param = "" + \
             " --input-design " + in_design + \
             " --input-aln " + in_aln + \
             " --output-pattern " + out_pattern
 
-        Cmd.__init__( self,
-                      "splitBAMByRG.py",
-                      "Splits BAM by groups of non-overlapping amplicons.",
-                      cmd_param,
-                      "--version" )
+        Cmd.__init__(self,
+                     "splitBAMByRG.py",
+                     "Splits BAM by groups of non-overlapping amplicons.",
+                     cmd_param,
+                     "--version")
+
 
 class AddRGOnBAM(Cmd):
-    """
-    @summary: Adds tag on reads by origin (amplicon ID).
-    """
+    """Add tag on reads by origin (amplicon ID)."""
+
     def __init__(self, in_aln, out_aln, platform, sample, library):
         """
-        @param in_aln: [str] Path to the alignments file (format: BAM).
-        @param out_aln: [str] Path to the outputted alignments file (format: BAM).
-        @param platform: [str] Platform/technology used to produce the reads.
-        @param sample: [str] Sample. Use pool name where a pool is being sequenced.
-        @param library: [str] Library.
+        :param in_aln: Path to the alignments file (format: BAM).
+        :type in_aln: str
+        :param out_aln: Path to the outputted alignments file (format: BAM).
+        :type out_aln: str
+        :param platform: Platform/technology used to produce the reads.
+        :type platform: str
+        :param sample: Sample. Use pool name where a pool is being sequenced.
+        :type sample: str
+        :param library: Library.
+        :type library: str
         """
         cmd_param = "" + \
             " --pl " + platform + \
@@ -300,25 +331,34 @@ class AddRGOnBAM(Cmd):
             " --input-aln " + in_aln + \
             " --output-aln " + out_aln
 
-        Cmd.__init__( self,
-                      "addRGOnBAM.py",
-                      "Adds tag on reads by origin (amplicon ID).",
-                      cmd_param,
-                      "--version" )
+        Cmd.__init__(self,
+                     "addRGOnBAM.py",
+                     "Adds tag on reads by origin (amplicon ID).",
+                     cmd_param,
+                     "--version")
+
 
 class VarDictStep1(Cmd):
-    """
-    @summary: Dicovers variants.
-    """
-    def __init__(self, in_reference, in_regions, in_aln, out_file, min_alt_freq=0.02, min_alt_count=4, min_base_qual=25):
+    """Dicover variants."""
+
+    def __init__(self, in_reference, in_regions, in_aln, out_file, min_alt_freq=0.02, min_alt_count=4, min_base_qual=25, vardict_call="vardict-java"):
         """
-        @param in_reference: [str] Path to the reference sequences file (format: fasta).
-        @param in_regions: [str] Path to the amplicons design (format: BED). Start and end of the amplicons must be with primers.
-        @param in_aln: [str] Path to the alignments file (format: BAM).
-        @param out_file: [str] Path to the outputted file.
-        @param min_alt_freq: [float] The threshold for allele frequency.
-        @param min_alt_count: [int] The threshold for allele count.
-        @param min_base_qual: [int] The phred score for a base to be considered a good call.
+        :param in_reference: Path to the reference sequences file (format: fasta).
+        :type in_reference: str
+        :param in_regions: Path to the amplicons design (format: BED). Start and end of the amplicons must be with primers.
+        :type in_regions: str
+        :param in_aln: Path to the alignments file (format: BAM).
+        :type in_aln: str
+        :param out_file: Path to the outputted file.
+        :type out_file: str
+        :param min_alt_freq: The threshold for allele frequency.
+        :type min_alt_freq: float
+        :param min_alt_count: The threshold for allele count.
+        :type min_alt_count: int
+        :param min_base_qual: The phred score for a base to be considered a good call.
+        :type min_base_qual: int
+        :param vardict_call: Command used to call vardict.
+        :type vardict_call: str
         """
         cmd_param = "" + \
             " -r " + str(min_alt_count) + \
@@ -332,38 +372,44 @@ class VarDictStep1(Cmd):
             " " + in_regions + \
             " > " + out_file
 
-        Cmd.__init__( self,
-                      "VarDict",
-                      "Dicovers variants.",
-                      cmd_param )
+        Cmd.__init__(self,
+                     vardict_call,
+                     "Dicovers variants.",
+                     cmd_param)
+
 
 class VarDictStep2(Cmd):
-    """
-    @summary: Filters variant on strand bias.
-    """
+    """Filter variant on strand bias."""
+
     def __init__(self, in_file, out_file):
         """
-        @param in_file: [str] Path to the input file.
-        @param out_file: [str] Path to the outputted file.
+        :param in_file: Path to the input file.
+        :type in_file: str
+        :param out_file: Path to the outputted file.
+        :type out_file: str
         """
         cmd_param = "" + \
             " cat " + in_file + " | " + \
             " ##PROGRAM##" + \
             " > " + out_file
 
-        Cmd.__init__( self,
-                      "teststrandbias.R",
-                      "Filters variants on strand bias.",
-                      cmd_param )
+        Cmd.__init__(self,
+                     "teststrandbias.R",
+                     "Filters variants on strand bias.",
+                     cmd_param)
+
 
 class VarDictStep3(Cmd):
     """Filter variants and converts to VCF."""
 
     def __init__(self, in_file, out_variants, min_alt_freq=0.02):
         """
-        @param in_file: [str] Path to the input file.
-        @param out_variants: [str] Path to the outputted file (format: VCF).
-        @param min_alt_freq: [float] The threshold for allele frequency.
+        :param in_file: Path to the input file.
+        :type in_file: str
+        :param out_variants: Path to the outputted file (format: VCF).
+        :type out_variants: str
+        :param min_alt_freq: The threshold for allele frequency.
+        :type min_alt_freq: float
         """
         cmd_param = "" + \
             " cat " + in_file + " | " + \
@@ -371,24 +417,29 @@ class VarDictStep3(Cmd):
             " -A" + \
             " -a" + \
             " -E" + \
+            " -P 0" \
             " -f " + str(min_alt_freq) + \
             " > " + out_variants
 
-        Cmd.__init__( self,
-                      "var2vcf_valid.pl",
-                      "Filters variants and converts to VCF.",
-                      cmd_param )
+        Cmd.__init__(self,
+                     "var2vcf_valid.pl",
+                     "Filters variants and converts to VCF.",
+                     cmd_param)
+
 
 class GatherOverlappingRegions(Cmd):
-    """
-    @summary: Gathers variants from non-overlapping groups.
-    """
+    """Gather variants from non-overlapping groups."""
+
     def __init__(self, in_regions, in_variants, in_aln, out_variants):
         """
-        @param in_regions: [str] Path to the amplicons design. Start and end of the amplicons must be without primers (format: BED).
-        @param in_variants: [str] Path to the variants files (format: VCF).
-        @param in_aln: [str] Path to the alignments files (format: BAM). Each alignment file correspond to a variants file.
-        @param out_variants: [str] Path to the outputted file (format: VCF).
+        :param in_regions: Path to the amplicons design. Start and end of the amplicons must be without primers (format: BED).
+        :type in_regions: str
+        :param in_variants: Path to the variants files (format: VCF).
+        :type in_variants: str
+        :param in_aln: Path to the alignments files (format: BAM). Each alignment file correspond to a variants file.
+        :type in_aln: str
+        :param out_variants: Path to the outputted file (format: VCF).
+        :type out_variants: str
         """
         cmd_param = "" + \
             " --input-designs " + " ".join(in_regions) + \
@@ -396,43 +447,50 @@ class GatherOverlappingRegions(Cmd):
             " --input-aln " + " ".join(in_aln) + \
             " --output-variants " + out_variants
 
-        Cmd.__init__( self,
-                      "mergeVCFAmpli.py",
-                      "Gathers variants from non-overlapping groups.",
-                      cmd_param,
-                      "--version" )
+        Cmd.__init__(self,
+                     "mergeVCFAmpli.py",
+                     "Gathers variants from non-overlapping groups.",
+                     cmd_param,
+                     "--version")
+
 
 class MeltOverlappingRegions(Cmd):
-    """
-    @summary: Melts all the samples contained in variant file in one sample.
-    """
+    """Melt all the samples contained in variant file in one sample."""
+
     def __init__(self, spl_name, in_variants, out_variants):
         """
-        @param spl_name: [str] Name of the final sample.
-        @param in_variants: [str] Path to the variants file with several samples (format: VCF).
-        @param out_variants: [str] Path to the outputted file (format: VCF).
+        :param spl_name: Name of the final sample.
+        :type spl_name: str
+        :param in_variants: Path to the variants file with several samples (format: VCF).
+        :type in_variants: str
+        :param out_variants: Path to the outputted file (format: VCF).
+        :type out_variants: str
         """
         cmd_param = "" + \
             " --new-spl-name '" + spl_name + "'" + \
             " --input-variants " + in_variants + \
             " --output-variants " + out_variants
 
-        Cmd.__init__( self,
-                      "meltVCFSamples.py",
-                      "Melts all the samples contained in variant file in one sample.",
-                      cmd_param,
-                      "--version" )
+        Cmd.__init__(self,
+                     "meltVCFSamples.py",
+                     "Melts all the samples contained in variant file in one sample.",
+                     cmd_param,
+                     "--version")
+
 
 class FilterVCFPrimers(Cmd):
-    """
-    @summary: Removes variants located on amplicons primers.
-    """
+    """Remove variants located on amplicons primers."""
+
     def __init__(self, in_sequences, in_regions, in_variants, out_variants):
         """
-        @param in_sequences: [str] Path to the reference sequences file (format: fasta). The reference used to discover variants.
-        @param in_regions: [str] Path to the amplicons design with their primers (format: BED). The zone of interest is defined by thickStart and thickEnd. The amplicons must not have any overlap between them.
-        @param in_variants: [str] Path to the variants file (format: VCF). This file should be sorted by coordinates otherwise the execution time will be dramatically increased.
-        @param out_variants: [str] Path to the outputted variants file (format: VCF).
+        :param in_sequences: Path to the reference sequences file (format: fasta). The reference used to discover variants.
+        :type in_sequences: str
+        :param in_regions: Path to the amplicons design with their primers (format: BED). The zone of interest is defined by thickStart and thickEnd. The amplicons must not have any overlap between them.
+        :type in_regions: str
+        :param in_variants: Path to the variants file (format: VCF). This file should be sorted by coordinates otherwise the execution time will be dramatically increased.
+        :type in_variants: str
+        :param out_variants: Path to the outputted variants file (format: VCF).
+        :type out_variants: str
         """
         cmd_param = "" + \
             " --input-sequences " + in_sequences + \
@@ -440,40 +498,47 @@ class FilterVCFPrimers(Cmd):
             " --input-variants " + in_variants + \
             " --output-variants " + out_variants
 
-        Cmd.__init__( self,
-                      "filterVCFPrimers.py",
-                      "Removes variants located on amplicons primers.",
-                      cmd_param,
-                      "--version" )
+        Cmd.__init__(self,
+                     "filterVCFPrimers.py",
+                     "Removes variants located on amplicons primers.",
+                     cmd_param,
+                     "--version")
+
 
 class fixVardictHeader(Cmd):
-    """
-    @summary: Fix errors in VCF format in VarDict outputs.
-    """
+    """Fix errors in VCF format in VarDict outputs."""
+
     def __init__(self, in_variants, out_variants):
         """
-        @param in_variants: [str] Path to the variants file (format: VCF).
-        @param out_variants: [str] Path to the outputted variants file (format: VCF).
+        :param in_variants: Path to the variants file (format: VCF).
+        :type in_variants: str
+        :param out_variants: Path to the outputted variants file (format: VCF).
+        :type out_variants: str
         """
         cmd_param = "" + \
             " --variant-caller vardict" + \
             " --input-variants " + in_variants + \
             " --output-variants " + out_variants
 
-        Cmd.__init__( self,
-                      "fixVCallerVCF.py",
-                      "Fix errors in VCF format in VarDict outputs.",
-                      cmd_param,
-                      "--version" )
+        Cmd.__init__(self,
+                     "fixVCallerVCF.py",
+                     "Fix errors in VCF format in VarDict outputs.",
+                     cmd_param,
+                     "--version")
 
 
 def filterBED(in_bed, in_names, out_bed, nb_col=None):
     """
-    @summary: Filters a BED file with the list of names of regions to keep.
-    @param in_bed: [str] Path to the initial file (format: BED).
-    @param in_names: [str] Path to the file containing the list of names of the retained regions.
-    @param out_bed: [str] Path to the filtered file (format: BED).
-    @param nb_col: [int] Number of columns in output.
+    Filter a BED file with the list of names of regions to keep.
+
+    :param in_bed: Path to the initial file (format: BED).
+    :type in_bed: str
+    :param in_names: Path to the file containing the list of names of the retained regions.
+    :type in_names: str
+    :param out_bed: Path to the filtered file (format: BED).
+    :type out_bed: str
+    :param nb_col: Number of columns in output.
+    :type nb_col: int
     """
     # Retrieve retained regions names
     retained_regions = dict()
@@ -493,21 +558,33 @@ def filterBED(in_bed, in_names, out_bed, nb_col=None):
                             line = "\t".join(fields[:nb_col]) + "\n"
                         FH_out.write(line)
 
-def VarDictFct(in_reference, in_regions, in_aln, out_variants, logger, tmp_file, min_alt_freq=0.02, min_alt_count=4, min_base_qual=25):
+
+def VarDictFct(in_reference, in_regions, in_aln, out_variants, logger, tmp_file, min_alt_freq=0.02, min_alt_count=4, min_base_qual=25, vardict_call="vardict-java"):
     """
-    @summary: Dicovers amplicons variants with VarDict.
-    @param in_reference: [str] Path to the reference sequences file (format: fasta).
-    @param in_regions: [str] Path to the amplicons design (format: BED). Start and end of the amplicons must be with primers.
-    @param in_aln: [str] Path to the alignments file (format: BAM).
-    @param out_variants: [str] Path to the outputted file (format: VCF).
-    @param logger: [Logger] Logger used to trace sub-commands.
-    @param tmp_file: [TmpFiles] Temporaries files manager.
-    @param min_alt_freq: [float] The threshold for allele frequency.
-    @param min_base_qual: [int] The phred score for a base to be considered a good call.
+    Dicover amplicons variants with VarDict.
+
+    :param in_reference: Path to the reference sequences file (format: fasta).
+    :type in_reference: str
+    :param in_regions: Path to the amplicons design (format: BED). Start and end of the amplicons must be with primers.
+    :type in_regions: str
+    :param in_aln: Path to the alignments file (format: BAM).
+    :type in_aln: str
+    :param out_variants: Path to the outputted file (format: VCF).
+    :type out_variants: str
+    :param logger: Logger used to trace sub-commands.
+    :type logger: Logger
+    :param tmp_file: Temporaries files manager.
+    :type tmp_file: TmpFiles
+    :param min_alt_freq: The threshold for allele frequency.
+    :type min_alt_freq: float
+    :param min_base_qual: The phred score for a base to be considered a good call.
+    :type min_base_qual: int
+    :param vardict_call: Command used to call vardict.
+    :type vardict_call: str
     """
     out_vardict = tmp.add("vardict.txt")
     out_strand_bias = tmp.add("strdBias.txt")
-    VarDictStep1(in_reference, in_regions, in_aln, out_vardict, min_alt_freq, min_alt_count, min_base_qual).submit(logger)
+    VarDictStep1(in_reference, in_regions, in_aln, out_vardict, min_alt_freq, min_alt_count, min_base_qual, vardict_call).submit(logger)
     VarDictStep2(out_vardict, out_strand_bias).submit(logger)
     VarDictStep3(out_strand_bias, out_variants, min_alt_freq).submit(logger)
 
@@ -523,6 +600,7 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--min-alt-freq', default=0.02, type=float, help='Variants with an allele frequency under this value are not emitted. [Default: %(default)s]')
     parser.add_argument('-c', '--min-alt-count', default=4, type=int, help='Variants with an allele count under this value are not emitted. [Default: %(default)s]')
     parser.add_argument('-q', '--min-base-qual', default=25, type=int, help='The phred score for a base to be considered a good call. [Default: %(default)s]')
+    parser.add_argument('-t', '--vardict-call', default="vardict-java", help='Command used to call vardict. [Default: %(default)s]')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_reference = parser.add_argument_group('Reference')  # Reference
     group_reference.add_argument('-g', '--input-genome', required=True, help='The path to the reference genome (format: fasta).')
@@ -583,7 +661,17 @@ if __name__ == "__main__":
 
         # Call variants
         curr_gp_vcf = tmp.add(curr_gp + ".vcf")
-        VarDictFct(args.input_genome, curr_gp_regions_with_prim_4_col, curr_gp_aln_new_RG, curr_gp_vcf, args.output_log, tmp, args.min_alt_freq, args.min_alt_count, args.min_base_qual)
+        VarDictFct(
+            args.input_genome,
+            curr_gp_regions_with_prim_4_col,
+            curr_gp_aln_new_RG, curr_gp_vcf,
+            args.output_log,
+            tmp,
+            args.min_alt_freq,
+            args.min_alt_count,
+            args.min_base_qual,
+            args.vardict_call
+        )
 
         # Filters variants located on primers
         curr_gp_clean_vcf = tmp.add(curr_gp + "_clean.vcf")
