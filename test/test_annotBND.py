@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -22,8 +22,8 @@ BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
-from annotBND import annotGeneShard, annotModelRetIntron, exonsPos, getGeneAnnot, getMostSupported, selectedPos, shardIsBeforeBND
-# todo: annot getDistBeforeCDSForward getDistBeforeCDSReverse
+from annotBND import annotGeneShard, annotModelRetIntron, exonsPos, getDistBeforeCDSForward, getDistBeforeCDSReverse, getGeneAnnot, getMostSupported, selectedPos, shardIsBeforeBND
+# todo: annot
 
 
 ########################################################################
@@ -201,6 +201,20 @@ class TestAnnotBND(unittest.TestCase):
             record.info["ANN"],
             [{"STRAND": '+', "GENE_SHARD": 'down'}, {"STRAND": '-', "GENE_SHARD": 'up'}]
         )
+
+
+    def test_getDistBeforeCDSReverse(self):
+        genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
+        protein = genes_by_chr["1"][0].children[1].proteins[0]
+        self.assertEqual(getDistBeforeCDSReverse(230, protein), 111)
+        self.assertEqual(getDistBeforeCDSReverse(150, protein), 50)
+        self.assertEqual(getDistBeforeCDSReverse(100, protein), 0)
+
+    def test_getDistBeforeCDSForward(self):
+        genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
+        protein = genes_by_chr["1"][1].children[0].proteins[0]
+        self.assertEqual(getDistBeforeCDSForward(90, protein), 45)
+        self.assertEqual(getDistBeforeCDSForward(135, protein), 0)
 
     def test_selectedPos(self):
         genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
