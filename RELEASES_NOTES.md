@@ -1,4 +1,4 @@
-# Release 3.1.0 [DEV]
+# Release 3.1.0 [2020-05-13]
 
 ### Improvements:
   * Add count by target in `--output-summary` file from `bin/addAmpliRG.py`.
