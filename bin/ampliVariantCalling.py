@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.0'
+__version__ = '1.4.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -89,7 +89,7 @@ class Cmd:
                     return stderr.decode('ascii').strip()
                 else:
                     return stdout.decode('ascii').strip()
-            except:
+            except Exception:
                 raise Exception("Version cannot be retrieve for the software '" + self.program + "'.")
 
     def parser(self, log_file):
@@ -417,7 +417,7 @@ class VarDictStep3(Cmd):
             " -A" + \
             " -a" + \
             " -E" + \
-            " -P 0" \
+            " -P 0" + \
             " -f " + str(min_alt_freq) + \
             " > " + out_variants
 
