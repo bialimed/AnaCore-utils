@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.0.0'
+__version__ = '2.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -13,6 +13,7 @@ import json
 import pysam
 import logging
 import argparse
+from statistics import median
 from anacore.bed import getSortedAreasByChr
 
 
@@ -21,6 +22,152 @@ from anacore.bed import getSortedAreasByChr
 # FUNCTIONS
 #
 ########################################################################
+def getEndOffset(read, region):
+    """
+    Return the offset between end of read alignment and region corresponding border.
+
+    :param read: Evaluated read.
+    :type read: pysam.AlignedSegment
+    :param region: Evaluated region source of the read.
+    :type region: anacore.region.Region
+    :return: The offset between end of read alignment and region corresponding border.
+    :return: int
+    """
+    offset = None
+    if read.is_reverse:
+        read_aln_end = read.reference_start + 1  # 0-based
+        offset = read_aln_end - region.start
+    else:
+        read_aln_end = read.reference_end  # 1-based
+        offset = read_aln_end - region.end
+    return offset
+
+
+def getStartOffset(read, region):
+    """
+    Return the offset between start of read alignment and region corresponding border.
+
+    :param read: Evaluated read.
+    :type read: pysam.AlignedSegment
+    :param region: Evaluated region source of the read.
+    :type region: anacore.region.Region
+    :return: The offset between end of read alignment and region corresponding border.
+    :return: int
+    """
+    offset = None
+    if read.is_reverse:
+        read_aln_start = read.reference_end  # 1-based
+        offset = read_aln_start - region.end
+    else:
+        read_aln_start = read.reference_start + 1  # 0-based
+        offset = read_aln_start - region.start
+    return offset
+
+
+def getOffsetPenalty(read, region, end_is_usable=False):
+    """
+    Return the offset penalty for the read coming from the region.
+
+    :param read: Evaluated read.
+    :type read: pysam.AlignedSegment
+    :param region: Evaluated region source of the read.
+    :type region: anacore.region.Region
+    :param end_is_usable: True if the offset of the end of read is usable.
+    :type end_is_usable: bool
+    :return: Offset penalty for the read coming from the region.
+    :return: float
+    """
+    # Start
+    start_offset = getStartOffset(read, region)
+    start_weight = 1
+    if (start_offset > 0 and not read.is_reverse) or (start_offset < 0 and read.is_reverse):
+        start_weight = 0.99  # Extend before primer is less plausible than after
+    # End
+    end_offset = 0
+    end_weight = 0.98  # Start carries a little weightier than end of the read in decision
+    if end_is_usable:
+        end_offset = getEndOffset(read, region)
+    return abs(start_offset) * start_weight + abs(end_offset) * end_weight
+
+
+def endOffsetIsUsable(read, first_region, second_region):
+    """
+    Return true if the read has sufficient length ad quality to overlap all the two regions. In this case The end offset can be used in penalty calculation for best source selection.
+
+    :param read: Evaluated read.
+    :type read: pysam.AlignedSegment
+    :param first_region: Region evaluated in best source selection.
+    :type first_region: anacore.region.Region
+    :param second_region: Region evaluated in best source selection.
+    :type second_region: anacore.region.Region
+    :return: True if the offset of the end of read is usable in offset penalty calculation.
+    :return: bool
+    """
+    end_is_usable = False
+    read_length = read.infer_read_length()
+    if read_length is not None:
+        longer_region_len = max(first_region.length(), second_region.length())
+        if longer_region_len <= read_length:  # Read can overlap the entire region
+            if read.is_reverse:
+                if read.query_alignment_start == 0:  # The end of the read is aligned
+                    end_is_usable = True
+                elif read.reference_start + 1 <= min(first_region.start, second_region.start):  # Read alignment ends includes the two regions
+                    end_is_usable = True
+                else:
+                    try:
+                        if read.query_qualities:
+                            if median(read.query_qualities[max(0, read.query_alignment_start - 5):read.query_alignment_start]) > 22:  # Quality of firsts unaligned is ok (unaligned correspnds to adapter)
+                                end_is_usable = True
+                    except Exception:
+                        pass
+            else:  # Read is forward
+                if read.query_alignment_end + 1 == read_length:  # The end of the read is aligned
+                    end_is_usable = True
+                elif read.reference_end >= max(first_region.end, second_region.end):  # Read alignment ends includes the two regions
+                    end_is_usable = True
+                else:
+                    try:
+                        if read.query_qualities:
+                            if median(read.query_qualities[read.query_alignment_end:read.query_alignment_end + 5]) > 22:  # Quality of firsts unaligned is ok (unaligned correspnds to adapter)
+                                end_is_usable = True
+                    except Exception:
+                        pass
+    return end_is_usable
+
+
+def selectBestSource(read, sources):
+    """
+    Return the best source for the read from a list of possible sources.
+
+    :param read: Evaluated read.
+    :type read: pysam.AlignedSegment
+    :param region: Amplion regions that can be source of the read.
+    :type region: list
+    :return: The best source for the read.
+    :return: anacore.region.Region
+    """
+    selected_region = sources[0]
+    read_start_aln = read.reference_end if read.is_reverse else read.reference_start + 1
+    for curr_region in sources[1:]:
+        skip_penalty = False
+        if read.cigartuples is not None and read.cigartuples[0][0] not in {4, 5, 8}:  # Read start nt is aligned (4: soft-clip, 5: hard-clip, 8: difference)
+            if read.is_reverse:
+                if read_start_aln == curr_region.end and read_start_aln != selected_region.end:  # If read 1 starts strictly on the border of the region
+                    skip_penalty = True
+                    selected_region = curr_region
+            else:
+                if read_start_aln == curr_region.start and read_start_aln != selected_region.start:  # If read 1 starts strictly on the border of the region
+                    skip_penalty = True
+                    selected_region = curr_region
+        if not skip_penalty:  # The start of read is ambiguous
+            end_is_usable = endOffsetIsUsable(read, selected_region, curr_region)
+            selected_penalty = getOffsetPenalty(read, selected_region, end_is_usable)
+            curr_penalty = getOffsetPenalty(read, curr_region, end_is_usable)
+            if curr_penalty < selected_penalty:
+                selected_region = curr_region
+    return selected_region
+
+
 def getSourceRegion(read, regions, anchor_offset=0):
     """
     Return the region where the read come from. Returns None if no region corresponds to the read.
@@ -34,26 +181,29 @@ def getSourceRegion(read, regions, anchor_offset=0):
     :return: The region where the read come from.
     :return: None/anacore.region.Region
     """
-    overlapped_region = None
-    ref_start = read.reference_start + 1
-    ref_end = read.reference_end
+    overlapped_regions = list()
     if read.is_reverse:
+        read_aln_start = read.reference_end
         for curr_region in regions:
-            if ref_end < curr_region.start - anchor_offset:
+            if read_aln_start < curr_region.start - anchor_offset:
                 break
-            if ref_end <= curr_region.end + anchor_offset:
-                if ref_end >= curr_region.end - anchor_offset:
-                    overlapped_region = curr_region
-                    break
+            if read_aln_start <= curr_region.end + anchor_offset:
+                if read_aln_start >= curr_region.end - anchor_offset:
+                    overlapped_regions.append(curr_region)
     else:
+        read_aln_start = read.reference_start + 1
         for curr_region in regions:
-            if ref_start < curr_region.start - anchor_offset:
+            if read_aln_start < curr_region.start - anchor_offset:  # Stop search after read position
                 break
-            if ref_start >= curr_region.start - anchor_offset:
-                if ref_start <= curr_region.start + anchor_offset:
-                    overlapped_region = curr_region
-                    break
-    return overlapped_region
+            if read_aln_start >= curr_region.start - anchor_offset:
+                if read_aln_start <= curr_region.start + anchor_offset:
+                    overlapped_regions.append(curr_region)
+    selected_region = None
+    if len(overlapped_regions) == 1:
+        selected_region = overlapped_regions[0]
+    elif len(overlapped_regions) > 1:
+        selected_region = selectBestSource(read, overlapped_regions)
+    return selected_region
 
 
 def hasOverlapOnZOI(amplicon, first_read, second_read=None, min_cov=10):

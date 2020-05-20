@@ -1,3 +1,9 @@
+# Release 3.2.0 [DEV]
+
+### Improvements:
+  * Add management for included or near full overlapped amplicons in
+   `bin/addAmpliRG.py`.
+
 # Release 3.1.0 [2020-05-13]
 
 ### Improvements:
