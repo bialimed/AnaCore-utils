@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -71,6 +71,19 @@ def getSupportUniqSource(record, calling_source=None):
     }]
 
 
+def getKnownPartners(record, known_field="known_partners"):
+    db_by_partners = {}
+    for partners_info in record.info["known_partners"]:  # partners_info example: BCR_@_ABL1=cosmic_91:1743,1745|chimerdb_pub-V4:3427,3428
+        partners, databases = partners_info.split("=", 1)
+        databases = databases.split("|")
+        partners_res = {}
+        for curr_db in databases:
+            db_name, db_entries = curr_db.split(":", 1)
+            partners_res[db_name] = db_entries.split(",")
+        db_by_partners[partners] = partners_res
+    return db_by_partners
+
+
 def getFusionAnnot(record, mate, annot_field="ANN"):
     fusion_annot = list()
     if len(record.info[annot_field]) == 0:
@@ -78,16 +91,14 @@ def getFusionAnnot(record, mate, annot_field="ANN"):
             for mate_idx, mate_annot in enumerate(mate.info[annot_field]):
                 fusion_annot.append({
                     "features_annotation": [None, str(mate_idx)],
-                    "inframe": ".",
-                    # "partners_known": None
+                    "inframe": "."
                 })
     else:
         if len(mate.info[annot_field]) == 0:  # record: annot ; mate: no annot
             for record_idx, record_annot in enumerate(record.info[annot_field]):
                 fusion_annot.append({
                     "features_annotation": [str(record_idx), None],
-                    "inframe": ".",
-                    # "partners_known": None
+                    "inframe": "."
                 })
         else:  # record: annot ; mate: annot
             for record_idx, record_annot in enumerate(record.info[annot_field]):
@@ -102,8 +113,7 @@ def getFusionAnnot(record, mate, annot_field="ANN"):
                 for mate_idx, mate_annot in enumerate(mate.info[annot_field]):
                     fusion_annot.append({
                         "features_annotation": [str(record_idx), str(mate_idx)],
-                        "inframe": inframe_by_partner[mate_annot["Feature"]],
-                        # "partners_known": None
+                        "inframe": inframe_by_partner[mate_annot["Feature"]]
                     })
     return fusion_annot
 
@@ -158,6 +168,9 @@ if __name__ == "__main__":
             # Fusion level annotations
             if reader.annot_field in record.info or reader.annot_field in mate.info:
                 curr_json["annotations"] = getFusionAnnot(record, mate, args.annotation_field)
+            # Known partners
+            if "known_partners" in record.info:
+                curr_json["known_partners"] = getKnownPartners(record, "known_partners")
             json_data.append(curr_json)
 
     # Write output file
