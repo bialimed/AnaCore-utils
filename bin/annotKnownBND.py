@@ -26,7 +26,7 @@ def sourcesBySymbols(in_known):
     """
     Return sources descriptions by fusion ID from database.
 
-    :param in_known: Path to the file containing databases and pubmed ID by known fusions (format: TSV). This file must contains 3 columns : 5prim_gene, 3_prim_gene and sources. 5prim_gene and 3prim_gene are symbol with the same master name of the name in GTF used for the annotation of breakends. sources is a string containing db1name:entryId,entryId|db2name:entryId (example: cosmic_91:1743,1745|chimerdb_pub-V4:3427,3428).
+    :param in_known: Path to the file containing known fusions (format: TSV). This file must contains 3 columns : 5prim_gene, 3_prim_gene and sources. 5prim_gene and 3prim_gene are symbol with the same master name of the name in GTF used for the annotation of breakends. sources is a string containing db1name:entryId,entryId|db2name:entryId (example: cosmic_91:1743,1745|chimerdb_pub-V4:3427,3428).
     :type in_known: str
     :return: sources descriptions (db1name:entryId,entryId|db2name:entryId) by fusion ID (5primSymbol_@_3primSymbol).
     :rtype: dict
@@ -57,7 +57,7 @@ def annotate(first, second, sources_by_symbols, annotation_field):
         for second_gene in {elt["SYMBOL"] for elt in second.info[annotation_field]}:
             if first_gene != "" and second_gene != "":
                 fusion_id = "{}_@_{}".format(first_gene, second_gene)
-                if fusion_id in sources_by_symbols:  # Strand is not evaluated only the order in transcript
+                if fusion_id in sources_by_symbols:  # Only partnerrs and order in fusion is evaluated (strand is skipped)
                     known.append(fusion_id + "=" + sources_by_symbols[fusion_id])
     first.info["known_partners"] = known
 
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--annotation-field', default="ANN", help='Field used for store annotations. [Default: %(default)s]')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs
-    group_input.add_argument('-p', '--input-known-partners', required=True, help='Path to the file containing databases and pubmed ID by known fusions (format: TSV). This file must contains 3 columns : 5prim_gene, 3_prim_gene and sources. 5prim_gene and 3prim_gene are symbol with the same master name of the name in GTF used for the annotation of breakends. sources is a string containing db1name:entryId,entryId|db2name:entryId (example: cosmic_91:1743,1745|chimerdb_pub-V4:3427,3428).')
+    group_input.add_argument('-p', '--input-known-partners', required=True, help='Path to the file containing known fusions (format: TSV). This file must contains 3 columns : 5prim_gene, 3_prim_gene and sources. 5prim_gene and 3prim_gene are symbol with the same master name of the name in GTF used for the annotation of breakends. sources is a string containing db1name:entryId,entryId|db2name:entryId (example: cosmic_91:1743,1745|chimerdb_pub-V4:3427,3428).')
     group_input.add_argument('-i', '--input-variants', required=True, help='Path to the file containing variants annotated (format: VCF). The process use only the SYMBOL field of each breakend.')
     group_output = parser.add_argument_group('Outputs')  # Outputs
     group_output.add_argument('-o', '--output-variants', required=True, help='Path to the annotated file. (format: VCF).')
