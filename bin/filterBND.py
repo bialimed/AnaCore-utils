@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.3.0'
+__version__ = '1.4.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -91,7 +91,7 @@ def hasLowSupport(record, min_support):
     return has_low_support
 
 
-def inNormal(first, second, annotation_field, normal_fusions):
+def inNormal(first, second, annotation_field, normal_fusions, normal_key="id"):
     """
     Return True if one of the two breakends falls in a gene of immunoglobulin.
 
@@ -103,12 +103,20 @@ def inNormal(first, second, annotation_field, normal_fusions):
     :type annotation_field: str
     :param normal_fusions: Set of normal fusions. Each element has the following format: 5prim_gene_ID<tab>3prim_gene_ID. Genes ID  must be consistent with breakends annotations.
     :type normal_fusions: set
+    :param normal_key: Type of key used in the normal database to identify the gene: "id" or "symbol".
+    :type normal_key: str
     :return: True if one of the two breakend falls in a gene of immunoglobulin.
     :rtype: boolean
     """
     in_normal = False
-    first_genes = {annot["Gene"].split(".")[0] for annot in first.info[annotation_field]}
-    second_genes = {annot["Gene"].split(".")[0] for annot in second.info[annotation_field]}
+    first_genes = {}
+    second_genes = {}
+    if normal_key == "id":
+        first_genes = {annot["Gene"].split(".")[0] for annot in first.info[annotation_field]}
+        second_genes = {annot["Gene"].split(".")[0] for annot in second.info[annotation_field]}
+    else:
+        first_genes = {annot["SYMBOL"] for annot in first.info[annotation_field]}
+        second_genes = {annot["SYMBOL"] for annot in second.info[annotation_field]}
     for curr_first_gene, curr_second_gene in product(first_genes, second_genes):
         if curr_first_gene + "\t" + curr_second_gene in normal_fusions:
             in_normal = True
@@ -257,6 +265,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Filter fusions that are readthrough, within a gene, known in normal samples or occuring on HLA or IG.')
     parser.add_argument('-f', '--annotation-field', default="ANN", help='Field used to store annotations. [Default: %(default)s]')
     parser.add_argument('-s', '--normal-sources', help='Information on normal databases source and version to add on inNormal filter description.')
+    parser.add_argument('-t', '--normal-key', default="id", choices=["id", "symbol"], help='Type of key used in the normal database to identify the gene: "id" or "symbol".')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_filter = parser.add_argument_group('Filters')  # Filters
     group_filter.add_argument('-m', '--mode', default="tag", choices=["tag", "remove"], help='Select the filter mode. In mode "tag": a tag is added in FILTER field if the fusion fits a filter. In mode "remove": the fusion is removed from the output if it fits filter. [Default: %(default)s]')
@@ -317,7 +326,7 @@ if __name__ == "__main__":
                 if isReadthrough(first, second, args.annotation_field, genes, args.rt_max_dist):
                     new_filters.add("Readthrough")
                 # In normals databases
-                if inNormal(first, second, args.annotation_field, normal_fusions):
+                if inNormal(first, second, args.annotation_field, normal_fusions, args.normal_key):
                     new_filters.add("inNormal")
                 # Has low support
                 if hasLowSupport(first, args.min_support):

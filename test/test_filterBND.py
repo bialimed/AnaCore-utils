@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.3.0'
+__version__ = '1.4.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -14,8 +14,9 @@ import tempfile
 import unittest
 from anacore.vcf import VCFRecord
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BIN_DIR = os.path.dirname(CURRENT_DIR)
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+APP_DIR = os.path.dirname(TEST_DIR)
+BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
@@ -103,7 +104,8 @@ GENE_ID02	GENE_ID05""")
         self.assertTrue(not hasLowSupport(up, 0))  # No test
 
     def testInNormal(self):
-        normal_fusions = {"GENE_ID01	GENE_ID02", "GENE_ID02	GENE_ID03"}
+        normal_fusions_id = {"GENE_ID01	GENE_ID02", "GENE_ID02	GENE_ID03"}
+        normal_fusions_symbol = {"GENE_N01	GENE_N02", "GENE_N02	GENE_N03"}
         up = VCFRecord(
             "chr1", 140, "id_01", "A", ["A[chr1:199["],
             info={
@@ -124,7 +126,8 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(inNormal(up, down, "ANN", normal_fusions))
+        self.assertTrue(inNormal(up, down, "ANN", normal_fusions_id, "id"))
+        self.assertTrue(inNormal(up, down, "ANN", normal_fusions_symbol, "symbol"))
         up = VCFRecord(
             "chr1", 140, "id_01", "A", ["A[chr1:299["],
             info={
@@ -146,7 +149,8 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(not inNormal(up, down, "ANN", normal_fusions))
+        self.assertTrue(not inNormal(up, down, "ANN", normal_fusions_id, "id"))
+        self.assertTrue(not inNormal(up, down, "ANN", normal_fusions_symbol, "symbol"))
         down = VCFRecord(
             "chr1", 140, "id_01", "A", ["]chr1:299]A"],
             info={
@@ -168,7 +172,8 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(not inNormal(up, down, "ANN", normal_fusions))
+        self.assertTrue(not inNormal(up, down, "ANN", normal_fusions_id, "id"))
+        self.assertTrue(not inNormal(up, down, "ANN", normal_fusions_symbol, "symbol"))
 
     def testInner(self):
         up = VCFRecord(
