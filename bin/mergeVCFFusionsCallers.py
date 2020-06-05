@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.1'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -39,6 +39,9 @@ def getNewHeaderAttr(args):
         ),
         "IDSRC": HeaderInfoAttr(
             "IDSRC", type="String", number=".", description="ID of breakend by source"
+        ),
+        "REFSRC": HeaderInfoAttr(
+            "REFSRC", type="String", number="1", description="Selected support data (SR, PR) come from this source"
         ),
         "SRC": HeaderInfoAttr(
             "SRC", type="String", number=".", description="Fusions callers where the breakend is identified. Possible values: {}".format(
@@ -393,6 +396,7 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
                 for curr_record in records:
                     # Data source
                     curr_record.info["SRC"] = [curr_caller]
+                    curr_record.info["REFSRC"] = curr_caller
                     curr_record.info["IDSRC"] = [curr_record.id]
                     # CIPOS
                     if "s{}_CIPOS".format(idx_in) in curr_record.info:

@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -40,10 +40,10 @@ def getBreakendInfo(record, annot_field="ANN", assembly_id=None):
 
 
 def getSupportMergedSources(record, id_by_src):
-    support = []
+    support = {}
     for curr_idx, curr_src in enumerate(record.info["SRC"]):
         src_id = id_by_src[curr_src]
-        support.append({
+        support[curr_src] = {
             "quality": (record.info["{}_VCQUAL".format(src_id)] if "{}_VCQUAL".format(src_id) in record.info else None),
             "libraries": [
                 {
@@ -51,24 +51,24 @@ def getSupportMergedSources(record, id_by_src):
                     "spanning_pairs": sample["PRSRC"][curr_idx],
                     "name": name
                 } for name, sample in record.samples.items()
-            ],
-            "source": curr_src
-        })
+            ]
+        }
     return support
 
 
-def getSupportUniqSource(record, calling_source=None):
-    return [{
-        "quality": record.qual,
-        "libraries": [
-            {
-                "spanning_reads": sample["SR"],
-                "spanning_pairs": sample["PR"],
-                "name": name
-            } for name, sample in record.samples.items()
-        ],
-        "source": calling_source
-    }]
+def getSupportUniqSource(record, calling_source="unknown"):
+    return {
+        calling_source: {
+            "quality": record.qual,
+            "libraries": [
+                {
+                    "spanning_reads": sample["SR"],
+                    "spanning_pairs": sample["PR"],
+                    "name": name
+                } for name, sample in record.samples.items()
+            ]
+        }
+    }
 
 
 def getKnownPartners(record, known_field="known_partners"):
@@ -162,9 +162,16 @@ if __name__ == "__main__":
             curr_json["filters"] = record.filter
             # Support information
             if not args.merged_sources:  # The VCF contains results from one variants caller
-                curr_json["supports"] = getSupportUniqSource(record, args.calling_source)
+                ref_source = args.calling_source if args.calling_source is not None else "unknown"
+                curr_json["supports"] = {
+                    "selected": ref_source,
+                    "by_src": getSupportUniqSource(record, ref_source)
+                }
             else:  # The VCF contains results from several variants caller
-                curr_json["supports"] = getSupportMergedSources(record, id_by_src)
+                curr_json["supports"] = {
+                    "selected": record.info["REFSRC"],
+                    "by_src": getSupportMergedSources(record, id_by_src)
+                }
             # Fusion level annotations
             if reader.annot_field in record.info or reader.annot_field in mate.info:
                 curr_json["annotations"] = getFusionAnnot(record, mate, args.annotation_field)
