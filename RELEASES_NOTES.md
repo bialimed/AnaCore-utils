@@ -4,6 +4,9 @@
   * Add management for included or near full overlapped amplicons in
    `bin/addAmpliRG.py`.
 
+### Bug fixes:
+  * Fix bug in `bin/fixVEPAnnot.py` when alleles are in lower case.
+
 # Release 3.1.0 [2020-05-13]
 
 ### Improvements:
