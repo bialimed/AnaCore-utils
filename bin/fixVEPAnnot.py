@@ -1,25 +1,9 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2019 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -105,6 +89,12 @@ if __name__ == "__main__":
             FH_out.writeHeader()
             # Records
             for record in FH_in:
+                # To upper
+                record.ref = record.ref.upper()
+                record.alt = [alt.upper() for alt in record.alt]
+                for annot in enumerate(record.info[FH_in.annot_field]):
+                    annot["Allele"] = annot["Allele"].upper()
+                # Change alternative representation
                 for alt_idx, alt in enumerate(record.alt):
                     alt_record = getAlleleRecord(FH_in, record, alt_idx)
                     vep_alt = getVEPAlt(alt_record.ref, alt_record.alt)[0]
