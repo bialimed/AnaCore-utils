@@ -1,25 +1,9 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2018 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -315,12 +299,14 @@ def getTranscriptsAnnot(region, transcripts):
     return annotations
 
 
-def region2dict(region):
+def region2dict(region, args):
     """
     Return the conversion of region object to dict.
 
     :param region: The region to convert.
     :type region: anacore.region.Region
+    :param args: Parameters used in analysis.
+    :type args: NameSpace
     :return: The dict representation of the region.
     :rtype: dict
     """
@@ -330,8 +316,8 @@ def region2dict(region):
         "strand": region.strand,
         "reference": (None if region.reference is None else region.reference.name),
         "name": region.name,
-        "annotations": region.annot["ANN"],
-        "known_variants": [curr_var.annot for curr_var in region.annot["VAR"]]
+        "annotations": None if args.input_annotations is None else region.annot["ANN"],
+        "known_variants": None if len(args.inputs_variants) == 0 else [curr_var.annot for curr_var in region.annot["VAR"]]
     }
 
 
@@ -352,7 +338,7 @@ def writeJSON(out_path, shallow, args):
         FH_out.write('  "parameters": {{"depth_mode": "{}", "min_depth": {}}},\n'.format(args.depth_mode, args.min_depth))
         FH_out.write('  "results": [\n')
         for idx_shallow, curr_shallow in enumerate(shallow):
-            curr_json = json.dumps(region2dict(curr_shallow), sort_keys=True)
+            curr_json = json.dumps(region2dict(curr_shallow, args), sort_keys=True)
             suffix = "," if idx_shallow + 1 < nb_shallows else ""
             FH_out.write("  {}{}\n".format(curr_json, suffix))
         FH_out.write('  ]\n')
@@ -409,7 +395,7 @@ if __name__ == "__main__":
     group_input.add_argument('-b', '--input-aln', required=True, help='Path to the alignments file (format: BAM).')
     group_input.add_argument('-t', '--input-targets', help='Path to the targeted regions (format: BED). They must not contains any overlap. [Default: all positions defined in the alignment file header]')
     group_input.add_argument('-a', '--input-annotations', help='Path to the file defining transcripts, genes and proteins locations (format: GTF). This file allow to annotate locations on genes and proteins located on shallows areas. [Default: The shallows areas are not annotated]')
-    group_input.add_argument('-s', '--inputs-variants', nargs="+", help='Path(es) to the file(s) defining known variants (format: VCF). This file allow to annotate variant potentially masked because they are on shallows areas. [Default: The variants on shallows areas are not reported]')
+    group_input.add_argument('-s', '--inputs-variants', nargs="+", default=[], help='Path(es) to the file(s) defining known variants (format: VCF). This file allow to annotate variant potentially masked because they are on shallows areas. [Default: The variants on shallows areas are not reported]')
     group_output = parser.add_argument_group('Outputs')  # Outputs
     group_output.add_argument('-o', '--output-shallow', default="shallow_areas.gff3", help='Path to the file containing shallow areas and there annotations. (format: GFF3 or JSON if file name ends with ".json"). [Default: %(default)s]')
     args = parser.parse_args()
