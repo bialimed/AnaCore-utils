@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.2'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -13,7 +13,6 @@ import json
 import pysam
 import logging
 import argparse
-import warnings
 from anacore.region import Region, RegionList, splittedByRef, iterOverlappedByRegion
 from anacore.genomicRegion import Intron
 from anacore.bed import getAreas
@@ -116,37 +115,42 @@ def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_depth, log)
     return shallow
 
 
-def variantsRegionFromVCF(vcf_path):
+def variantsRegionFromVCF(vcf_path, min_count=1, symbol="GENE", hgvsc="CDS", hgvsp="AA"):
     """
     Return the region object corresponding to the known variants in a VCF.
 
     :param vcf_path: Path to the variants file (format: VCF).
     :type vcf_path: str
+    :param min_count: Minimum number of samples where the variant is known in the databases to use its information.
+    :type min_count: int
+    :param symbol: Tag used in VCF.info to store the symbol of the gene.
+    :type symbol: str
+    :param hgvsc: Tag used in VCF.info to store the HGVSc.
+    :type hgvsc: str
+    :param hgvsp: Tag used in VCF.info to store the HGVSp.
+    :type hgvsp: str
     :return: List of variants regions.
     :rtype: anacore.region.RegionList
-    .. warning:: The insertion regions are extended to one nucleotid before start and one nucleotid after end.
     """
-    variants_region = RegionList()
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        with VCFIO(vcf_path) as FH_in:
-            for record in FH_in:
-                variants_region.append(
-                    Region(
-                        int(record.refStart()),  # Insertions between two bases impact the two bases
-                        int(record.refEnd() + 0.5),  # Insertions between two bases impact the two bases
-                        None,
-                        record.chrom,
-                        record.id,
-                        {
-                            "id": record.id,
-                            "gene": ("" if "GENE" not in record.info else record.info["GENE"]),
-                            "HGVSp": ("" if "HGVSp" not in record.info else record.info["AA"]),
-                            "HGVSc": ("" if "CDS" not in record.info else record.info["CDS"]),
-                        }
-                    )
-                )
-    return variants_region
+    variants_region = None
+    with VCFIO(vcf_path) as FH_in:
+        variants_region = [
+            Region(
+                record.pos,
+                record.pos + len(record.ref),
+                None,
+                record.chrom,
+                record.id,
+                {
+                    "id": record.id,
+                    "gene": ("" if symbol not in record.info else record.info[symbol]),
+                    "HGVSp": ("" if hgvsp not in record.info else record.info[hgvsp]),
+                    "HGVSc": ("" if hgvsc not in record.info else record.info[hgvsc]),
+                    "count": (None if "CNT" not in record.info else record.info["CNT"])
+                }
+            ) for record in FH_in if "_ENST" not in record.info[symbol] and ("CNT" not in record.info or record.info["CNT"] >= min_count)
+        ]
+    return RegionList(variants_region)
 
 
 def setVariantsByOverlap(queries, variants):
@@ -335,7 +339,15 @@ def writeJSON(out_path, shallow, args):
     nb_shallows = len(shallow)
     with open(out_path, "w") as FH_out:
         FH_out.write("{\n")
-        FH_out.write('  "parameters": {{"depth_mode": "{}", "min_depth": {}}},\n'.format(args.depth_mode, args.min_depth))
+        FH_out.write(
+            '  "parameters": {{"depth_mode": "{}", "min_depth": {}, "use_annotations": {}, "use_variants": {}, "known_min_count": {}}},\n'.format(
+                args.depth_mode,
+                args.min_depth,
+                str(args.input_annotations is not None).lower(),
+                str(len(args.inputs_variants) != 0).lower(),
+                args.known_min_count
+            )
+        )
         FH_out.write('  "results": [\n')
         for idx_shallow, curr_shallow in enumerate(shallow):
             curr_json = json.dumps(region2dict(curr_shallow, args), sort_keys=True)
@@ -343,6 +355,75 @@ def writeJSON(out_path, shallow, args):
             FH_out.write("  {}{}\n".format(curr_json, suffix))
         FH_out.write('  ]\n')
         FH_out.write('}')
+
+
+def writeGenesJSON(out_path, shallow, args):
+    """
+    Write the genes, their parts and known variants affected by shallow areas in a JSON file.
+
+    :param out_path: Path to the output file.
+    :type out_path: str
+    :param shallow: The list of shallow areas.
+    :type shallow: anacore.region.RegionList
+    :param args: Parameters used in analysis.
+    :type args: NameSpace
+    """
+    genes_data = {}
+    # Annotations
+    if args.input_annotations is not None:
+        for curr_shallow in sorted(shallow, key=lambda x: (x.reference.name, x.start, x.end)):
+            for annot in curr_shallow.annot["ANN"]:
+                gene_name = annot["SYMBOL"]
+                transcript_id = annot["Feature"].split(".")[0]
+                if gene_name not in genes_data:
+                    genes_data[gene_name] = {"tr": dict(), "var": list()}
+                if transcript_id not in genes_data[gene_name]["tr"]:
+                    genes_data[gene_name]["tr"][transcript_id] = list()
+                stored_tr = genes_data[gene_name]["tr"][transcript_id]
+                start = {"type": "exon", "pos": annot["start_EXON"]}
+                if start["pos"] is None:
+                    start = {"type": "intron", "pos": annot["start_INTRON"]}
+                end = {"type": "exon", "pos": annot["end_EXON"]}
+                if end["pos"] is None:
+                    end = {"type": "intron", "pos": annot["end_INTRON"]}
+                if start["type"] == end["type"] and start["pos"] == end["pos"]:
+                    stored_tr.append(
+                        "on {} {}".format(start["type"], start["pos"])
+                    )
+                else:
+                    stored_tr.append(
+                        "from {} {} to {} {}".format(
+                            start["type"], start["pos"], end["type"], end["pos"]
+                        )
+                    )
+    # Variants
+    if len(args.inputs_variants) != 0:
+        for curr_shallow in shallow:
+            for curr_var in sorted(curr_shallow.annot["VAR"], key=lambda elt: elt.annot["count"], reverse=True):
+                curr_var = curr_var.annot
+                gene_name = curr_var["gene"]
+                if gene_name != "" and curr_var["HGVSc"] != "":
+                    if gene_name not in genes_data:
+                        genes_data[gene_name] = {"tr": dict(), "var": list()}
+                    genes_data[gene_name]["var"].append({
+                        "HGVS": curr_var["HGVSc"] if curr_var["HGVSp"] is None or curr_var["HGVSp"] == "p.?" else curr_var["HGVSp"],
+                        "id": curr_var["id"],
+                        "count": curr_var["count"]
+                    })
+    # write
+    with open(out_path, "w") as FH_out:
+        FH_out.write(
+            json.dumps({
+                "parameters": {
+                    "depth_mode": args.depth_mode,
+                    "min_depth": args.min_depth,
+                    "use_annotations": args.input_annotations is not None,
+                    "use_variants": len(args.inputs_variants) != 0,
+                    "known_min_count": args.known_min_count
+                },
+                "results": genes_data
+            })
+        )
 
 
 def writeGFF(out_path, shallow, args):
@@ -390,6 +471,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Extract shallow areas from the alignment are annotate them with genomic features and known variants.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     parser.add_argument('-m', '--depth-mode', choices=["read", "fragment"], default="fragment", help='How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once). [Default: %(default)s]')
+    parser.add_argument('-c', '--known-min-count', type=int, default=3, help='Minimum number of samples where the variant is known in the databases to use its information. [Default: %(default)s]')
     parser.add_argument('-d', '--min-depth', type=int, default=30, help='All the locations with a depth under this value are reported in shallows areas. [Default: %(default)s]')
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-b', '--input-aln', required=True, help='Path to the alignments file (format: BAM).')
@@ -398,6 +480,7 @@ if __name__ == "__main__":
     group_input.add_argument('-s', '--inputs-variants', nargs="+", default=[], help='Path(es) to the file(s) defining known variants (format: VCF). This file allow to annotate variant potentially masked because they are on shallows areas. [Default: The variants on shallows areas are not reported]')
     group_output = parser.add_argument_group('Outputs')  # Outputs
     group_output.add_argument('-o', '--output-shallow', default="shallow_areas.gff3", help='Path to the file containing shallow areas and there annotations. (format: GFF3 or JSON if file name ends with ".json"). [Default: %(default)s]')
+    group_output.add_argument('-g', '--output-genes', help="Path to the file containing genes's shallow areas (format: JSON).")
     args = parser.parse_args()
 
     # Logger
@@ -424,7 +507,7 @@ if __name__ == "__main__":
     # Retrieved known variants potentialy masked in shallow areas
     for curr_input in args.inputs_variants:
         log.info("Load variants from {}.".format(curr_input))
-        variant_regions = variantsRegionFromVCF(curr_input)
+        variant_regions = variantsRegionFromVCF(curr_input, args.known_min_count)
         log.info("List potentialy masked mutations.")
         setVariantsByOverlap(shallow, variant_regions)
 
@@ -434,4 +517,6 @@ if __name__ == "__main__":
         writeJSON(args.output_shallow, shallow, args)
     else:
         writeGFF(args.output_shallow, shallow, args)
+    if args.output_genes is not None:
+        writeGenesJSON(args.output_genes, shallow, args)
     log.info("End of job")

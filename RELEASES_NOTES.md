@@ -3,9 +3,13 @@
 ### Improvements:
   * Add management for included or near full overlapped amplicons in
    `bin/addAmpliRG.py`.
+  * Add the shallow gene file as output from `bin/shallowsAreas.py`. It summarizes
+  by gene the shallow areas and potentially missed variants.
 
 ### Bug fixes:
   * Fix bug in `bin/fixVEPAnnot.py` when alleles are in lower case.
+  * Fix bug in writeJSON of `bin/shallowsAnalysis.py` when optional parameters
+  input-annotations and inputs-variants are not provided.
 
 # Release 3.1.0 [2020-05-13]
 
