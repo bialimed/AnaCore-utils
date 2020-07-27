@@ -387,9 +387,9 @@ def writeGenesJSON(out_path, shallow, args):
                 if end["pos"] is None:
                     end = {"type": "intron", "pos": annot["end_INTRON"]}
                 if start["type"] == end["type"] and start["pos"] == end["pos"]:
-                    stored_tr.append(
-                        "on {} {}".format(start["type"], start["pos"])
-                    )
+                    msg = "on {} {}".format(start["type"], start["pos"])
+                    if len(stored_tr) == 0 or msg != stored_tr[-1]:  # Prevent repeated location (e.g. 2 shallows on same exon)
+                        stored_tr.append(msg)
                 else:
                     stored_tr.append(
                         "from {} {} to {} {}".format(
