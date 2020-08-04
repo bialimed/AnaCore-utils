@@ -92,7 +92,7 @@ if __name__ == "__main__":
                 # To upper
                 record.ref = record.ref.upper()
                 record.alt = [alt.upper() for alt in record.alt]
-                for annot in enumerate(record.info[FH_in.annot_field]):
+                for annot in record.info[FH_in.annot_field]:
                     annot["Allele"] = annot["Allele"].upper()
                 # Change alternative representation
                 for alt_idx, alt in enumerate(record.alt):
