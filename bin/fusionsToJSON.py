@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -25,6 +25,7 @@ def getBreakendInfo(record, annot_field="ANN", assembly_id=None):
     coordinates = {
         "region": record.chrom,
         "pos": record.pos,
+        "cipos": None if "CIPOS" not in record.info else record.info["CIPOS"],
         "annot_pos": record.info["ANNOT_POS"],
         "ref": record.ref,
         "alt": record.alt[0],
