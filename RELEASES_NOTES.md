@@ -1,6 +1,9 @@
 # Release 3.2.0 [DEV]
 
 ### Improvements:
+  * Add scripts to prepare data mining of fusions from breakends annotations:
+  `bin/ensemblInterProToGFF.py` to generate the proteins domains annotations file
+  and `bin/inspectAnnotBND.py` to produce a detailed annotation of each breakend.
   * Add management for included or near full overlapped amplicons in
    `bin/addAmpliRG.py`.
   * Add the shallow gene file as output from `bin/shallowsAreas.py`. It summarizes
