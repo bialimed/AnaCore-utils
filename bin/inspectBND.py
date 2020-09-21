@@ -11,7 +11,7 @@ from anacore.bed import getSortedAreasByChr
 from anacore.fusion import BreakendVCFIO
 from anacore.gff import GFF3IO
 from anacore.gtf import loadModel
-from anacore.region import iterOverlapped
+from anacore.region import iterOverlapped, RegionList
 import argparse
 import json
 import logging
@@ -61,28 +61,48 @@ def annotateDomains(annot_by_gene_id, in_domains):
                 protein["annot"]["domains"].append(domain_data)
 
 
-def annotateTargets(annot_by_gene_id, targets_by_chr, gene_by_id):
+def filteredByOverlap(targets_by_chr, selected_genes):
     """
-    Add targets coordinates overlapping selected genes in annotations.
+    Return targeted areas overlapping selected genes.
 
-    :param annot_by_gene_id: Light genomic annotations by gene ID. Only genes overlapping breakends are present.
-    :type annot_by_gene_id: dict
     :param targets_by_chr: RegionList of targets by chromosomes.
     :type targets_by_chr: dict
-    :param gene_by_id: Gene object by ID from genomic annotations.
-    :type gene_by_id: dict
+    :param selected_genes: Translocated genes. Each element is a Gene object from genomic annotations.
+    :type selected_genes: list
+    :return: Targeted areas overlapping selected genes.
+    :rtype: dict
     """
-    for gene_id, gene in annot_by_gene_id.items():
-        gene_declaration = gene_by_id[gene_id]
-        gene_chrom = gene_declaration.reference.name
-        overlapped_targets = []
-        for query, overlaps in iterOverlapped([gene_declaration], targets_by_chr[gene_chrom], False):
-            for curr in overlaps:
-                overlapped_targets.append([
-                    max(gene_declaration.start, curr.start),
-                    min(gene_declaration.end, curr.end)
+    # Genes by chromosome
+    genes_by_chr = dict()
+    for gene in selected_genes:
+        chrom = gene.reference.name
+        if chrom in selected_genes:
+            genes_by_chr[chrom].append(gene)
+        else:
+            genes_by_chr[chrom] = RegionList([gene])
+    # Find overlaps between targets and selected genes
+    trimmed_targets_by_chr = dict()
+    for chrom, genes in genes_by_chr.items():
+        overlaps = list()
+        for gene, targets in iterOverlapped(genes_by_chr[chrom], targets_by_chr[chrom]):
+            for curr in targets:
+                overlaps.append([
+                    max(gene.start, curr.start),
+                    min(gene.end, curr.end)
                 ])
-        gene["annot"]["in_targets"] = overlapped_targets
+        consolidated_overlaps = list()
+        if len(overlaps) > 0:
+            overlaps = sorted(overlaps, key=lambda x: (x[0], x[1]))
+            consolidated_overlaps = [overlaps[0]]
+            prev = overlaps[0]
+            for curr in overlaps[1:]:
+                if curr[0] > prev[1]:
+                    consolidated_overlaps.append(curr)
+                    prev = curr
+                else:
+                    prev[1] = max(curr[1], prev[1])
+        trimmed_targets_by_chr[chrom] = consolidated_overlaps
+    return trimmed_targets_by_chr
 
 
 def getAnnotByGene(tr_by_id, in_alignments, in_variants, stranded=None, annotation_field="ANN"):
@@ -270,7 +290,7 @@ if __name__ == "__main__":
     tr_by_id = {curr_tr.annot["id"].split(".")[0]: curr_tr for curr_tr in transcripts}
 
     # Get annotations by gene
-    log.info("Get genomic annotations from {}.".format(args.input_variants))
+    log.info("Get fusions genomic annotations from {}.".format(args.input_variants))
     annot_by_gene_id = getAnnotByGene(tr_by_id, args.input_alignments, args.input_variants, args.stranded, args.annotation_field)
 
     # Annotate domains area on proteins
@@ -278,18 +298,16 @@ if __name__ == "__main__":
         log.info("Annotate proteins domains areas on proteins.")
         annotateDomains(annot_by_gene_id, args.input_domains)
 
-    # Annotate targeted area on genes
+    # Store targeted areas overlapping selected genes
+    selected_targets_by_chr = None
     if args.input_targets is not None:
-        # Load targets
-        log.info("Load targets from {}.".format(args.input_targets))
+        log.info("Store selected targets from {}.".format(args.input_targets))
         targets_by_chr = getSortedAreasByChr(args.input_targets)
-        # Add in targets
-        log.info("Annotate targeted areas on genes.")
-        gene_by_id = {curr_tr.parent.annot["id"].split(".")[0]: curr_tr.parent for curr_tr in transcripts}
-        annotateTargets(annot_by_gene_id, targets_by_chr, gene_by_id)
+        selected_genes = [curr_tr.parent for curr_tr in transcripts if curr_tr.parent.annot["id"].split(".")[0] in annot_by_gene_id]
+        selected_targets_by_chr = filteredByOverlap(targets_by_chr, selected_genes)
 
     # Write output
     log.info("Write output.")
     with open(args.output_annotations, "w") as writer:
-        json.dump(annot_by_gene_id, writer)
+        json.dump({"gene_by_id": annot_by_gene_id, "targets_by_chr": selected_targets_by_chr}, writer)
     log.info("End of job")
