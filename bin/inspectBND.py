@@ -54,7 +54,7 @@ def annotateDomains(annot_by_gene_id, in_domains):
                     "end": domain.end,
                     "start": domain.start
                 }
-                if "id" in domain.annot:
+                if "Dbxref" in domain.annot:
                     domain_data["annot"]["id"] = domain.annot["Dbxref"]
                 if "sub_segments" in domain.annot:
                     domain_data["annot"]["sub"] = domain.annot["sub_segments"]
@@ -295,7 +295,7 @@ if __name__ == "__main__":
 
     # Annotate domains area on proteins
     if args.input_domains is not None:
-        log.info("Annotate proteins domains areas on proteins.")
+        log.info("Annotate proteins domains areas on proteins from {}.".format(args.input_domains))
         annotateDomains(annot_by_gene_id, args.input_domains)
 
     # Store targeted areas overlapping selected genes
