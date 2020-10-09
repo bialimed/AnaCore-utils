@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -70,7 +70,7 @@ class FilterVCFPrimers(unittest.TestCase):
         ]
 
         # Execute command
-        subprocess.check_call(cmd)
+        subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
 
         # Validate results
         expected = """##fileformat=VCFv4.1
@@ -100,7 +100,7 @@ class FilterVCFPrimers(unittest.TestCase):
         ]
 
         # Execute command
-        subprocess.check_call(cmd)
+        subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
 
         # Validate results
         expected = """##fileformat=VCFv4.1
@@ -131,7 +131,7 @@ class FilterVCFPrimers(unittest.TestCase):
         ]
 
         # Execute command
-        subprocess.check_call(cmd)
+        subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
 
         # Validate results
         expected = """##fileformat=VCFv4.1

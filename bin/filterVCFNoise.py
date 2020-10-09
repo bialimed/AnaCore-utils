@@ -1,31 +1,18 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2018 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
-import argparse
-from anacore.vcf import VCFIO, getAlleleRecord, HeaderFilterAttr
 from anacore.sv import HashedSVIO
+from anacore.vcf import VCFIO, getAlleleRecord, HeaderFilterAttr
+import argparse
+import logging
+import os
+import sys
 
 
 ########################################################################
@@ -77,7 +64,15 @@ if __name__ == "__main__":
     group_output.add_argument('-o', '--output-variants', required=True, help='The path to the outputted variants file (format: VCF).')
     args = parser.parse_args()
 
+    # Logger
+    logging.basicConfig(format='%(asctime)s -- [%(filename)s][pid:%(process)d][%(levelname)s] -- %(message)s')
+    log = logging.getLogger(os.path.basename(__file__))
+    log.setLevel(logging.INFO)
+    log.info("Command: " + " ".join(sys.argv))
+
     # Process
+    nb_variants = 0
+    nb_filtered = 0
     noise_by_variant = getNoise(args.input_noises)
     with VCFIO(args.input_variants) as FH_in:
         with VCFIO(args.output_variants, "w") as FH_out:
@@ -88,6 +83,7 @@ if __name__ == "__main__":
             # Records
             for record in FH_in:
                 for idx in range(len(record.alt)):
+                    nb_variants += 1
                     curr_allele = getAlleleRecord(FH_in, record, idx)
                     # Compare signal to noise
                     if curr_allele.getName() in noise_by_variant:
@@ -96,6 +92,7 @@ if __name__ == "__main__":
                             if curr_allele.getAltAF(curr_spl)[0] > noise_by_variant[curr_allele.getName()]:
                                 nb_spl_over_noise += 1
                         if nb_spl_over_noise == 0:
+                            nb_filtered += 1
                             if curr_allele.filter is None or len(curr_allele.filter) == 0:
                                 curr_allele.filter = [args.tag_name]
                             else:
@@ -110,3 +107,14 @@ if __name__ == "__main__":
                         FH_out.write(curr_allele)
                     elif args.tag_name not in curr_allele.filter:
                         FH_out.write(curr_allele)
+
+    # Log process
+    log.info(
+        "{:.2%} of variants have been {} ({}/{})".format(
+            0 if nb_variants == 0 else nb_filtered / nb_variants,
+            "tagged" if args.mode == "tag" else "removed",
+            nb_filtered,
+            nb_variants
+        )
+    )
+    log.info("End of job")
