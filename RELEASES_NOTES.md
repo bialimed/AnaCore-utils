@@ -1,6 +1,7 @@
 # Release 3.2.0 [DEV]
 
 ### Improvements:
+  * Manage new ID format from COSMIC in `bin/VCFToJSON.py`: COSM* -> COS*.
   * Add scripts to prepare data mining of fusions from breakends annotations:
   `bin/ensemblInterProToGFF.py` to generate the proteins domains annotations file
   and `bin/inspectBND.py` to produce a detailed annotation of each breakend.

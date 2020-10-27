@@ -1,25 +1,9 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2017 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.3.0'
+__version__ = '2.4.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -62,13 +46,13 @@ def getAnnotSummary(allele_record, initial_alt, annot_field="ANN", pop_prefixes=
     variant_annot = list()
     collocated_annot = list()
     for annot in allele_record.info[annot_field]:
-        is_self_variant = (initial_alt == annot["Allele"])
+        is_self_variant = (initial_alt.upper() == annot["Allele"].upper())
         # Similar knowns variants
         if is_self_variant and annot["Existing_variation"] is not None:
             for db_id in annot["Existing_variation"].split("&"):
                 if db_id.startswith("rs"):
                     xref["dbSNP"].add(db_id)
-                elif db_id.startswith("COSM"):
+                elif db_id.startswith("COS"):
                     xref["cosmic"].add(db_id)
                 elif db_id.startswith("CM"):
                     xref["HGMD"].add(db_id)
@@ -230,7 +214,7 @@ if __name__ == "__main__":
                         src_id = id_by_src[curr_src]
                         src_filters = []
                         for curr_filter in allele_record.filter:
-                            if not re.match("^s\d+_", curr_filter):  # Filters common between all sources
+                            if not re.match(r"^s\d+_", curr_filter):  # Filters common between all sources
                                 src_filters.append(curr_filter)
                             elif curr_filter.startswith("{}_".format(src_id)):  # Filters coming from the current source
                                 src_filters.append(curr_filter.split("_", 1)[1])
