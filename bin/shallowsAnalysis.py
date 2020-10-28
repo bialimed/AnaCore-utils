@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -115,7 +115,7 @@ def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_depth, log)
     return shallow
 
 
-def variantsRegionFromVCF(vcf_path, min_count=1, symbol="GENE", hgvsc="CDS", hgvsp="AA"):
+def variantsRegionFromVCF(vcf_path, min_count=1, symbol="GENE", hgvsc="CDS", hgvsp="AA", count="CNT"):
     """
     Return the region object corresponding to the known variants in a VCF.
 
@@ -129,6 +129,8 @@ def variantsRegionFromVCF(vcf_path, min_count=1, symbol="GENE", hgvsc="CDS", hgv
     :type hgvsc: str
     :param hgvsp: Tag used in VCF.info to store the HGVSp.
     :type hgvsp: str
+    :param count: Tag used in VCF.info to store the number of database's samples with this variant.
+    :type count: str
     :return: List of variants regions.
     :rtype: anacore.region.RegionList
     """
@@ -146,9 +148,9 @@ def variantsRegionFromVCF(vcf_path, min_count=1, symbol="GENE", hgvsc="CDS", hgv
                     "gene": ("" if symbol not in record.info else record.info[symbol]),
                     "HGVSp": ("" if hgvsp not in record.info else record.info[hgvsp]),
                     "HGVSc": ("" if hgvsc not in record.info else record.info[hgvsc]),
-                    "count": (None if "CNT" not in record.info else record.info["CNT"])
+                    "count": (None if count not in record.info else int(record.info[count]))
                 }
-            ) for record in FH_in if "_ENST" not in record.info[symbol] and ("CNT" not in record.info or record.info["CNT"] >= min_count)
+            ) for record in FH_in if (symbol not in record.info or "_ENST" not in record.info[symbol]) and (count not in record.info or int(record.info[count]) >= min_count)
         ]
     return RegionList(variants_region)
 
@@ -471,16 +473,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Extract shallow areas from the alignment are annotate them with genomic features and known variants.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     parser.add_argument('-m', '--depth-mode', choices=["read", "fragment"], default="fragment", help='How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once). [Default: %(default)s]')
-    parser.add_argument('-c', '--known-min-count', type=int, default=3, help='Minimum number of samples where the variant is known in the databases to use its information. [Default: %(default)s]')
     parser.add_argument('-d', '--min-depth', type=int, default=30, help='All the locations with a depth under this value are reported in shallows areas. [Default: %(default)s]')
-    group_input = parser.add_argument_group('Inputs')  # Inputs
+    group_known = parser.add_argument_group('Known variants')
+    group_known.add_argument('-n', '--known-count-field', default="CNT", help="Field used in known variants database to store the number of database's samples with this variant. [Default: %(default)s]")
+    group_known.add_argument('-i', '--known-hgvsc-field', default="CDS", help='Field used in known variants databases to store the HGVSp. [Default: %(default)s]')
+    group_known.add_argument('-p', '--known-hgvsp-field', default="AA", help='Field used in known variants databases to store the HGVSp. [Default: %(default)s]')
+    group_known.add_argument('-c', '--known-min-count', type=int, default=3, help='Minimum number of samples where the variant is known in the databases to use its information. [Default: %(default)s]')
+    group_known.add_argument('-y', '--known-symbol-field', default="GENE", help='Field used in known variants databases to store the symbol of the gene. This field is required in VCF when you generate the output by gene: --output-genes. [Default: %(default)s]')
+    group_input = parser.add_argument_group('Inputs')
     group_input.add_argument('-b', '--input-aln', required=True, help='Path to the alignments file (format: BAM).')
     group_input.add_argument('-t', '--input-targets', help='Path to the targeted regions (format: BED). They must not contains any overlap. [Default: all positions defined in the alignment file header]')
     group_input.add_argument('-a', '--input-annotations', help='Path to the file defining transcripts, genes and proteins locations (format: GTF). This file allow to annotate locations on genes and proteins located on shallows areas. [Default: The shallows areas are not annotated]')
     group_input.add_argument('-s', '--inputs-variants', nargs="+", default=[], help='Path(es) to the file(s) defining known variants (format: VCF). This file allow to annotate variant potentially masked because they are on shallows areas. [Default: The variants on shallows areas are not reported]')
-    group_output = parser.add_argument_group('Outputs')  # Outputs
+    group_output = parser.add_argument_group('Outputs')
     group_output.add_argument('-o', '--output-shallow', default="shallow_areas.gff3", help='Path to the file containing shallow areas and there annotations. (format: GFF3 or JSON if file name ends with ".json"). [Default: %(default)s]')
-    group_output.add_argument('-g', '--output-genes', help="Path to the file containing genes's shallow areas (format: JSON).")
+    group_output.add_argument('-g', '--output-genes', help="Path to the file containing genes's shallow areas (format: JSON). For use this option with the option --inputs-variants the databases must provide the gene's symbol of each variant (see --known-symbol-field).")
     args = parser.parse_args()
 
     # Logger
@@ -507,7 +514,14 @@ if __name__ == "__main__":
     # Retrieved known variants potentialy masked in shallow areas
     for curr_input in args.inputs_variants:
         log.info("Load variants from {}.".format(curr_input))
-        variant_regions = variantsRegionFromVCF(curr_input, args.known_min_count)
+        variant_regions = variantsRegionFromVCF(
+            curr_input,
+            args.known_min_count,
+            args.known_symbol_field,
+            args.known_hgvsc_field,
+            args.known_hgvsp_field,
+            args.known_count_field
+        )
         log.info("List potentialy masked mutations.")
         setVariantsByOverlap(shallow, variant_regions)
 
