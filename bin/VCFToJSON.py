@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.4.0'
+__version__ = '2.5.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -107,9 +107,7 @@ def getPathogenicityPredictors(annot, pathogenicity_fields=None):
     pathogenicity_fields = ["CLIN_SIG", "CADD_PHRED", "MetaLR_rankscore", "VEST3_rankscore"] if pathogenicity_fields is None else pathogenicity_fields
     rename = {
         "CLIN_SIG": "ClinVar",
-        "CADD_PHRED": "CADD_phred",
-        "MetaLR_rankscore": "MetaLR",
-        "VEST3_rankscore": "VEST3"
+        "CADD_PHRED": "CADD_phred"
     }
     score_by_predictor = {}
     for key in pathogenicity_fields:
