@@ -3,15 +3,18 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
-import os
-import sys
-import unittest
-from anacore.region import Region
 from anacore.genomicRegion import CDS, Exon, Gene, Protein, Transcript
+from anacore.region import Region, RegionList
+import os
+import pysam
+import sys
+import tempfile
+import unittest
+import uuid
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_DIR = os.path.dirname(TEST_DIR)
@@ -19,7 +22,7 @@ BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
-from shallowsAnalysis import getTranscriptsAnnot
+from shallowsAnalysis import getTranscriptsAnnot, shallowFromAlignment
 
 
 ########################################################################
@@ -27,7 +30,83 @@ from shallowsAnalysis import getTranscriptsAnnot
 # FUNCTIONS
 #
 ########################################################################
+def samToBam(in_sam, out_bam):
+    with pysam.AlignmentFile(in_sam, "r") as reader:
+        with pysam.AlignmentFile(out_bam, "wb", header=reader.header) as writer:
+            for record in reader:
+                writer.write(record)
+
+
 class DepthAnalysis(unittest.TestCase):
+    def setUp(self):
+        tmp_folder = tempfile.gettempdir()
+        unique_id = str(uuid.uuid1())
+        self.tmp_sam = os.path.join(tmp_folder, unique_id + "_aln.sam")
+        self.tmp_bam = os.path.join(tmp_folder, unique_id + "_aln.bam")
+
+    def tearDown(self):
+        # Clean temporary files
+        for curr_file in [self.tmp_sam, self.tmp_bam, self.tmp_bam + ".bai"]:
+            if os.path.exists(curr_file):
+                os.remove(curr_file)
+
+    def testShallowFromAlignment(self):
+        """
+        art_chr1:
+                10        20        30        40        50        60        70        80        90       100       110       120
+        123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|12345678
+        ATGACTGAATATAAACTTGTGGTAGTTGGAGCTGGTGTTTGCCATAAATAATACTAAATCATTTGAAGATATTCACCATTATAGAGAACAAATGCGTAGGCAAGAGTGCCTTGACGATACAGCTAAAT
+                   *******.************************************************** ******************************************.*********
+                TCGTAAACTTCTGGTAGTTGGAGCTGGTGTTTGCCATAAATAATACTAAATCATTTGAAGA
+                                                                              ATTCACCATTATAGAGAACAAATGCGTAGGCAAGAGTGCCTTTACGATACAG
+                 ------------------------------------------------------------------------------------------------------------------
+
+        art_chr2:
+                10        20        30        40        50        60        70        80        90       100       110       120
+        123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|123456789|12345678
+        ATGACTGAATATAAACTTGTGGTAGTTGGAGCTGGTGTTTGCCATAAATAATACTAAATCATTTGAAGATATTCACCATTATAGAGAACAAATGCGTAGGCAAGAGTGCCTTGACGATACAGCTAAAT               **********************         **********************
+               ********************************************        ***************************************************
+               AATATAAACTTGTGGTAGTTGGAGCTGGTGTTTGCCATAAATAA        CATTTGAAGATATTCACCATTATAGAGAACAAATGCGTAGGCAAGAGTGCC
+                 -------------------------------------------------------------------------------------------
+
+        art_chr3:
+                10        20        30        40        50        60        70
+        123456789|123456789|123456789|123456789|123456789|123456789|123456789|12
+        ATGACTGAATATAAACTTGTGGTAGTTGGAGCTGGTGGCGTAGGCAAGAGTGCCTTGACGATACAGCTAAAT
+
+                 -------------------------------
+        """
+        with open(self.tmp_sam, "w") as writer:
+            writer.write("""@SQ	SN:art_chr1	LN:128
+@SQ	SN:art_chr2	LN:128
+@SQ	SN:art_chr3	LN:72
+@PG	ID:bwa	PN:bwa	VN:0.7.17-r1188	CL:bwa mem ref.fasta reads.fasta
+read_1	0	art_chr1	12	60	3S58M	*	0	0	TCGTAAACTTCTGGTAGTTGGAGCTGGTGTTTGCCATAAATAATACTAAATCATTTGAAGA	*	NM:i:1	MD:Z:7G50	AS:i:53	XS:i:0
+read_2	0	art_chr1	71	60	52M	*	0	0	ATTCACCATTATAGAGAACAAATGCGTAGGCAAGAGTGCCTTTACGATACAG	*	NM:i:1	MD:Z:42G9	AS:i:47	XS:i:0
+read_3	0	art_chr2	8	60	44M8D51M	*	0	0	AATATAAACTTGTGGTAGTTGGAGCTGGTGTTTGCCATAAATAACATTTGAAGATATTCACCATTATAGAGAACAAATGCGTAGGCAAGAGTGCC	*	NM:i:8	MD:Z:44^TACTAAAT51	AS:i:81	XS:i:0
+""")
+        samToBam(self.tmp_sam, self.tmp_bam)
+        pysam.index(self.tmp_bam)
+
+        class FakeLogger:
+            def info(self, msg):
+                pass
+
+        selected_regions = RegionList([
+            Region(10, 123, None, "art_chr1"),
+            Region(10, 100, None, "art_chr2"),
+            Region(10, 40, None, "art_chr3"),
+        ])
+
+        expected = [
+            "art_chr1:10-11",
+            "art_chr1:70-70",
+            "art_chr1:123-123",
+            "art_chr3:10-40",
+        ]
+        observed = [str(elt) for elt in shallowFromAlignment(self.tmp_bam, selected_regions, "reads", 1, FakeLogger())]
+        self.assertEqual(sorted(expected), sorted(observed))
+
     def testGetTranscriptsAnnot_withUTR_threeExons(self):
         exon_1 = Exon(10, 40, "+", "chr1", "fwd_exon_1")
         exon_2 = Exon(91, 150, "+", "chr1", "fwd_exon_2")

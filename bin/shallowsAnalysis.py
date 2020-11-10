@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.3.0'
+__version__ = '1.3.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -57,6 +57,33 @@ def getTargets(in_aln, in_targets=None):
     return selected_regions
 
 
+def addToShallow(curr_chr, curr_pos, prev_opened, shallows):
+    """
+    Add current position in current shallow frame if they are consecutive else create a shallow area with previous frame and open new shallow frame with current pos.
+
+    :param curr_chr: Name of the current region.
+    :type curr_chr: str
+    :param curr_pos: The current position with low DP (0-based).
+    :type curr_pos: int
+    :param prev_opened: The previous shallow frame ({"start": x, "end": y}).
+    :type prev_opened: dict
+    :param shallows: The list of shallows areas
+    :type shallows: anacore.region.RegionList
+    """
+    if prev_opened["start"] is None:
+        prev_opened["start"] = curr_pos
+        prev_opened["end"] = curr_pos
+    else:
+        if prev_opened["end"] == curr_pos - 1:
+            prev_opened["end"] = curr_pos
+        else:
+            shallows.append(
+                Region(prev_opened["start"] + 1, prev_opened["end"] + 1, "+", curr_chr)
+            )
+            prev_opened["start"] = curr_pos
+            prev_opened["end"] = curr_pos
+
+
 def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_depth, log):
     """
     Return the list of shallow regions from the alignment file.
@@ -84,8 +111,14 @@ def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_depth, log)
                 log.info("Processed regions {}/{}.".format(idx_region + 1, nb_selected_regions))
             idx_in_part += 1
             prev_opened = {"start": None, "end": None}
+            curr_checked = region.start - 1
             for pileupcolumn in FH_bam.pileup(region.reference.name, region.start - 1, region.end - 1, max_depth=100000000):
                 if pileupcolumn.reference_pos + 1 >= region.start and pileupcolumn.reference_pos + 1 <= region.end:
+                    # Missing positions
+                    while curr_checked < pileupcolumn.reference_pos:
+                        addToShallow(region.reference, curr_checked, prev_opened, shallow)
+                        curr_checked += 1
+                    # Current position
                     curr_reads_depth = 0
                     curr_frag = set()
                     for pileupread in pileupcolumn.pileups:
@@ -98,16 +131,12 @@ def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_depth, log)
                     if depth_mode == "fragment":
                         curr_depth = len(curr_frag)
                     if min_depth > curr_depth:
-                        if prev_opened["start"] is None:
-                            prev_opened = {"start": pileupcolumn.reference_pos, "end": pileupcolumn.reference_pos}
-                        else:
-                            if prev_opened["end"] == pileupcolumn.reference_pos - 1:
-                                prev_opened["end"] = pileupcolumn.reference_pos
-                            else:
-                                shallow.append(
-                                    Region(prev_opened["start"] + 1, prev_opened["end"] + 1, "+", region.reference)
-                                )
-                                prev_opened = {"start": pileupcolumn.reference_pos, "end": pileupcolumn.reference_pos}
+                        addToShallow(region.reference, pileupcolumn.reference_pos, prev_opened, shallow)
+                    curr_checked = pileupcolumn.reference_pos + 1
+            # Missing positions
+            while curr_checked < region.end:
+                addToShallow(region.reference, curr_checked, prev_opened, shallow)
+                curr_checked += 1
             if prev_opened["start"] is not None:
                 shallow.append(
                     Region(prev_opened["start"] + 1, prev_opened["end"] + 1, "+", region.reference)
