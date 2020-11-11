@@ -1,4 +1,4 @@
-# Release 3.2.0 [DEV]
+# Release 3.2.0 [2020-11-11]
 
 ### Improvements:
   * Manage new ID format from COSMIC in `bin/VCFToJSON.py`: COSM* -> COS*.
@@ -11,8 +11,8 @@
   by gene the shallow areas and potentially missed variants.
 
 ### Bug fixes:
-  * Fix bug in `bin/shallowsAnalysis.py`: missing shallow area when there is no
-  read on the area.
+  * Fix critical bug in `bin/shallowsAnalysis.py`: missing shallow area when
+  there is no read on the area.
   * Fix bug in `bin/fixVEPAnnot.py` when alleles are in lower case.
   * Fix bug in writeJSON of `bin/shallowsAnalysis.py` when optional parameters
   input-annotations and inputs-variants are not provided.
