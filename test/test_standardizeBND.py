@@ -211,7 +211,7 @@ GAAGACTATTTTGGTGAATCACCTTCAGTGAACAAATGCCT""")
 # IMPRECISE without CIPOS and with unknown ref: 8:38299494=N/]7:92614584]N => 8:38299494=T/]7:92614584]T   7:92614584=N/N[8:38299494[ => 7:92614584=A/A[8:38299494[
 35	21	a258abe3-31e6-483b-b463-fcca36cc848f	N	]36:21]N	.	PASS	IMPRECISE;MATEID=2c4739b6-b750-4c5e-b10a-491538aae408;RNA_FIRST;SVTYPE=BND
 36	21	2c4739b6-b750-4c5e-b10a-491538aae408	N	N[35:21[	.	PASS	IMPRECISE;MATEID=a258abe3-31e6-483b-b463-fcca36cc848f;SVTYPE=BND""")
-        self.expected = """##fileformat=VCFv4.1
+        self.expected = """##fileformat=VCFv4.3
 ##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS">
 ##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description="Imprecise structural variation.">
 ##INFO=<ID=MATEID,Number=A,Type=String,Description="ID of mate breakend.">

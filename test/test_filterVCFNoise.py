@@ -73,7 +73,7 @@ class FilterVCFPrimers(unittest.TestCase):
         subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
 
         # Validate results
-        expected = """##fileformat=VCFv4.1
+        expected = """##fileformat=VCFv4.3
 ##FILTER=<ID=popConst,Description="The variant correspond to a constitutive detection (sequencing polymerase error rate at this position, workflow artifact, ...).">
 ##FORMAT=<ID=AF,Number=.,Type=Float,Description="Allele Frequency">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
@@ -103,7 +103,7 @@ class FilterVCFPrimers(unittest.TestCase):
         subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
 
         # Validate results
-        expected = """##fileformat=VCFv4.1
+        expected = """##fileformat=VCFv4.3
 ##FILTER=<ID=popConst,Description="The variant correspond to a constitutive detection (sequencing polymerase error rate at this position, workflow artifact, ...).">
 ##FORMAT=<ID=AF,Number=.,Type=Float,Description="Allele Frequency">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
@@ -134,7 +134,7 @@ class FilterVCFPrimers(unittest.TestCase):
         subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
 
         # Validate results
-        expected = """##fileformat=VCFv4.1
+        expected = """##fileformat=VCFv4.3
 ##FILTER=<ID=noise,Description="The signal is lower than noise.">
 ##FORMAT=<ID=AF,Number=.,Type=Float,Description="Allele Frequency">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Total Depth">

@@ -96,7 +96,7 @@ chr20	2020	4	G	T,A	.	PASS	.	AF:DP	0.2,0.1:20"""
         ]
         subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
         # Validate results
-        expected = """##fileformat=VCFv4.1
+        expected = """##fileformat=VCFv4.3
 ##fileDate=20200202
 ##source=GenerateSVCandidates 1.6.0
 ##reference=file://Homo_sapiens.GRCh38.94.dna.fa
@@ -232,7 +232,7 @@ Y	chrY"""
         ]
         subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
         # Validate results
-        expected = """##fileformat=VCFv4.1
+        expected = """##fileformat=VCFv4.3
 ##fileDate=20200202
 ##source=GenerateSVCandidates 1.6.0
 ##reference=file://Homo_sapiens.GRCh38.94.dna.fa

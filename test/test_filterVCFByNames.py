@@ -77,7 +77,7 @@ class FilterVCFByNames(unittest.TestCase):
         ]
         subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
         expected = [
-            "##fileformat=VCFv4.1",
+            "##fileformat=VCFv4.3",
             '##INFO=<ID=AA,Number=1,Type=String,Description="Ancestral Allele">',
             '##FILTER=<ID=selID,Description="Select variants by list of names">',
             "#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO",
@@ -108,7 +108,7 @@ class FilterVCFByNames(unittest.TestCase):
         ]
         subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
         expected = [
-            "##fileformat=VCFv4.1",
+            "##fileformat=VCFv4.3",
             '##INFO=<ID=AA,Number=1,Type=String,Description="Ancestral Allele">',
             '##FILTER=<ID=remvID,Description="Remove variants by list of names">',
             "#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO",

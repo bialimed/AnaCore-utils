@@ -216,7 +216,7 @@ X	118791837	dca7f41e-6ab1-4bea-a1aa-6ac00f10e7f9	N	N]7:140777046]	.	PASS	MATEID=
         subprocess.check_call(self.cmd, stderr=subprocess.DEVNULL)
 
         # Validate results
-        expected = """##fileformat=VCFv4.1
+        expected = """##fileformat=VCFv4.3
 ##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS">
 ##INFO=<ID=IDSRC,Number=.,Type=String,Description="ID of breakend by source">
 ##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description="Imprecise structural variation">

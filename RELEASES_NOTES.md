@@ -1,3 +1,9 @@
+# Release 3.3.0 [DEV]
+
+### Improvements:
+  * Replace non-allele specific COSMIC annotations produced by VEP to
+  allelle-specific annotations in `bin/fixVEPAnnot.py`.
+
 # Release 3.2.0 [2020-11-11]
 
 ### Improvements:
