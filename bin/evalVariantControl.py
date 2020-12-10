@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.1'
+__version__ = '1.4.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -216,7 +216,7 @@ if __name__ == "__main__":
 
     # Process
     all_variants = dict()
-    addVCFVariants(all_variants, args.expected_file, 0, "expected")
+    addVCFVariants(all_variants, args.expected_file, 0)
     addVCFVariants(all_variants, args.detected_file, 1)
     filterVarNotIn(all_variants, 0)
     if args.output_file.endswith("json"):
