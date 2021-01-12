@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.5.0'
+__version__ = '2.6.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -234,7 +234,17 @@ if __name__ == "__main__":
                         log
                     )
                 json_data.append(curr_json)
-
+                # Evidences
+                if "EVID_PA" in FH_vcf.format:
+                    curr_json["evidences"] = {}
+                    for spl, curr_evidence in allele_record.samples.items():
+                        curr_json["evidences"][spl] = {
+                            "prec_all_dis": curr_evidence["EVID_PA"],
+                            "imp_all_dis": curr_evidence["EVID_IA"],
+                        }
+                        if curr_evidence["EVID_PS"] is not None:
+                            curr_json["evidences"][spl]["prec_same_dis"] = curr_evidence["EVID_PS"]
+                            curr_json["evidences"][spl]["imp_same_dis"] = curr_evidence["EVID_IS"]
     # Write output file
     with open(args.output_variants, "w") as FH_out:
         FH_out.write(
