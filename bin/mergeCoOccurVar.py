@@ -500,7 +500,7 @@ if __name__ == "__main__":
                                                         second_std_name = std_prev.getName()
                                                     merged = mergedRecord(FH_vcf, first, first_std_name, second, second_std_name, chrom_seq)
                                                     traceMerge(merged, intersection_rate, intersection_count)
-                                                    log.info("Merge {} and {} in {} (intersection: {:.1f} on {}]).".format(
+                                                    log.info("Merge {} and {} in {} (intersection: {:.2f} on {}]).".format(
                                                         prev.getName(), curr.getName(), merged.getName(), intersection_rate, analysed_count
                                                     ))
                                                     # Prepare merged to become prev
