@@ -12,6 +12,7 @@ from anacore.sv import HashedSVIO
 import argparse
 import logging
 import os
+from owlready2 import get_ontology
 import re
 import sys
 
@@ -182,9 +183,9 @@ def getSimpleCategory(variant, record):
         if record["reference_bases"] != "" or record["variant_bases"] != "":
             if len(record["reference_bases"]) == len(record["variant_bases"]):
                 if len(record["reference_bases"]) == 1:
-                    category = "mutation>snv"
+                    category = "mutation>substitution"
                 else:
-                    category = "mutation>mnv"
+                    category = "mutation>substitution"
             else:
                 if len(record["reference_bases"]) < len(record["variant_bases"]):
                     category = "mutation>insertion"
@@ -247,9 +248,9 @@ def getSimpleCategory(variant, record):
         if record["reference_bases"] != "" or record["variant_bases"] != "":
             if len(record["reference_bases"]) == len(record["variant_bases"]):
                 if len(record["reference_bases"]) == 1:
-                    category = "mutation>snv"
+                    category = "mutation>substitution"
                 else:
-                    category = "mutation>mnv"
+                    category = "mutation>substitution"
             else:
                 if len(record["reference_bases"]) < len(record["variant_bases"]):
                     category = "mutation>insertion"
@@ -294,9 +295,9 @@ def getSimpleCategory(variant, record):
         if record["reference_bases"] != "" or record["variant_bases"] != "":
             if len(record["reference_bases"]) == len(record["variant_bases"]):
                 if len(record["reference_bases"]) == 1:
-                    category = "mutation>snv"
+                    category = "mutation>substitution"
                 else:
-                    category = "mutation>mnv"
+                    category = "mutation>substitution"
             else:
                 if len(record["reference_bases"]) < len(record["variant_bases"]):
                     category = "mutation>insertion"
@@ -307,9 +308,9 @@ def getSimpleCategory(variant, record):
         if record["reference_bases"] != "" or record["variant_bases"] != "":
             if len(record["reference_bases"]) == len(record["variant_bases"]):
                 if len(record["reference_bases"]) == 1:
-                    category = "mutation>snv"
+                    category = "mutation>substitution"
                 else:
-                    category = "mutation>mnv"
+                    category = "mutation>substitution"
             else:
                 if len(record["reference_bases"]) < len(record["variant_bases"]):
                     category = "mutation>insertion"
@@ -318,12 +319,37 @@ def getSimpleCategory(variant, record):
     return category
 
 
+def getOntologyElementByID(ontology, disease_id):
+    element = None
+    diseases = ontology.search(id=disease_id)
+    if len(diseases) == 0:
+        diseases = ontology.search(hasAlternativeId=disease_id)
+        if len(diseases) > 1:
+            raise Exception('The disease with ID "{}" is found several times in ontology.'.format(disease_id))
+    elif len(diseases) > 1:
+        raise Exception('The disease with ID "{}" is found several times in ontology.'.format(disease_id))
+    if len(diseases) == 1:
+        element = diseases[0]
+    return element
+
+
+def getOntologyElementByTerm(ontology, disease_term, case_sensitive=True):
+    element = None
+    diseases = ontology.search(label=disease_term, _case_sensitive=case_sensitive)
+    if len(diseases) == 0:
+        diseases = ontology.search(hasExactSynonym=disease_term, _case_sensitive=case_sensitive)
+        if len(diseases) > 1:
+            raise Exception('The disease "{}" is found several times in ontology.'.format(disease_term))
+    elif len(diseases) > 1:
+        raise Exception('The disease "{}" is found several times in ontology.'.format(disease_term))
+    if len(diseases) == 1:
+        element = diseases[0]
+    return element
+
+
 def cleanedRawVariant(record):
     feature_change_by_variant_id = {
         "1991": "EXON 10 MUTATIONS and EXON 21 MUTATIONS",  # Instead of "EXON 10 and EXON 21 MUTATIONS"
-        # "1497": "P551_E554del",  # Instead of "P551_E554delPMYE"
-        # "961": "W557_K558del",  # Instead of "W557_K558DELWK"
-        # "943": "D842_H845del",  # Instead of "D842_H845DELDIMH"
         "785": "Thr367Metfs",  # Instead of "1100DELC"
         "736": "V769_D770insASV",  # Instead of "V769_770insASV"
         "503": "EML4-ALK",  # Instead of "EML4-ALK E6;A20"
@@ -351,10 +377,11 @@ TRUNC_HGVS_P_CHANGE_REGEXP = r"[" + "".join(ONE_LETTER_AA_LEXIC).replace("*", r"
 ########################################################################
 if __name__ == "__main__":
     # Manage parameters
-    parser = argparse.ArgumentParser(description='Add category, HGVSp and location in CIViC clinical evidence file.')
+    parser = argparse.ArgumentParser(description='Standardize clinical evidence from CIViC bank.')
     group_input = parser.add_argument_group('Inputs')
-    group_input.add_argument('-g', '--input-genes', help='Path to the genes information from NCBI-Entrez (format: TSV).')
     group_input.add_argument('-i', '--input-bank', required=True, help='Path to the clinical evidence file from CIViC (format: TSV).')
+    group_input.add_argument('-d', '--input-disease-ontology', required=True, help='Path to the disease ontology file. (format: OWL).')
+    group_input.add_argument('-g', '--input-genes', help='Path to the genes information from NCBI-Entrez (format: TSV).')
     group_output = parser.add_argument_group('Outputs')
     group_input.add_argument('-o', '--output-bank', required=True, help='Path to the outputted file (format: TSV).')
     args = parser.parse_args()
@@ -366,38 +393,88 @@ if __name__ == "__main__":
     log.info("Command: " + " ".join(sys.argv))
 
     # Process
+    renamed_diseases = set()
+    ontology = get_ontology("file://{}".format(args.input_disease_ontology)).load()
     aliases_by_gene_id = {}
     if args.input_genes:
         aliases_by_gene_id = getAliasesByGeneId(args.input_genes)
     with HashedSVIO(args.output_bank, "w") as writer:
+        writer.titles = ["gene", "entrez_id", "subject", "category", "disease",
+                         "doid", "level", "type", "drugs", "direction",
+                         "clinical_significance", "citation", "HGVSp_change",
+                         "HGVSp_change_trunc", "source", "transcript", "chromosome",
+                         "start", "end", "xref_level"]
         with HashedSVIO(args.input_bank) as reader:
-            writer.titles = reader.titles + ["cleaned_variant", "variant_category", "HGVSp_change"]
             for record in reader:
-                cleaned_variant = cleanedRawVariant(record).replace("  ", " ")
-                splitted_feature = splitMulti(cleaned_variant)
-                for sub_variant in splitted_feature:
-                    # Clean
-                    cleaned_sub_variant = cleanedAlias(sub_variant, record, aliases_by_gene_id)
-                    if cleaned_sub_variant.startswith(record["gene"] + " "):
-                        cleaned_sub_variant = cleaned_sub_variant[len(record["gene"]) + 1:]
-                    if re.match(r"^.+ \(?c\..+\)?$", sub_variant):
-                        probable_hgvs = cleaned_sub_variant.split(" ")[0]
-                        if HGVSProtChange.isValid(probable_hgvs):
-                            cleaned_sub_variant = str(HGVSProtChange.fromStr(probable_hgvs))
-                        elif re.match(TRUNC_HGVS_P_CHANGE_REGEXP, cleaned_sub_variant):
-                            cleaned_sub_variant = probable_hgvs
-                    record["cleaned_variant"] = cleaned_sub_variant
-                    # HGVS
-                    record["HGVSp_change"] = ""
-                    if HGVSProtChange.isValid(cleaned_sub_variant):
-                        record["HGVSp_change"] = HGVSProtChange.fromStr(cleaned_sub_variant)
-                    elif re.match("^" + TRUNC_HGVS_P_CHANGE_REGEXP + "$", cleaned_sub_variant):
-                        record["HGVSp_change"] = AA_THREE_BY_ONE[cleaned_sub_variant[0]] + cleaned_sub_variant[1:]
-                    # Category
-                    category = getCategory(cleaned_sub_variant, record)
-                    record["variant_category"] = "" if category is None else category
-                    # Write
-                    writer.write(record)
+                if record["evidence_status"] == "accepted":
+                    cleaned_variant = cleanedRawVariant(record).replace("  ", " ")
+                    splitted_feature = splitMulti(cleaned_variant)
+                    # Disease
+                    record["disease"] = record["disease"]
+                    if record["disease"] == "Pediatric Low-grade Glioma (PLGG)":
+                        record["disease"] = "Pediatric Low-grade Glioma"
+                    ontology_elt = getOntologyElementByTerm(ontology, record["disease"], False)
+                    if ontology_elt is not None:
+                        elt_ids = set([str(ontology_elt.id[0])] + [str(elt) for elt in ontology_elt.hasAlternativeId])
+                        if record["doid"] != "" and "DOID:" + record["doid"] not in elt_ids:
+                            raise Exception('The disease "{}" match to the ID {} in ontology and is associated with DOID:{}.'.format(record["disease"], ontology_elt.id, record["doid"]))
+                        record["doid"] = ontology_elt.id[0][5:]
+                        record["disease"] = str(ontology_elt.label[0])
+                    elif record["doid"] != "":
+                        ontology_elt = getOntologyElementByID(ontology, "DOID:{}".format(record["doid"]))
+                        if ontology_elt is None:
+                            raise Exception("The variant {} does not have valid DO_term and DO_id.".format(record["variant_id"]))
+                        disease_term = str(ontology_elt.label[0])
+                        if record["disease"] not in renamed_diseases:
+                            log.warning('Rename disease "{}" to "{}".'.format(record["disease"], disease_term))
+                            renamed_diseases.add(record["disease"])
+                        record["disease"] = disease_term
+                    else:
+                        log.warning('The variant {} with evidence level {} does not have DO_id and DO_term is not found: {}.'.format(record["variant_id"], record["evidence_level"], record["disease"]))
+                    # Other fields
+                    for sub_variant in splitted_feature:
+                        # Clean
+                        cleaned_sub_variant = cleanedAlias(sub_variant, record, aliases_by_gene_id)
+                        if cleaned_sub_variant.startswith(record["gene"] + " "):
+                            cleaned_sub_variant = cleaned_sub_variant[len(record["gene"]) + 1:]
+                        if re.match(r"^.+ \(?c\..+\)?$", sub_variant):
+                            probable_hgvs = cleaned_sub_variant.split(" ")[0]
+                            if HGVSProtChange.isValid(probable_hgvs):
+                                cleaned_sub_variant = str(HGVSProtChange.fromStr(probable_hgvs))
+                            elif re.match(TRUNC_HGVS_P_CHANGE_REGEXP, cleaned_sub_variant):
+                                cleaned_sub_variant = probable_hgvs
+                        record["subject"] = cleaned_sub_variant
+                        # HGVS
+                        record["HGVSp_change"] = ""
+                        record["HGVSp_change_trunc"] = ""
+                        if HGVSProtChange.isValid(cleaned_sub_variant):
+                            record["HGVSp_change"] = HGVSProtChange.fromStr(cleaned_sub_variant)
+                        elif re.match("^" + TRUNC_HGVS_P_CHANGE_REGEXP + "$", cleaned_sub_variant):
+                            record["HGVSp_change_trunc"] = AA_THREE_BY_ONE[cleaned_sub_variant[0]] + cleaned_sub_variant[1:]
+                        # Category
+                        category = getCategory(cleaned_sub_variant, record)
+                        record["category"] = "" if category is None else category
+                        # Position
+                        record["transcript"] = record['representative_transcript'] + ("" if record['representative_transcript2'] == "" else " and " + record['representative_transcript2'])
+                        record["chromosome"] = ""
+                        record["start"] = ""
+                        record["end"] = ""
+                        # Level
+                        record["xref_level"] = record["evidence_level"]
+                        record["level"] = record["evidence_level"]
+                        if record["evidence_level"] == "C":
+                            record["level"] = "C" if record["evidence_type"] == "predictive" else "D"
+                        elif record["evidence_level"] == "E":
+                            record["level"] = "D"
+                        # Additionnal features
+                        record["source"] = "CIViC"
+                        record["type"] = record["evidence_type"]
+                        record["direction"] = record["evidence_direction"]
+                        record["citation"] = "{}:{}".format(record['source_type'].replace("PubMed", "PMID"), record['citation_id'])
+                        if record['drug_interaction_type'] != "":
+                            record["drugs"] = "{} of {}".format(record['drug_interaction_type'], record['drugs'].replace(",", ", "))
+                        # Write
+                        writer.write(record)
     log.info("End of job")
 
 
