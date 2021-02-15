@@ -106,23 +106,23 @@ def getEvidences(record, annot_field):
     processed_associations = set()
     retained_evidences = list()
     for annot in record.info[annot_field]:
-        if annot["HGVSp"] is not None and not annot["HGVSp"].endswith("p.?") and not annot["HGVSp"].replace(")", "").endswith("="):
+        if annot["HGVSp"] is not None and not annot["HGVSp"].endswith("p.?") and not annot["HGVSp"].replace(")", "").endswith("="):  #################### = exist if variant is locaterd on splice site or promoter
             annot_association_id = "{}:\t{}".format(annot["SYMBOL"], annot["HGVSp"].split(":", 1)[1])
             if annot_association_id not in processed_associations:  # Skip association on other annotation with the same impact
                 processed_associations.add(annot_association_id)
                 associations = evidences_by_gene_id[annot["Gene"]] if annot["Gene"] in evidences_by_gene_id else []
                 log.debug("{}: {} initial associations".format(record.getName(), len(associations)))
                 for curr_asso in associations:
-                    if curr_asso["HGVSp_change"] == "" and curr_asso["HGVSp_change_trunc"] == "":
+                    if curr_asso["HGVSp_change"] == "" and curr_asso["HGVSp_change_trunc"] == "":  # Imprecise variant: without HGVS
                         if varCatAreCompatible(variant_category, curr_asso["category"]):
                             retained_evidences.append(curr_asso)
-                    else:
+                    else:  # Precise variant: standard or truncated HGVS
                         record_hgvs_p = HGVSProtChange.fromStr(annot["HGVSp"].rsplit("p.", 1)[1])
                         record_hgvs_p.predicted = False
-                        if str(record_hgvs_p) == curr_asso["HGVSp_change"]:
+                        if str(record_hgvs_p) == curr_asso["HGVSp_change"]:  # Standard HGVS with exact match
                             retained_evidences.append(curr_asso)
                         elif curr_asso["HGVSp_change"] != "":  ################################# to test
-                            # Try to match insertions and duplications/repeats
+                            # Standard HGVS try to match insertions and duplications/repeats
                             asso_hgvs_p = HGVSProtChange.fromStr(curr_asso["HGVSp_change"])
                             if record_hgvs_p.isInFrameIns() and asso_hgvs_p.isInFrameIns():  # Are insertions
                                 if (record_hgvs_p.evt == "ins" and asso_hgvs_p.evt != "ins"):  # Record is insertion and association is repeat

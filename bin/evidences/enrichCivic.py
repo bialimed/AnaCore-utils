@@ -99,9 +99,9 @@ def getCategory(variant, record):
                 offset, ref, alt = match.groups()
                 if len(ref) == len(alt):
                     if len(ref) == 1:
-                        category = "mutation>snv"
+                        category = "mutation>substitution"
                     else:
-                        category = "mutation>mnv"
+                        category = "mutation>substitution"
                 else:
                     if len(ref) < len(alt):
                         category = "mutation>insertion"
