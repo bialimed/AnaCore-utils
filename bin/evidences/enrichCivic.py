@@ -7,6 +7,7 @@ __version__ = '1.0.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
+from anacore.gtf import loadModel
 from anacore.hgvs import AA_THREE_BY_ONE, HGVSProtChange, ONE_LETTER_AA_LEXIC
 from anacore.sv import HashedSVIO
 import argparse
@@ -347,6 +348,35 @@ def getOntologyElementByTerm(ontology, disease_term, case_sensitive=True):
     return element
 
 
+def getVariantIntervals(cleaned_sub_variant, tr_by_id, annot_path):
+    intervals = []
+    start_exon = None
+    end_exon = None
+    match = re.search(r"^exon (\d+) ((mutations?)|(insertion)|(frameshift)|(deletion))", cleaned_sub_variant.lower())
+    if match:  # EXON 2 MUTATION
+        start_exon = int(match.group(1))
+        end_exon = int(match.group(1))
+    else:
+        match = re.search(r"^exon (\d+)-(\d+) ((mutations?)|(insertion)|(frameshift)|(deletion))", cleaned_sub_variant.lower())
+        if match:  # EXON 2-5 MUTATION
+            start_exon = int(match.group(1))
+            end_exon = int(match.group(2))
+    if start_exon:
+        selected_tr = record["transcript"].split(".")[0]
+        if record["transcript"] != "":
+            if selected_tr not in tr_by_id:
+                log.warning("The transcript {} is missing in {}.".format(selected_tr, annot_path))
+            else:
+                for exon_nb in range(start_exon, end_exon + 1):
+                    curr_exon = tr_by_id[selected_tr].children[start_exon - 1]
+                    intervals.append("{}:{}-{}".format(
+                        curr_exon.reference.name,
+                        curr_exon.start,
+                        curr_exon.end
+                    ))
+    return ",".join(intervals)
+
+
 def cleanedRawVariant(record):
     feature_change_by_variant_id = {
         "1991": "EXON 10 MUTATIONS and EXON 21 MUTATIONS",  # Instead of "EXON 10 and EXON 21 MUTATIONS"
@@ -378,6 +408,9 @@ TRUNC_HGVS_P_CHANGE_REGEXP = r"[" + "".join(ONE_LETTER_AA_LEXIC).replace("*", r"
 if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Standardize clinical evidence from CIViC bank.')
+    group_assemblies = parser.add_argument_group('Assemblies coordinates')
+    group_assemblies.add_argument('-8', '--input-grch38-annot', required=True, help='Path to the genes, transcripts and exons annotations for the GRCh38 (format: GTF).')
+    group_assemblies.add_argument('-7', '--input-grch37-annot', required=True, help='Path to the genes, transcripts and exons annotations for the GRCh37 (format: GTF).')
     group_input = parser.add_argument_group('Inputs')
     group_input.add_argument('-i', '--input-bank', required=True, help='Path to the clinical evidence file from CIViC (format: TSV).')
     group_input.add_argument('-d', '--input-disease-ontology', required=True, help='Path to the disease ontology file. (format: OWL).')
@@ -392,18 +425,35 @@ if __name__ == "__main__":
     log.setLevel(logging.INFO)
     log.info("Command: " + " ".join(sys.argv))
 
-    # Process
-    renamed_diseases = set()
+    # Load ontology
+    log.info("Load disease ontology from {}.".format(args.input_disease_ontology))
     ontology = get_ontology("file://{}".format(args.input_disease_ontology)).load()
+
+    # Load genes symbols aliases
     aliases_by_gene_id = {}
     if args.input_genes:
+        log.info("Load genes symbols aliases from {}.".format(args.input_genes))
         aliases_by_gene_id = getAliasesByGeneId(args.input_genes)
+
+    # Load annotations
+    log.info("Load trancripts and exons coordinates from {} and {}.".format(args.input_grch37_annot, args.input_grch38_annot))
+    representative_tr = set()
+    with HashedSVIO(args.input_bank) as reader:
+        for record in reader:
+            representative_tr.add(record['representative_transcript'].split(".")[0])
+    tr_grch37 = {tr.annot["id"]: tr for tr in loadModel(args.input_grch37_annot, "transcripts") if tr.annot["id"] in representative_tr}
+    tr_grch38 = {tr.annot["id"]: tr for tr in loadModel(args.input_grch38_annot, "transcripts") if tr.annot["id"] in representative_tr}
+
+    # Create database
+    log.info("Create/update evidences database.")
+    renamed_diseases = set()
     with HashedSVIO(args.output_bank, "w") as writer:
         writer.titles = ["gene", "entrez_id", "subject", "category", "disease",
                          "doid", "level", "type", "drugs", "direction",
                          "clinical_significance", "citation", "HGVSp_change",
-                         "HGVSp_change_trunc", "source", "transcript", "chromosome",
-                         "start", "end", "xref_level"]
+                         "HGVSp_change_trunc", "source", "transcript",
+                         "GRCh37_category_intervals", "GRCh38_category_intervals",
+                         "xref_level"]
         with HashedSVIO(args.input_bank) as reader:
             for record in reader:
                 if record["evidence_status"] == "accepted":
@@ -456,9 +506,11 @@ if __name__ == "__main__":
                         record["category"] = "" if category is None else category
                         # Position
                         record["transcript"] = record['representative_transcript'] + ("" if record['representative_transcript2'] == "" else " and " + record['representative_transcript2'])
-                        record["chromosome"] = ""
-                        record["start"] = ""
-                        record["end"] = ""
+                        record["GRCh37_category_intervals"] = ""
+                        record["GRCh38_category_intervals"] = ""
+                        if record["HGVSp_change"] == "" and record["HGVSp_change_trunc"] == "":
+                            record["GRCh37_category_intervals"] = getVariantIntervals(cleaned_sub_variant, tr_grch37, args.input_grch37_annot)
+                            record["GRCh38_category_intervals"] = getVariantIntervals(cleaned_sub_variant, tr_grch38, args.input_grch38_annot)
                         # Level
                         record["xref_level"] = record["evidence_level"]
                         record["level"] = record["evidence_level"]
