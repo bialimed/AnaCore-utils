@@ -9,6 +9,7 @@ __status__ = 'prod'
 
 from anacore.annotVcf import AnnotVCFIO, HeaderFormatAttr, HeaderSampleAttr
 from anacore.hgvs import HGVSProtChange
+from anacore.region import Region, RegionList
 from anacore.sv import HashedSVIO
 import argparse
 import copy
@@ -101,7 +102,7 @@ def insCouldBeIdentical(hgvs_ins, hgvs_repeat):
     return could_be_identical
 
 
-def getEvidences(record, annot_field):
+def getEvidences(record, annot_field, assembly="GRCh38"):
     variant_category = getVariantCategory(record)
     processed_associations = set()
     retained_evidences = list()
@@ -115,7 +116,20 @@ def getEvidences(record, annot_field):
                 for curr_asso in associations:
                     if curr_asso["HGVSp_change"] == "" and curr_asso["HGVSp_change_trunc"] == "":  # Imprecise variant: without HGVS
                         if varCatAreCompatible(variant_category, curr_asso["category"]):
-                            retained_evidences.append(curr_asso)
+                            if curr_asso[assembly + "_category_intervals"] != "":  # Location can be validated
+                                evid_intervals = RegionList()
+                                evid_intervals_str = curr_asso[assembly + "_category_intervals"].split(",")
+                                for curr_interval in evid_intervals_str:
+                                    evid_intervals.append(Region.fromStr(curr_interval))
+                                variant_region = Region(
+                                    start=int(record.refStart()),  # Extend insertion at the two border nt
+                                    end=int(record.refEnd() + 0.5),  # Extend insertion at the two border nt
+                                    reference=record.chrom
+                                )  ############################# Manage upstream and downstream
+                                if len(evid_intervals.getOverlapped(variant_region)) > 0:  # Evidence and variant have an overlap
+                                    retained_evidences.append(curr_asso)
+                            else:
+                                retained_evidences.append(curr_asso)
                     else:  # Precise variant: standard or truncated HGVS
                         record_hgvs_p = HGVSProtChange.fromStr(annot["HGVSp"].rsplit("p.", 1)[1])
                         record_hgvs_p.predicted = False
@@ -206,6 +220,7 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Add clinical/drug evidence level to known variants.')
     parser.add_argument('-a', '--annotation-field', default="ANN", help='Field used for store annotations. [Default: %(default)s]')
+    parser.add_argument('-y', '--assembly-version', default="GRCh38", help='Assembly used in alignement step. This information is used to validate imprecise evidence on precise variant. [Default: %(default)s]')
     group_disease = parser.add_mutually_exclusive_group()
     group_disease.add_argument('-d', '--disease-id', help='Replace samples disease by this value. It must be a valid ID in disease ontology.')
     group_disease.add_argument('-t', '--disease-term', help='Replace samples disease by this value. It must be a valid TERM in disease ontology.')
@@ -252,7 +267,7 @@ if __name__ == "__main__":
                 )
                 nb_variants["total"] += 1
                 # Get corresponding clinical evidences
-                retained_evidences = getEvidences(record, args.annotation_field)
+                retained_evidences = getEvidences(record, args.annotation_field, args.assembly_version)
                 # Select best evidences
                 best_evidence = {}
                 for spl_name in record.samples:
