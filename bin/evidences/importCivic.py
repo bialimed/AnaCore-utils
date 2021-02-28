@@ -468,7 +468,7 @@ if __name__ == "__main__":
                         elt_ids = set([str(ontology_elt.id[0])] + [str(elt) for elt in ontology_elt.hasAlternativeId])
                         if record["doid"] != "" and "DOID:" + record["doid"] not in elt_ids:
                             raise Exception('The disease "{}" match to the ID {} in ontology and is associated with DOID:{}.'.format(record["disease"], ontology_elt.id, record["doid"]))
-                        record["doid"] = ontology_elt.id[0][5:]
+                        record["doid"] = ontology_elt.id[0]
                         record["disease"] = str(ontology_elt.label[0])
                     elif record["doid"] != "":
                         ontology_elt = getOntologyElementByID(ontology, "DOID:{}".format(record["doid"]))
