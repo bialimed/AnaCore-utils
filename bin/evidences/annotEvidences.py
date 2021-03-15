@@ -267,17 +267,21 @@ def getEvidences(record, evidences_by_gene_id, log, annot_field="ANN", assembly=
     return retained_evidences
 
 
-def addHeaderFields(writer, disease_id=None, disease_term=None):
+def addHeaderFields(writer, evidences_db_source=None, disease_id=None, disease_term=None):
     """
     Add evidence fields and disease information in VCF header.
 
     :param writer: Handle to the VCF output.
     :type writer: anacore.vcf.VCFIO
+    :param evidences_db_source: Evidences database source and version.
+    :type evidences_db_source: str
     :param disease_id: The disease ID in ontology. If this parameter is set, disease ID is apply on all samples.
     :type disease_id: str
     :param disease_term: The disease term or exact synonym in ontology. If this parameter is set, disease term is apply on all samples.
     :type disease_term: str
     """
+    if evidences_db_source:
+        writer.extra_header.append('##EVIDENCES_DB="{}"'.format(evidences_db_source))
     writer.format["EVID_PS"] = HeaderFormatAttr("EVID_PS", "The higher clinical evidence level for this precise variant in sample disease.", number=1)
     writer.format["EVID_PA"] = HeaderFormatAttr("EVID_PA", "The higher clinical evidence level for this precise variant in all diseases.", number=1)
     writer.format["EVID_IS"] = HeaderFormatAttr("EVID_IS", "The higher clinical evidence level for this precise and imprecise variants in same area and with same category (example: deletion in exon 8) in sample disease.", number=1)
@@ -357,6 +361,7 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Add clinical/drug evidence level to known variants.')
     parser.add_argument('-a', '--annotation-field', default="ANN", help='Field used for store annotations. [Default: %(default)s]')
+    parser.add_argument('-u', '--evidences-source', help='Evidences database source and version to trace in VCF.')
     parser.add_argument('-y', '--assembly-version', default="GRCh38", help='Assembly used in alignement step. This information is used to check if an imprecise evidence overlap the variant. [Default: %(default)s]')
     group_disease = parser.add_mutually_exclusive_group()
     group_disease.add_argument('-d', '--disease-id', help='Replace samples disease by this value. It must be a valid ID in disease ontology.')
@@ -379,23 +384,23 @@ if __name__ == "__main__":
 
     # Process
     nb_variants = {"total": 0, "with_asso": 0, "with_precise_asso": 0}
-    ontology = get_ontology("file://{}".format(args.input_disease_ontology)).load()
-    disease_id, disease_term = getDiseaseElt(ontology, args.disease_id, args.disease_term)
     evidences_by_gene_id = loadEvidences(args.input_evidences)
     details_by_spl = {}
     with AnnotVCFIO(args.output_variants, "w") as writer:
         with AnnotVCFIO(args.input_variants) as reader:
             # Header
             writer.copyHeader(reader)
-            addHeaderFields(writer, disease_id, disease_term)
-            writer.writeHeader()
+            ontology = get_ontology("file://{}".format(args.input_disease_ontology)).load()
+            disease_id, disease_term = getDiseaseElt(ontology, args.disease_id, args.disease_term)
+            addHeaderFields(writer, args.evidences_source, disease_id, disease_term)
             disease_ancestors_by_spl = getDiseaseAncestors(ontology, writer)
+            del(ontology)  # Ontology is no longer useful
             for spl_name, spl in writer.sample_info.items():
                 details_by_spl[spl.id] = {
                     "variants": [],
                     "disease": {"doid": spl.doid, "term": spl.doterm}
                 }
-            del(ontology)  # Ontology is no longer useful
+            writer.writeHeader()
             # Records
             for record in reader:
                 log.debug(
