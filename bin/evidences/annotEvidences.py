@@ -3,16 +3,17 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
-from anacore.annotVcf import AnnotVCFIO, HeaderFormatAttr, HeaderSampleAttr
+from anacore.annotVcf import AnnotVCFIO, HeaderFormatAttr, HeaderSampleAttr, VCFRecord
 from anacore.hgvs import HGVSProtChange
 from anacore.region import Region, RegionList
+from anacore.sequenceIO import IdxFastaIO
 from anacore.sv import HashedSVIO
 import argparse
-import copy
+from copy import deepcopy
 import json
 import logging
 import os
@@ -194,12 +195,14 @@ def getDiseaseAncestors(ontology, vcf_handle):
     return disease_ancestors_by_spl
 
 
-def getEvidences(record, evidences_by_gene_id, log, annot_field="ANN", assembly="GRCh38"):
+def getEvidences(record, seq_handler, evidences_by_gene_id, log, annot_field="ANN", assembly="GRCh38"):
     """
     Return list of evidences corresponding to the variant.
 
     :param record: The annotated variant.
     :type record: anacore.vcf.VCFRecord
+    :param seq_handler: File handle to the reference sequences file.
+    :type seq_handler: anacore.sequenceIO.IdxFastaIO
     :param evidences_by_gene_id: By gene ENTREZ id the list of evidences.
     :type evidences_by_gene_id: dict
     :param log: Logger of the script.
@@ -216,6 +219,7 @@ def getEvidences(record, evidences_by_gene_id, log, annot_field="ANN", assembly=
     retained_evidences_id = set()
     retained_evidences = list()
     for annot in record.info[annot_field]:
+        variant_region = None
         if annot["HGVSp"] is not None and not annot["HGVSp"].endswith("p.?") and not annot["HGVSp"].replace(")", "").endswith("="):  #################### = exist if variant is locaterd on splice site or promoter
             annot_association_id = "{}:\t{}".format(annot["SYMBOL"], annot["HGVSp"].split(":", 1)[1])
             if annot_association_id not in processed_associations:  # Skip association on other annotation with the same impact
@@ -231,11 +235,13 @@ def getEvidences(record, evidences_by_gene_id, log, annot_field="ANN", assembly=
                                     evid_intervals_str = curr_asso[assembly + "_category_intervals"].split(",")
                                     for curr_interval in evid_intervals_str:
                                         evid_intervals.append(Region.fromStr(curr_interval))
-                                    variant_region = Region(
-                                        start=int(record.refStart()),  # Extend insertion at the two border nt
-                                        end=int(record.refEnd() + 0.5),  # Extend insertion at the two border nt
-                                        reference=record.chrom
-                                    )  ############################# Manage upstream and downstream
+                                    if variant_region is None:
+                                        downstream_record = record.fastDownstreamed(seq_handler)
+                                        variant_region = Region(
+                                            start=int(record.refStart()),  # Extend insertion at the two border nt
+                                            end=int(downstream_record.refEnd() + 0.5),  # Extend insertion at the two border nt
+                                            reference=record.chrom
+                                        )
                                     if len(evid_intervals.getOverlapped(variant_region)) > 0:  # Evidence and variant have an overlap
                                         retained_evidences.append(curr_asso)
                                         retained_evidences_id.add(asso_idx)
@@ -371,9 +377,10 @@ if __name__ == "__main__":
     group_input.add_argument('-e', '--input-evidences', required=True, help='Path to the clinical evidence file from AnaCore-utils/bin/enrichCivic.py (format: TSV).')
     group_input.add_argument('-i', '--input-variants', required=True, help='Path to the variants file. (format: VCF).')
     group_input.add_argument('-n', '--input-disease-ontology', required=True, help='Path to the disease ontology file. (format: OWL).')
+    group_input.add_argument('-s', '--input-sequences', required=True, help='The path to the reference used in variant calling to produced the input VCF (format: fasta with faidx).')
     group_output = parser.add_argument_group('Outputs')
     group_output.add_argument('-o', '--output-variants', required=True, help='Path to the annotated file. (format: VCF).')
-    group_output.add_argument('-s', '--output-evidences', help='Path to the evidences associated with variants. (format: TSV or JSON depends on extension).')
+    group_output.add_argument('-c', '--output-evidences', help='Path to the evidences associated with variants. (format: TSV or JSON depends on extension).')
     args = parser.parse_args()
 
     # Logger
@@ -386,107 +393,108 @@ if __name__ == "__main__":
     nb_variants = {"total": 0, "with_asso": 0, "with_precise_asso": 0}
     evidences_by_gene_id = loadEvidences(args.input_evidences)
     details_by_spl = {}
-    with AnnotVCFIO(args.output_variants, "w") as writer:
-        with AnnotVCFIO(args.input_variants) as reader:
-            # Header
-            writer.copyHeader(reader)
-            ontology = get_ontology("file://{}".format(args.input_disease_ontology)).load()
-            disease_id, disease_term = getDiseaseElt(ontology, args.disease_id, args.disease_term)
-            addHeaderFields(writer, args.evidences_source, disease_id, disease_term)
-            disease_ancestors_by_spl = getDiseaseAncestors(ontology, writer)
-            del(ontology)  # Ontology is no longer useful
-            for spl_name, spl in writer.sample_info.items():
-                details_by_spl[spl.id] = {
-                    "variants": [],
-                    "disease": {"doid": spl.doid, "term": spl.doterm}
-                }
-            writer.writeHeader()
-            # Records
-            for record in reader:
-                log.debug(
-                    "start {} ({})".format(
-                        record.getName(),
-                        sorted(set(annot["SYMBOL"] for annot in record.info[args.annotation_field] if annot["SYMBOL"]))
-                    )
-                )
-                nb_variants["total"] += 1
-                # Get corresponding clinical evidences
-                retained_evidences = getEvidences(record, evidences_by_gene_id, log, args.annotation_field, args.assembly_version)
-                # Select best evidences
-                best_evidence = {}
-                for spl_name in record.samples:
-                    best_evidence[spl_name] = {
-                        "ps": "",  # precise_variant_same_disease
-                        "pa": "",  # precise_variant_all_diseases
-                        "is": "",  # imprecise_variant_same_disease
-                        "ia": ""  # imprecise_variant_all_diseases
+    with IdxFastaIO(args.input_sequences) as seq_reader:
+        with AnnotVCFIO(args.output_variants, "w") as writer:
+            with AnnotVCFIO(args.input_variants) as reader:
+                # Header
+                writer.copyHeader(reader)
+                ontology = get_ontology("file://{}".format(args.input_disease_ontology)).load()
+                disease_id, disease_term = getDiseaseElt(ontology, args.disease_id, args.disease_term)
+                addHeaderFields(writer, args.evidences_source, disease_id, disease_term)
+                disease_ancestors_by_spl = getDiseaseAncestors(ontology, writer)
+                del(ontology)  # Ontology is no longer useful
+                for spl_name, spl in writer.sample_info.items():
+                    details_by_spl[spl.id] = {
+                        "variants": [],
+                        "disease": {"doid": spl.doid, "term": spl.doterm}
                     }
-                    details_by_spl[spl_name]["variants"].append({
-                        "gene": ";".join(
-                            sorted(set(
-                                [elt["SYMBOL"] for elt in record.info[args.annotation_field] if elt["SYMBOL"]]
-                            ))
-                        ),
-                        "genomic_alteration": record.getName(),
-                        "HGVSp": ";".join(
-                            sorted(set(
-                                [elt["HGVSp"] for elt in record.info[args.annotation_field] if elt["HGVSp"]]
-                            ))
-                        ),
-                        "evidences": []
-                    })
-                contains_precise = False
-                if len(retained_evidences) != 0:
-                    nb_variants["with_asso"] += 1
-                    for curr_evidence in sorted(retained_evidences, key=lambda elt: elt["level"]):
-                        detailed_annot = {
-                            "subject": curr_evidence["subject"],
-                            "category": curr_evidence["category"],
-                            "disease": curr_evidence['disease'],
-                            "doid": curr_evidence["doid"],
-                            "level": curr_evidence['level'],
-                            "type": curr_evidence['type'],
-                            "direction": curr_evidence['direction'],
-                            "drugs": curr_evidence['drugs'],
-                            "clinical_significance": curr_evidence['clinical_significance'],
-                            "citation": curr_evidence['citation'],
-                            "source": curr_evidence['source'],
-                            "specificity": {"variant": "imprecise", "disease": "all"}
+                writer.writeHeader()
+                # Records
+                for record in reader:
+                    log.debug(
+                        "start {} ({})".format(
+                            record.getName(),
+                            sorted(set(annot["SYMBOL"] for annot in record.info[args.annotation_field] if annot["SYMBOL"]))
+                        )
+                    )
+                    nb_variants["total"] += 1
+                    # Get corresponding clinical evidences
+                    retained_evidences = getEvidences(record, seq_reader, evidences_by_gene_id, log, args.annotation_field, args.assembly_version)
+                    # Select best evidences
+                    best_evidence = {}
+                    for spl_name in record.samples:
+                        best_evidence[spl_name] = {
+                            "ps": "",  # precise_variant_same_disease
+                            "pa": "",  # precise_variant_all_diseases
+                            "is": "",  # imprecise_variant_same_disease
+                            "ia": ""  # imprecise_variant_all_diseases
                         }
-                        for spl_name in record.samples:
-                            disease_ancestors = disease_ancestors_by_spl[spl_name]
-                            evidence_for_spl = copy.deepcopy(detailed_annot)
-                            # Best evidence
-                            variant_specificity = ["i"]
-                            if curr_evidence["HGVSp_change"] != "":
-                                variant_specificity = ["p", "i"]
-                                evidence_for_spl["specificity"]["variant"] = "precise"
-                                contains_precise = True
-                            disease_specificity = ["a"]
-                            if curr_evidence['doid'] in disease_ancestors:
-                                disease_specificity = ["a", "s"]
-                                evidence_for_spl["specificity"]["disease"] = "specific"
-                            for curr_v_spe in variant_specificity:
-                                for curr_d_spe in disease_specificity:
-                                    best_tag = "{}{}".format(curr_v_spe, curr_d_spe)
-                                    prev = best_evidence[spl_name][best_tag]
-                                    if prev == "" or prev > curr_evidence['level']:
-                                        best_evidence[spl_name][best_tag] = curr_evidence['level']
-                            # Add to detail
-                            details_by_spl[spl_name]["variants"][-1]["evidences"].append(evidence_for_spl)
-                # Add best evidence to record
-                for spl_name in record.samples:
-                    spl_disease = writer.sample_info[spl_name].doid
-                    for key, val in best_evidence[spl_name].items():
-                        if key[1] == "s" and spl_disease == "":  # Evidence for disease when sample disease is not provided
-                            record.samples[spl_name]["EVID_{}".format(key.upper())] = None
-                        else:  # Evidence for all diseases or when sample disease is provided
-                            record.samples[spl_name]["EVID_{}".format(key.upper())] = val
-                record.format.extend(["EVID_PS", "EVID_PA", "EVID_IS", "EVID_IA"])
-                if contains_precise:
-                    nb_variants["with_precise_asso"] += 1
-                # Write record
-                writer.write(record)
+                        details_by_spl[spl_name]["variants"].append({
+                            "gene": ";".join(
+                                sorted(set(
+                                    [elt["SYMBOL"] for elt in record.info[args.annotation_field] if elt["SYMBOL"]]
+                                ))
+                            ),
+                            "genomic_alteration": record.getName(),
+                            "HGVSp": ";".join(
+                                sorted(set(
+                                    [elt["HGVSp"] for elt in record.info[args.annotation_field] if elt["HGVSp"]]
+                                ))
+                            ),
+                            "evidences": []
+                        })
+                    contains_precise = False
+                    if len(retained_evidences) != 0:
+                        nb_variants["with_asso"] += 1
+                        for curr_evidence in sorted(retained_evidences, key=lambda elt: elt["level"]):
+                            detailed_annot = {
+                                "subject": curr_evidence["subject"],
+                                "category": curr_evidence["category"],
+                                "disease": curr_evidence['disease'],
+                                "doid": curr_evidence["doid"],
+                                "level": curr_evidence['level'],
+                                "type": curr_evidence['type'],
+                                "direction": curr_evidence['direction'],
+                                "drugs": curr_evidence['drugs'],
+                                "clinical_significance": curr_evidence['clinical_significance'],
+                                "citation": curr_evidence['citation'],
+                                "source": curr_evidence['source'],
+                                "specificity": {"variant": "imprecise", "disease": "all"}
+                            }
+                            for spl_name in record.samples:
+                                disease_ancestors = disease_ancestors_by_spl[spl_name]
+                                evidence_for_spl = deepcopy(detailed_annot)
+                                # Best evidence
+                                variant_specificity = ["i"]
+                                if curr_evidence["HGVSp_change"] != "":
+                                    variant_specificity = ["p", "i"]
+                                    evidence_for_spl["specificity"]["variant"] = "precise"
+                                    contains_precise = True
+                                disease_specificity = ["a"]
+                                if curr_evidence['doid'] in disease_ancestors:
+                                    disease_specificity = ["a", "s"]
+                                    evidence_for_spl["specificity"]["disease"] = "specific"
+                                for curr_v_spe in variant_specificity:
+                                    for curr_d_spe in disease_specificity:
+                                        best_tag = "{}{}".format(curr_v_spe, curr_d_spe)
+                                        prev = best_evidence[spl_name][best_tag]
+                                        if prev == "" or prev > curr_evidence['level']:
+                                            best_evidence[spl_name][best_tag] = curr_evidence['level']
+                                # Add to detail
+                                details_by_spl[spl_name]["variants"][-1]["evidences"].append(evidence_for_spl)
+                    # Add best evidence to record
+                    for spl_name in record.samples:
+                        spl_disease = writer.sample_info[spl_name].doid
+                        for key, val in best_evidence[spl_name].items():
+                            if key[1] == "s" and spl_disease == "":  # Evidence for disease when sample disease is not provided
+                                record.samples[spl_name]["EVID_{}".format(key.upper())] = None
+                            else:  # Evidence for all diseases or when sample disease is provided
+                                record.samples[spl_name]["EVID_{}".format(key.upper())] = val
+                    record.format.extend(["EVID_PS", "EVID_PA", "EVID_IS", "EVID_IA"])
+                    if contains_precise:
+                        nb_variants["with_precise_asso"] += 1
+                    # Write record
+                    writer.write(record)
 
     # Write detailed outputs
     if args.output_evidences:
