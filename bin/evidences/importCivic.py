@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -408,6 +408,7 @@ TRUNC_HGVS_P_CHANGE_REGEXP = r"[" + "".join(ONE_LETTER_AA_LEXIC).replace("*", r"
 if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Standardize clinical evidence from CIViC bank.')
+    parser.add_argument('-b', '--bank-id', help='ID for the produced database.')
     group_assemblies = parser.add_argument_group('Assemblies coordinates')
     group_assemblies.add_argument('-8', '--input-grch38-annot', required=True, help='Path to the genes, transcripts and exons annotations for the GRCh38 (format: GTF).')
     group_assemblies.add_argument('-7', '--input-grch37-annot', required=True, help='Path to the genes, transcripts and exons annotations for the GRCh37 (format: GTF).')
@@ -448,6 +449,8 @@ if __name__ == "__main__":
     log.info("Create/update evidences database.")
     renamed_diseases = set()
     with HashedSVIO(args.output_bank, "w") as writer:
+        if args.bank_id:
+            writer.metadata.append("bank_ID={}".format(args.bank_id))
         writer.titles = ["gene", "entrez_id", "subject", "category", "disease",
                          "doid", "level", "type", "drugs", "direction",
                          "clinical_significance", "citation", "HGVSp_change",

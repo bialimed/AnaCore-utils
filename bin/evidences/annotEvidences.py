@@ -384,12 +384,12 @@ class EvidenceDbFile(EvidencesProvider):
                 self._evidences_by_gene_id[record["entrez_id"]].append(record)
 
     def loadSource(self):
-        """Set the source in instance from self.filepath if metadata source_ID=$value exists in header."""
-        source_tag = "source_ID="
+        """Set the source in instance from self.filepath if metadata bank_ID=$value exists in header."""
+        id_tag = "bank_ID="
         with HashedSVIO(self.filepath) as reader:
             for curr_metadata in reader.metadata:
-                if curr_metadata.startswith(source_tag):
-                    self.source = curr_metadata[len(source_tag):]
+                if curr_metadata.startswith(id_tag):
+                    self.source = curr_metadata[len(id_tag):]
 
     def getByGeneID(self, gene_id):
         """
@@ -415,7 +415,7 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Add clinical/drug evidence level to known variants.')
     parser.add_argument('-a', '--annotation-field', default="ANN", help='Field used for store annotations. [Default: %(default)s]')
-    parser.add_argument('-u', '--evidences-source', help='Evidences database source and version to trace in VCF.')
+    parser.add_argument('-u', '--evidences-source', help='Evidences database ID (source and release) to trace in VCF.')
     parser.add_argument('-y', '--assembly-version', default="GRCh38", help='Assembly used in alignement step. This information is used to check if an imprecise evidence overlap the variant. [Default: %(default)s]')
     group_disease = parser.add_mutually_exclusive_group()
     group_disease.add_argument('-d', '--disease-id', help='Replace samples disease by this value. It must be a valid ID in disease ontology.')
@@ -448,7 +448,7 @@ if __name__ == "__main__":
                 writer.copyHeader(reader)
                 ontology = get_ontology("file://{}".format(args.input_disease_ontology)).load()
                 disease_id, disease_term = getDiseaseElt(ontology, args.disease_id, args.disease_term)
-                addHeaderFields(writer, args.evidences_source, disease_id, disease_term)
+                addHeaderFields(writer, evidence_provider.source, disease_id, disease_term)
                 disease_ancestors_by_spl = getDiseaseAncestors(ontology, writer)
                 del(ontology)  # Ontology is no longer useful
                 for spl_name, spl in writer.sample_info.items():
