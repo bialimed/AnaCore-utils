@@ -7,7 +7,7 @@ __version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
-from anacore.annotVcf import AnnotVCFIO, HeaderFormatAttr, HeaderSampleAttr, VCFRecord
+from anacore.annotVcf import AnnotVCFIO, HeaderFormatAttr, HeaderSampleAttr
 from anacore.hgvs import HGVSProtChange
 from anacore.region import Region, RegionList
 from anacore.sequenceIO import IdxFastaIO
@@ -74,24 +74,6 @@ def getVariantCategory(variant):
         else:
             variant_category = "mutation>substitution"
     return variant_category
-
-
-def loadEvidences(in_evidences):
-    """
-    Return the list of evidences by gene ENTREZ id.
-
-    :param in_evidences: Path to the clinical evidences file from AnaCore-utils/bin/enrichCivic.py (format: TSV).
-    :type in_evidences: str
-    :retrun: List of evidences by gene ENTREZ id.
-    :rtype: dict
-    """
-    evidences_by_gene_id = {}
-    with HashedSVIO(in_evidences) as reader:
-        for record in reader:
-            if record["entrez_id"] not in evidences_by_gene_id:
-                evidences_by_gene_id[record["entrez_id"]] = list()
-            evidences_by_gene_id[record["entrez_id"]].append(record)
-    return evidences_by_gene_id
 
 
 def getOntologyElementByID(ontology, disease_id):
@@ -195,7 +177,7 @@ def getDiseaseAncestors(ontology, vcf_handle):
     return disease_ancestors_by_spl
 
 
-def getEvidences(record, seq_handler, evidences_by_gene_id, log, annot_field="ANN", assembly="GRCh38"):
+def getEvidences(record, seq_handler, evidences_provider, log, annot_field="ANN", assembly="GRCh38"):
     """
     Return list of evidences corresponding to the variant.
 
@@ -203,8 +185,8 @@ def getEvidences(record, seq_handler, evidences_by_gene_id, log, annot_field="AN
     :type record: anacore.vcf.VCFRecord
     :param seq_handler: File handle to the reference sequences file.
     :type seq_handler: anacore.sequenceIO.IdxFastaIO
-    :param evidences_by_gene_id: By gene ENTREZ id the list of evidences.
-    :type evidences_by_gene_id: dict
+    :param evidence_provider: A provider to get evidences by gene ENTREZ ID.
+    :type evidence_provider: EvidencesProvider
     :param log: Logger of the script.
     :type log: logging.Logger
     :param annot_field: Field used to store annotations in VCF.
@@ -224,7 +206,7 @@ def getEvidences(record, seq_handler, evidences_by_gene_id, log, annot_field="AN
             annot_association_id = "{}:\t{}".format(annot["SYMBOL"], annot["HGVSp"].split(":", 1)[1])
             if annot_association_id not in processed_associations:  # Skip association on other annotation with the same impact
                 processed_associations.add(annot_association_id)
-                associations = evidences_by_gene_id[annot["Gene"]] if annot["Gene"] in evidences_by_gene_id else []
+                associations = evidence_provider.getByGeneID(annot["Gene"])
                 log.debug("{}: {} initial associations".format(record.getName(), len(associations)))
                 for asso_idx, curr_asso in enumerate(associations):
                     if asso_idx not in retained_evidences_id:
@@ -289,9 +271,9 @@ def addHeaderFields(writer, evidences_db_source=None, disease_id=None, disease_t
     if evidences_db_source:
         writer.extra_header.append('##EVIDENCES_DB="{}"'.format(evidences_db_source))
     writer.format["EVID_PS"] = HeaderFormatAttr("EVID_PS", "The higher clinical evidence level for this precise variant in sample disease.", number=1)
-    writer.format["EVID_PA"] = HeaderFormatAttr("EVID_PA", "The higher clinical evidence level for this precise variant in all diseases.", number=1)
+    writer.format["EVID_PA"] = HeaderFormatAttr("EVID_PA", "The higher clinical evidence level for this precise variant in any diseases.", number=1)
     writer.format["EVID_IS"] = HeaderFormatAttr("EVID_IS", "The higher clinical evidence level for this precise and imprecise variants in same area and with same category (example: deletion in exon 8) in sample disease.", number=1)
-    writer.format["EVID_IA"] = HeaderFormatAttr("EVID_IA", "The higher clinical evidence level for this precise and imprecise variants in same area and with same category (example: deletion in exon 8) in all diseases.", number=1)
+    writer.format["EVID_IA"] = HeaderFormatAttr("EVID_IA", "The higher clinical evidence level for this precise and imprecise variants in same area and with same category (example: deletion in exon 8) in any diseases.", number=1)
     # DOID and DO_term for each sample
     for spl_name in writer.samples:
         if spl_name in writer.sample_info:  # VCF already contains samples information
@@ -358,6 +340,72 @@ def writeEvidencesDetails(out_file, details_by_spl):
                         writer_evidences.write(curr_evidence)
 
 
+class EvidencesProvider:
+    """Interface to query evidences."""
+    def getByGeneID(self, gene_id):
+        """
+        Return the evidences for the gene.
+
+        :param gene_id: The gene ENTREZ ID.
+        :type gene_id: str
+        :return: Evidences for the gene.
+        :rtype: list
+        """
+        raise Exception("Not implemented")
+
+
+class EvidenceDbFile(EvidencesProvider):
+    """Interface to query evidences from a file."""
+    def __init__(self, input_evidences, source=None):
+        """
+        Build and return an instance of EvidenceDbFile.
+
+        :param input_evidences: Path to the clinical evidence file from AnaCore-utils/bin/enrichCivic.py (format: TSV).
+        :type input_evidences: str.
+        :param source: Evidences database source and version.
+        :type source: str.
+        :return: The new instance.
+        :rtype: EvidenceDbFile
+        """
+        self.filepath = input_evidences
+        self._evidences_by_gene_id = None  # List of evidences by gene ENTREZ id.
+        self.loadEvidences()
+        self.source = source
+        if source is None:
+            self.loadSource()
+
+    def loadEvidences(self):
+        """Set the list of evidences by gene ENTREZ id in instance from self.filepath."""
+        self._evidences_by_gene_id = {}
+        with HashedSVIO(self.filepath) as reader:
+            for record in reader:
+                if record["entrez_id"] not in self._evidences_by_gene_id:
+                    self._evidences_by_gene_id[record["entrez_id"]] = list()
+                self._evidences_by_gene_id[record["entrez_id"]].append(record)
+
+    def loadSource(self):
+        """Set the source in instance from self.filepath if metadata source_ID=$value exists in header."""
+        source_tag = "source_ID="
+        with HashedSVIO(self.filepath) as reader:
+            for curr_metadata in reader.metadata:
+                if curr_metadata.startswith(source_tag):
+                    self.source = curr_metadata[len(source_tag):]
+
+    def getByGeneID(self, gene_id):
+        """
+        Return the evidences for the gene.
+
+        :param gene_id: The gene ENTREZ ID.
+        :type gene_id: str
+        :return: Evidences for the gene.
+        :rtype: list
+        """
+        evidences = []
+        if gene_id in self._evidences_by_gene_id:
+            evidences = self._evidences_by_gene_id[gene_id]
+        return evidences
+
+
 ########################################################################
 #
 # MAIN
@@ -391,7 +439,7 @@ if __name__ == "__main__":
 
     # Process
     nb_variants = {"total": 0, "with_asso": 0, "with_precise_asso": 0}
-    evidences_by_gene_id = loadEvidences(args.input_evidences)
+    evidence_provider = EvidenceDbFile(args.input_evidences, args.evidences_source)
     details_by_spl = {}
     with IdxFastaIO(args.input_sequences) as seq_reader:
         with AnnotVCFIO(args.output_variants, "w") as writer:
@@ -419,7 +467,7 @@ if __name__ == "__main__":
                     )
                     nb_variants["total"] += 1
                     # Get corresponding clinical evidences
-                    retained_evidences = getEvidences(record, seq_reader, evidences_by_gene_id, log, args.annotation_field, args.assembly_version)
+                    retained_evidences = getEvidences(record, seq_reader, evidence_provider, log, args.annotation_field, args.assembly_version)
                     # Select best evidences
                     best_evidence = {}
                     for spl_name in record.samples:
