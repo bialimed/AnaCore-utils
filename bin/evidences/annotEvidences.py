@@ -21,6 +21,11 @@ from owlready2 import get_ontology, owl
 import sys
 
 
+########################################################################
+#
+# FUNCTIONS
+#
+########################################################################
 def varCatAreCompatible(variant_cat, evidence_cat):
     """
     Return True if the evidence feature category correspond to the variant category.
@@ -327,6 +332,7 @@ def writeEvidencesDetails(out_file, details_by_spl):
                 "evidence_doid", "evidence_category", "evidence_variant_specificity",
                 "evidence_disease_specificity"
             ]
+            writer_evidences.writeHeader()
             for spl_name, spl in details_by_spl.items():
                 for curr_variant in spl["variants"]:
                     for curr_evidence in curr_variant["evidences"]:
