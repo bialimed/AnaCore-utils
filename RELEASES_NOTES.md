@@ -1,4 +1,4 @@
-# Release 3.3.0 [DEV]
+# Release 3.3.0 [2020-04-28]
 
 ### Improvements:
   * Replace non-allele specific COSMIC annotations produced by VEP to
