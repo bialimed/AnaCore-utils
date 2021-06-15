@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Concatenate text files.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')
-    group_input.add_argument('-i', '--inputs', required=True, nargs='+', help='Pathes to files.')
+    group_input.add_argument('-i', '--inputs', required=True, nargs='+', help='Paths to files.')
     group_output = parser.add_argument_group('Outputs')
     group_output.add_argument('-o', '--output', required=True, help='Path to the concatenated file.')
     args = parser.parse_args()

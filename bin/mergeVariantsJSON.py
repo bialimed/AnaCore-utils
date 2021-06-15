@@ -40,7 +40,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Merge variants JSON coming from different sources.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')
-    group_input.add_argument('-i', '--inputs-variants', nargs='+', required=True, help='Pathes to the variants files (format: JSON).')
+    group_input.add_argument('-i', '--inputs-variants', nargs='+', required=True, help='Paths to the variants files (format: JSON).')
     group_output = parser.add_argument_group('Outputs')
     group_output.add_argument('-o', '--output-variants', help='Path to the outputted variant file (format: JSON).')
     args = parser.parse_args()

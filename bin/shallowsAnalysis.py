@@ -257,7 +257,7 @@ def getTranscriptsAnnot(region, transcripts):
                 len(curr_tr.children)
             )
             # Annot protein
-            if len(curr_tr.proteins) > 0 and curr_tr.proteins[0].hasOverlap(region):
+            if len(curr_tr.proteins) > 0 and curr_tr.proteins[0].hasOverlap(region): ##############################
                 protein = curr_tr.proteins[0]
                 overlap_start["prot_pos"] = (1 if curr_tr.strand != "-" else protein.aaLength())
         else:
@@ -274,7 +274,7 @@ def getTranscriptsAnnot(region, transcripts):
                 overlap_start["tr_sub_type"] = "EXON"
                 overlap_start["tr_sub_idx"] = "{}/{}".format(subregion_idx, len(curr_tr.children))
             # Annot protein
-            if len(curr_tr.proteins) > 0 and curr_tr.proteins[0].hasOverlap(region):
+            if len(curr_tr.proteins) > 0 and curr_tr.proteins[0].hasOverlap(region): ##############################
                 protein = curr_tr.proteins[0]
                 if overlap_start["tr_ref_pos"] < protein.start:  # The region overlap an UTR
                     overlap_start["prot_pos"] = (1 if curr_tr.strand != "-" else protein.aaLength())
@@ -295,7 +295,7 @@ def getTranscriptsAnnot(region, transcripts):
                 len(curr_tr.children)
             )
             # Annot protein
-            if len(curr_tr.proteins) > 0 and curr_tr.proteins[0].hasOverlap(region):
+            if len(curr_tr.proteins) > 0 and curr_tr.proteins[0].hasOverlap(region): ##############################
                 protein = curr_tr.proteins[0]
                 overlap_end["prot_pos"] = (protein.aaLength() if curr_tr.strand != "-" else 1)
         else:
@@ -312,7 +312,7 @@ def getTranscriptsAnnot(region, transcripts):
                 overlap_end["tr_sub_type"] = "EXON"
                 overlap_end["tr_sub_idx"] = "{}/{}".format(subregion_idx, len(curr_tr.children))
             # Annot protein
-            if len(curr_tr.proteins) > 0 and curr_tr.proteins[0].hasOverlap(region):
+            if len(curr_tr.proteins) > 0 and curr_tr.proteins[0].hasOverlap(region): ##############################
                 protein = curr_tr.proteins[0]
                 if overlap_end["tr_ref_pos"] > protein.end:  # The region overlap an UTR
                     overlap_end["prot_pos"] = (protein.aaLength() if curr_tr.strand != "-" else 1)

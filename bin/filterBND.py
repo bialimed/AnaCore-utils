@@ -57,7 +57,7 @@ def loadNormalDb(databases):
     """
     Return the set of normal fusions from a list of databases.
 
-    :param databases: Pathes to recurrent chimeric fusion in non-cancer samples (format: TSV). First column contains the gene ID of the 5' gene in fusion and second column contains the gene ID of the 3' gene in fusion.
+    :param databases: Paths to recurrent chimeric fusion in non-cancer samples (format: TSV). First column contains the gene ID of the 5' gene in fusion and second column contains the gene ID of the 3' gene in fusion.
     :type databases: list
     :return: Set of normal fusions.
     :rtype: set
@@ -274,7 +274,7 @@ if __name__ == "__main__":
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-i', '--input-variants', required=True, help='Path to the file containing variants annotated with anacore-utils/annotBND.py (format: VCF).')
     group_input.add_argument('-a', '--input-annotations', required=True, help='Path to the genome annotations file used with anacore-utils/annotBND.py (format: GTF).')
-    group_input.add_argument('-n', '--inputs-normal', nargs='+', help="Pathes to recurrent chimeric fusion in non-cancer samples (format: TSV). First column contains the gene ID of the 5' gene in fusion and second column contains the gene ID of the 3' gene in fusion. Genes ID  must be consistent with annotations used in '--input-annotions'.")
+    group_input.add_argument('-n', '--inputs-normal', nargs='+', help="Paths to recurrent chimeric fusion in non-cancer samples (format: TSV). First column contains the gene ID of the 5' gene in fusion and second column contains the gene ID of the 3' gene in fusion. Genes ID  must be consistent with annotations used in '--input-annotions'.")
     group_output = parser.add_argument_group('Outputs')  # Outputs
     group_output.add_argument('-o', '--output-variants', required=True, help='Path to the filtered file (format: VCF).')
     args = parser.parse_args()

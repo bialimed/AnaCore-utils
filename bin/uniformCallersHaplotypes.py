@@ -26,7 +26,7 @@ def getVariantsByName(callers, haplotyped_variants_files):
 
     :param callers: List of variants callers corresponding to haplotyped_variants_files.
     :type callers: list
-    :param haplotyped_variants_files: Pathes to the variants files after merging by haplotype (format: VCF).
+    :param haplotyped_variants_files: Paths to the variants files after merging by haplotype (format: VCF).
     :type haplotyped_variants_files: list
     :return: Variants detection and haplotype by variant name (example: {"chr1:1235448=ATAG/GTAC": {"mutect2": {"merged": True, "sub": {"chr1:1235448=A/G", "chr1:1235451=G/C"}}, "freebayes": {"merged": False, "sub": {"chr1:1235448=ATAG/GTAC"}}}}).
     :rtype: dict
@@ -174,8 +174,8 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--calling-sources', required=True, nargs='+', help='Name of the source in same order of --inputs-variants. The order of caller determines which configuration between split and merge is retained for variants where callers are not agree.')
     parser.add_argument('-l', '--logging-level', default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], action=LoggerAction, help='The logger level. [Default: %(default)s]')
     group_input = parser.add_argument_group('Inputs')  # Inputs
-    group_input.add_argument('-a', '--inputs-haplotyped', required=True, nargs='+', help='Pathes to the variants files after merging by haplotype (format: VCF). One file by variant caller. The order of caller determines which configuration between split and merge is retained for variants where callers are not agree.')
-    group_input.add_argument('-i', '--inputs-variants', required=True, nargs='+', help='Pathes to the variants files before merging by haplotype (format: VCF). One file by variant caller. The order of caller determines which configuration between split and merge is retained for variants where callers are not agree.')
+    group_input.add_argument('-a', '--inputs-haplotyped', required=True, nargs='+', help='Paths to the variants files after merging by haplotype (format: VCF). One file by variant caller. The order of caller determines which configuration between split and merge is retained for variants where callers are not agree.')
+    group_input.add_argument('-i', '--inputs-variants', required=True, nargs='+', help='Paths to the variants files before merging by haplotype (format: VCF). One file by variant caller. The order of caller determines which configuration between split and merge is retained for variants where callers are not agree.')
     group_output = parser.add_argument_group('Outputs')  # Outputs
     group_input.add_argument('-o', '--outputs-variants', required=True, nargs='+', help='Path to the output variants files (format: VCF).')
     args = parser.parse_args()
