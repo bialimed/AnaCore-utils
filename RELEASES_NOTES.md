@@ -1,3 +1,8 @@
+# Release 3.4.0 [DEV]
+
+### Improvements:
+  * Add script to create data for saturation curve `bin/saturationCurve.py`.
+
 # Release 3.3.0 [2020-04-28]
 
 ### Improvements:
