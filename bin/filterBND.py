@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.0'
+__version__ = '1.5.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -66,7 +66,8 @@ def loadNormalDb(databases):
     for curr_db in databases:
         with open(curr_db) as reader:
             for line in reader:
-                normal_fusions.add(line.strip())
+                fusions_partners = "\t".join(line.strip().split("\t")[0:2])  # Remove additionnal columns
+                normal_fusions.add(fusions_partners)
     return normal_fusions
 
 
