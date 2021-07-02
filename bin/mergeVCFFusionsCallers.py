@@ -355,7 +355,7 @@ def getMergedRecords(inputs_variants, calling_sources, annotation_field, shared_
     """
     Merge VCFRecords coming from several variant callers.
 
-    :param inputs_variants: Pathes to the variants files.
+    :param inputs_variants: Paths to the variants files.
     :type inputs_variants: list
     :param calling_sources: Names of the variants callers (in same order as inputs_variants).
     :type calling_sources: list

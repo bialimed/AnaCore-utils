@@ -1,8 +1,8 @@
 {% set version = "3.3.0" %}
 # Dependencies versions
-{% set anacore_version = "2.9.0" %}
-{% set pysam_version = "0.15.3" %}
-{% set scipy_version = "1.2.1" %}
+{% set anacore_version = "=2.9.0" %}
+{% set pysam_version = "=0.15.3" %}
+{% set scipy_version = "=1.2.1" %}
 
 package:
   name: anacore-utils
@@ -15,6 +15,7 @@ source:
 build:
   number: 1
   script: ${PYTHON} setup.py install
+  noarch: python
 
 requirements:
   build:

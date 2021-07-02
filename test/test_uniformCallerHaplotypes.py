@@ -29,7 +29,7 @@ class TestUniformCallersHaplotypes(unittest.TestCase):
     def tearDown(self):
         # Clean temporary files
         for curr_caller in sorted(self.callers):
-            for curr_pattern in [self.tmp_initial_pathes, self.tmp_haplotyped_pathes, self.tmp_expected_pathes, self.tmp_out_pathes]:
+            for curr_pattern in [self.tmp_initial_paths, self.tmp_haplotyped_paths, self.tmp_expected_paths, self.tmp_out_paths]:
                 curr_file = curr_pattern.format(curr_caller)
                 if os.path.exists(curr_file):
                     os.remove(curr_file)
@@ -37,10 +37,10 @@ class TestUniformCallersHaplotypes(unittest.TestCase):
     def setUp(self):
         tmp_folder = tempfile.gettempdir()
         unique_id = str(uuid.uuid1())
-        self.tmp_initial_pathes = os.path.join(tmp_folder, unique_id + "_{}_initial.vcf")
-        self.tmp_haplotyped_pathes = os.path.join(tmp_folder, unique_id + "_{}_haplotyped.vcf")
-        self.tmp_expected_pathes = os.path.join(tmp_folder, unique_id + "_{}_expected.vcf")
-        self.tmp_out_pathes = os.path.join(tmp_folder, unique_id + "_{}_out.vcf")
+        self.tmp_initial_paths = os.path.join(tmp_folder, unique_id + "_{}_initial.vcf")
+        self.tmp_haplotyped_paths = os.path.join(tmp_folder, unique_id + "_{}_haplotyped.vcf")
+        self.tmp_expected_paths = os.path.join(tmp_folder, unique_id + "_{}_expected.vcf")
+        self.tmp_out_paths = os.path.join(tmp_folder, unique_id + "_{}_out.vcf")
 
         # test cases
         self.test_cases = [
@@ -432,7 +432,7 @@ class TestUniformCallersHaplotypes(unittest.TestCase):
         # Write files
         for curr_caller in self.callers:
             # Initial
-            with VCFIO(self.tmp_initial_pathes.format(curr_caller), "w") as handle_out:
+            with VCFIO(self.tmp_initial_paths.format(curr_caller), "w") as handle_out:
                 handle_out.info = {
                     "AD": HeaderInfoAttr("AD", "Alternative allele depth.", type="Integer", number="1")
                 }
@@ -443,7 +443,7 @@ class TestUniformCallersHaplotypes(unittest.TestCase):
                         for curr_var in curr_test["initial"][curr_caller]:
                             handle_out.write(curr_var)
             # Haplotyped
-            with VCFIO(self.tmp_haplotyped_pathes.format(curr_caller), "w") as handle_out:
+            with VCFIO(self.tmp_haplotyped_paths.format(curr_caller), "w") as handle_out:
                 handle_out.info = {
                     "AD": HeaderInfoAttr("AD", "Alternative allele depth.", type="Integer", number="1"),
                     "MCO_VAR": HeaderInfoAttr("MCO_VAR", "Name of the variants merged because their occur on same reads.", type="String", number=".")
@@ -455,7 +455,7 @@ class TestUniformCallersHaplotypes(unittest.TestCase):
                         for curr_var in curr_test["haplotyped"][curr_caller]:
                             handle_out.write(curr_var)
             # Expected
-            with VCFIO(self.tmp_expected_pathes.format(curr_caller), "w") as handle_out:
+            with VCFIO(self.tmp_expected_paths.format(curr_caller), "w") as handle_out:
                 handle_out.info = {
                     "AD": HeaderInfoAttr("AD", "Alternative allele depth.", type="Integer", number="1")
                 }
@@ -471,19 +471,19 @@ class TestUniformCallersHaplotypes(unittest.TestCase):
         cmd = [
             "uniformCallersHaplotypes.py",
             "--calling-sources", *self.callers,
-            "--inputs-haplotyped", *[self.tmp_haplotyped_pathes.format(curr_caller) for curr_caller in self.callers],
-            "--inputs-variants", *[self.tmp_initial_pathes.format(curr_caller) for curr_caller in self.callers],
-            "--outputs-variants", *[self.tmp_out_pathes.format(curr_caller) for curr_caller in self.callers]
+            "--inputs-haplotyped", *[self.tmp_haplotyped_paths.format(curr_caller) for curr_caller in self.callers],
+            "--inputs-variants", *[self.tmp_initial_paths.format(curr_caller) for curr_caller in self.callers],
+            "--outputs-variants", *[self.tmp_out_paths.format(curr_caller) for curr_caller in self.callers]
         ]
         subprocess.check_call(cmd, stderr=subprocess.DEVNULL)
 
         # Validate results
         for curr_caller in self.callers:
             expected = []
-            with open(self.tmp_expected_pathes.format(curr_caller)) as handle_in:
+            with open(self.tmp_expected_paths.format(curr_caller)) as handle_in:
                 expected = [elt.replace("\t\t", "\t.\t") for elt in handle_in.readlines()]
             observed = []
-            with open(self.tmp_out_pathes.format(curr_caller)) as handle_in:
+            with open(self.tmp_out_paths.format(curr_caller)) as handle_in:
                 observed = handle_in.readlines()
             self.assertEqual(
                 expected,
