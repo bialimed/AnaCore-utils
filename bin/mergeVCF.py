@@ -19,7 +19,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.6.0'
+__version__ = '1.6.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     )
     parser.add_argument('-v', '--version', action='version', version=__version__)
     parser.add_argument('-d', '--deactivate-completion', action='store_true', help="This option deactivate the calculation of AD, AF and DP for samples where a variant present in other(s) sample(s) has no information.")
-    parser.add_argument('-p', '--AF-precision', type=float, default=5, help="The AF's decimal precision. [Default: %(default)s]")
+    parser.add_argument('-p', '--AF-precision', type=int, default=5, help="The AF's decimal precision. [Default: %(default)s]")
     parser.add_argument('-s', '--selected-region', help="Only the variants on this region (example: 'chr1') will be kept. [Default: All the regions are kept]")
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-i', '--input-variants', nargs='+', required=True, help='The path to the variants files (format: VCF).')
