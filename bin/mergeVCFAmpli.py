@@ -19,7 +19,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.4.0'
+__version__ = '2.4.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -406,7 +406,7 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Merges variants from several samples. If one variant is missing from a sample his AD, AF and DP are retrieved from the alignment file of this sample. The VCFs must come from the same process with same references. Note: for a common variant all the fields values except for AF, AD and DP are retrieved from the first VCF where it has been found.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
-    parser.add_argument('-f', '--AF-precision', type=float, default=5, help="The AF's decimal precision. [Default: %(default)s]")
+    parser.add_argument('-f', '--AF-precision', type=int, default=5, help="The AF's decimal precision. [Default: %(default)s]")
     parser.add_argument('-t', '--RG-tag', default='LB', help='RG tag used to store the area ID. [Default: %(default)s]')
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-p', '--input-designs', nargs='+', required=True, help='The path to the amplicons design (format: BED). The start and end of the amplicons must be without primers.')
