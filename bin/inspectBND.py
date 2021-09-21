@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -188,8 +188,8 @@ def getDepths(reader_aln, region):
     expected_pos = region.start
     for aln_col in reader_aln.pileup(
         region.reference.name,
-        region.start - 1,
-        region.end - 1,
+        region.start - 1,  # 0-based
+        region.end,  # 1-based
         truncate=True,
         max_depth=1000000
     ):  # By defaul filter out unmap, secondary, qcfail and duplicate
@@ -223,8 +223,8 @@ def getStrandedDepths(reader_aln, region):
     expected_pos = region.start
     for aln_col in reader_aln.pileup(
         region.reference.name,
-        region.start - 1,
-        region.end - 1,
+        region.start - 1,  # 0-based
+        region.end,  # 1-based
         truncate=True,
         max_depth=1000000
     ):  # By defaul filter out unmap, secondary, qcfail and duplicate
