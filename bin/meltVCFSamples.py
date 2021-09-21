@@ -19,7 +19,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.2.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -35,7 +35,7 @@ from anacore.vcf import VCFIO, HeaderFormatAttr
 if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Melts all the samples contained in VCF in one sample. For the output only the fields AD, AF and DP will be writted in FORMAT.')
-    parser.add_argument('-f', '--AF-precision', type=float, default=5, help="The AF's decimal precision. [Default: %(default)s]")
+    parser.add_argument('-f', '--AF-precision', type=int, default=5, help="The AF's decimal precision. [Default: %(default)s]")
     parser.add_argument('-n', '--new-spl-name', default="all", help="The name of the outputted sample. [Default: %(default)s]")
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs
