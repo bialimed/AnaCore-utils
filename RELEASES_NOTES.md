@@ -1,6 +1,7 @@
 # Release 3.4.0 [DEV]
 
 ### Improvements:
+  * Add script to report depths on panel: `bin/depthsPanel.py`.
   * Add script to create known fusions partners database: `bin/buildKnownBNDDb.py`.
   * Add script to create data for saturation curve `bin/saturationCurve.py`.
 
