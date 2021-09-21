@@ -12,6 +12,7 @@ from anacore.sv import HashedSVIO
 import argparse
 import json
 import logging
+from numpy import quantile
 import os
 import pysam
 import sys
@@ -24,7 +25,7 @@ import sys
 ########################################################################
 def depthsTargets(aln_path, targets, depth_mode, min_depths, log):
     """
-    Add the number of nt below depth thresholds in each target.
+    Add depths distribution and number of nt below depth thresholds in each target.
 
     :param aln_path: Path to the alignment file (format: SAM/BAM).
     :type aln_path: str
@@ -45,15 +46,18 @@ def depthsTargets(aln_path, targets, depth_mode, min_depths, log):
                 idx_in_part = 0
                 log.info("Processed regions {}/{}.".format(idx_region + 1, nb_selected_regions))
             idx_in_part += 1
-            curr_target["under_threshold"] = {elt: 0 for elt in min_depths}
+            curr_target["depths"] = {
+                "distribution": None,
+                "under_thresholds": {elt: 0 for elt in min_depths}
+            }
+            target_depths = []
             for curr_sub_region in curr_target["locations"]:
                 curr_checked = curr_sub_region.start - 1
                 for pileupcolumn in FH_bam.pileup(curr_sub_region.reference.name, curr_sub_region.start - 1, curr_sub_region.end, max_depth=100000000):
                     if pileupcolumn.reference_pos + 1 >= curr_sub_region.start and pileupcolumn.reference_pos + 1 <= curr_sub_region.end:
                         # Missing positions
                         while curr_checked < pileupcolumn.reference_pos:
-                            for threshold in curr_target["under_threshold"]:
-                                curr_target["under_threshold"][threshold] += 1
+                            target_depths.append(0)
                             curr_checked += 1
                         # Current position
                         curr_reads_depth = 0
@@ -64,18 +68,25 @@ def depthsTargets(aln_path, targets, depth_mode, min_depths, log):
                             if not pileupread.alignment.is_secondary and not pileupread.alignment.is_duplicate and not pileupread.is_refskip:
                                 curr_reads_depth += 1
                                 curr_frag.add(pileupread.alignment.query_name)
-                        curr_depth = curr_reads_depth
-                        if depth_mode == "fragment":
-                            curr_depth = len(curr_frag)
-                        for threshold in curr_target["under_threshold"]:
-                            if threshold > curr_depth:
-                                curr_target["under_threshold"][threshold] += 1
+                        if depth_mode == "read":
+                            target_depths.append(curr_reads_depth)
+                        else:
+                            target_depths.append(len(curr_frag))
                         curr_checked = pileupcolumn.reference_pos + 1
                 # Missing positions
                 while curr_checked < curr_sub_region.end:
-                    for threshold in curr_target["under_threshold"]:
-                        curr_target["under_threshold"][threshold] += 1
+                    target_depths.append(0)
                     curr_checked += 1
+                # Store depths
+                for threshold in curr_target["depths"]["under_thresholds"]:
+                    curr_target["depths"]["under_thresholds"][threshold] = sum([1 for elt in target_depths if elt < threshold])
+                curr_target["depths"]["distribution"] = {
+                    "lower_quartile": quantile(target_depths, 0.25, interpolation="midpoint"),
+                    "max": max(target_depths),
+                    "median": quantile(target_depths, 0.5),
+                    "min": min(target_depths),
+                    "upper_quartile": quantile(target_depths, 0.75, interpolation="midpoint"),
+                }
 
 
 def getTargets(in_targets):
@@ -137,7 +148,7 @@ def writeJSON(out_path, annotated_targets, depth_mode, min_depths):
 ########################################################################
 if __name__ == "__main__":
     # Manage parameters
-    parser = argparse.ArgumentParser(description='Write the number of nt below depth thresholds for each target.')
+    parser = argparse.ArgumentParser(description='Write depths distribution and number of nt below depth thresholds for each target.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     parser.add_argument('-m', '--depth-mode', choices=["read", "fragment"], default="fragment", help='How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once). [Default: %(default)s]')
     parser.add_argument('-d', '--min-depths', type=int, nargs='+', default=[25, 30], help='Depth thresholds used to count the number of nt below. [Default: %(default)s]')

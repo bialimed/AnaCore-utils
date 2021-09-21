@@ -98,15 +98,49 @@ read4	0	chr2	1	60	31M	*	0	0	ATTTGAAGATATTCACCATTATAGAGAACAA	*	NM:i:0	MD:Z:31	AS:
         class FakeLogger:
             def info(self, msg):
                 pass
+        targets = getTargets(self.tmp_tgt)
+        depthsTargets(self.tmp_bam, targets, "reads", [1, 2, 3], FakeLogger())
+        # Test under_thresholds
         expected = [
             {1: 0, 2: 0, 3: 6},
             {1: 0, 2: 6, 3: 6},
             {1: 0, 2: 1, 3: 1},
             {1: 5, 2: 5, 3: 5}
         ]
-        targets = getTargets(self.tmp_tgt)
-        depthsTargets(self.tmp_bam, targets, "reads", [1, 2, 3], FakeLogger())
-        observed = [elt["under_threshold"] for elt in targets]
+        observed = [elt["depths"]["under_thresholds"] for elt in targets]
+        self.assertEqual(expected, observed)
+        # Test distribution
+        expected = [
+            {  # [2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,2]
+                "lower_quartile": 3.0,
+                "max": 3,
+                "median": 3.0,
+                "min": 2,
+                "upper_quartile": 3.0,
+            },
+            {  # [1,1,1,1,1,1]
+                "lower_quartile": 1.0,
+                "max": 1,
+                "median": 1.0,
+                "min": 1,
+                "upper_quartile": 1.0,
+            },
+            {  # [3,1]
+                "lower_quartile": 2.0,
+                "max": 3,
+                "median": 2.0,
+                "min": 1,
+                "upper_quartile": 2.0,
+            },
+            {  # [0,0,0,0,0]
+                "lower_quartile": 0.0,
+                "max": 0,
+                "median": 0.0,
+                "min": 0,
+                "upper_quartile": 0.0,
+            }
+        ]
+        observed = [elt["depths"]["distribution"] for elt in targets]
         self.assertEqual(expected, observed)
 
     def test_getTargets(self):
