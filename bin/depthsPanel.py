@@ -129,8 +129,10 @@ def writeJSON(out_path, annotated_targets, depth_mode, min_depths):
     :param min_depths: Depth thresholds used to count the number of nt below.
     :type min_depths: list
     """
-    with open(out_path, "w") as FH_out:
-        FH_out.write(
+    with open(out_path, "w") as writer:
+        for target in annotated_targets:
+            target["locations"] = [str(elt) for elt in target["locations"]]  # Region to string
+        writer.write(
             json.dumps(
                 {
                     "parameters": {"depth_mode": depth_mode, "min_depths": min_depths},
