@@ -175,5 +175,5 @@ if __name__ == "__main__":
 
     # Write output
     log.info("Write output.")
-    writeJSON(args.output, targets, args)
+    writeJSON(args.output, targets, args.depth_mode, args.min_depths)
     log.info("End of job")
