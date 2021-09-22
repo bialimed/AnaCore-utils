@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
     # Load selected regions
     log.info("Load targeted regions.")
-    targets = getTargets(args.input_aln, args.input_targets)
+    targets = getTargets(args.input_targets)
 
     # Find shallow areas
     log.info("Find validate depths rate by target.")
