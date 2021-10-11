@@ -136,7 +136,7 @@ if __name__ == "__main__":
     domains = sorted(domains, key=lambda x: (x.reference.name, x.start, x.end))
 
     # Add split info
-    log.info("Add sub-segment without inron(s) for domains.")
+    log.info("Add sub-segment without intron(s) for domains.")
     for curr_domain in domains:
         tr_id = curr_domain.annot["target_transcript"].split(".", 1)[0]
         transcript = tr_by_id[tr_id]
