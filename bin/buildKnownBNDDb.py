@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.1.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -197,9 +197,14 @@ def loadChimerdb(db_path, db_version, fusions_by_partners, aliases_by_symbol, an
     # id    Source    webSource    Fusion_pair    H_gene    H_chr    H_position    H_strand    T_gene    T_chr    T_position    T_strand    Breakpoint_Type    Genome_Build_Version    PMID    Disease    Validation    Kinase    Oncogene    Tumor_suppressor    Receptor    Transcription_Factor    ChimerPub    ChimerSeq
     with HashedSVIO(db_path) as reader:
         for record in reader:
+            up_gene = None
+            down_gene = None
             try:
                 up_gene = selectAnnotSymbol(record["H_gene"], annotation_symbols, aliases_by_symbol)
                 down_gene = selectAnnotSymbol(record["T_gene"], annotation_symbols, aliases_by_symbol)
+            except Exception:
+                print("warning", "chimeradb", db_version, record["H_gene"], record["T_gene"], sep="\t")
+            if up_gene and down_gene:
                 fusion_partners = "{}_@_{}".format(up_gene, down_gene)
                 source = "chimerdb_{}".format(db_version)
                 if fusion_partners not in fusions_by_partners:
@@ -210,9 +215,8 @@ def loadChimerdb(db_path, db_version, fusions_by_partners, aliases_by_symbol, an
                 if record["PMID"] != "":
                     if "PMID" not in fusions_by_partners[fusion_partners]:
                         fusions_by_partners[fusion_partners]["PMID"] = set()
-                    fusions_by_partners[fusion_partners]["PMID"].add(int(record["PMID"]))
-            except Exception:
-                print("warning", "chimeradb", db_version, record["H_gene"], record["T_gene"], sep="\t")
+                    pubmed_ids = set(map(int, record["PMID"].split(",")))
+                    fusions_by_partners[fusion_partners]["PMID"] = fusions_by_partners[fusion_partners]["PMID"] | pubmed_ids
 
 
 def loadCosmic(db_path, db_version, fusions_by_partners, aliases_by_symbol, annotation_symbols):
@@ -278,15 +282,20 @@ def loadGeneric(db_path, db_name, db_version, fusions_by_partners, aliases_by_sy
     source = "{}_{}".format(db_name, db_version)
     with HashedSVIO(db_path) as reader:
         for record in reader:
+            up_gene = None
+            down_gene = None
             try:
                 up_gene = selectAnnotSymbol(record[up_title], annotation_symbols, aliases_by_symbol)
                 down_gene = selectAnnotSymbol(record[down_title], annotation_symbols, aliases_by_symbol)
-                fusion_partners = "{}_@_{}".format(up_gene, down_gene)
-                if fusion_partners not in fusions_by_partners:
-                    fusions_by_partners[fusion_partners] = set()
-                fusions_by_partners[fusion_partners].add(source)
             except Exception:
                 print("warning", db_name, db_version, record["up_gene"], record["down_gene"], sep="\t")
+            if up_gene and down_gene:
+                fusion_partners = "{}_@_{}".format(up_gene, down_gene)
+                if fusion_partners not in fusions_by_partners:
+                    fusions_by_partners[fusion_partners] = {source: set()}
+                if source not in fusions_by_partners[fusion_partners]:
+                    fusions_by_partners[fusion_partners][source] = set()
+                fusions_by_partners[fusion_partners][source].add(fusion_partners)
 
 
 def loadMitelman(db_path, db_version, fusions_by_partners, aliases_by_symbol, annotation_symbols):
@@ -315,11 +324,16 @@ def loadMitelman(db_path, db_version, fusions_by_partners, aliases_by_symbol, an
             if record["GeneShort"] != "":
                 for fusion in record["GeneShort"].split(","):
                     if "/" in fusion:
-                        try:
-                            genes = fusion.replace("+", "").split("/")  # PDRG1/ARF3/RUNX1 => fusion between 3 genes
-                            for up_gene, down_gene in zip(genes, genes[1:]):  # For each breakpoint
+                        genes = fusion.replace("+", "").split("/")  # PDRG1/ARF3/RUNX1 => fusion between 3 genes
+                        for up_gene, down_gene in zip(genes, genes[1:]):  # For each breakpoint
+                            found = False
+                            try:
                                 up_gene = selectAnnotSymbol(up_gene, annotation_symbols, aliases_by_symbol)
                                 down_gene = selectAnnotSymbol(down_gene, annotation_symbols, aliases_by_symbol)
+                                found = True
+                            except Exception:
+                                print("warning", "mitelman", db_version, "\t".join(fusion.split("/")), sep="\t")
+                            if found:
                                 fusion_partners = "{}_@_{}".format(up_gene, down_gene)
                                 source = "mitelman_{}".format(db_version)
                                 if fusion_partners not in fusions_by_partners:
@@ -331,8 +345,6 @@ def loadMitelman(db_path, db_version, fusions_by_partners, aliases_by_symbol, an
                                     fusions_by_partners[fusion_partners]["PMID"] = set()
                                     for pmid in pubmed_by_fusion[record["RefNo"]]:
                                         fusions_by_partners[fusion_partners]["PMID"].add(int(pmid))
-                        except Exception:
-                            print("warning", "mitelman", db_version, "\t".join(fusion.split("/")), sep="\t")
 
 
 def pubmedByFusion(in_ref):
