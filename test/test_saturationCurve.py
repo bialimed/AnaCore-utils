@@ -12,7 +12,6 @@ import uuid
 import tempfile
 import unittest
 import subprocess
-from anacore.vcf import VCFIO, VCFRecord, HeaderInfoAttr
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_DIR = os.path.dirname(TEST_DIR)
