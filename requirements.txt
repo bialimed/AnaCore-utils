@@ -1,3 +1,3 @@
 scipy == 1.2.1
 pysam == 0.15.3
-anacore == 2.9.0
+anacore == 2.10.0
