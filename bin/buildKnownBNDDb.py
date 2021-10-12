@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.1'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -203,7 +203,11 @@ def loadChimerdb(db_path, db_version, fusions_by_partners, aliases_by_symbol, an
                 up_gene = selectAnnotSymbol(record["H_gene"], annotation_symbols, aliases_by_symbol)
                 down_gene = selectAnnotSymbol(record["T_gene"], annotation_symbols, aliases_by_symbol)
             except Exception:
-                print("warning", "chimeradb", db_version, record["H_gene"], record["T_gene"], sep="\t")
+                log.warning(
+                    "Error to parse gene names [{}, {}] from chimerDB (PMID: {}).".format(
+                        record["H_gene"], record["T_gene"], record["PMID"]
+                    )
+                )
             if up_gene and down_gene:
                 fusion_partners = "{}_@_{}".format(up_gene, down_gene)
                 source = "chimerdb_{}".format(db_version)
@@ -240,7 +244,12 @@ def loadCosmic(db_path, db_version, fusions_by_partners, aliases_by_symbol, anno
             if record["Translocation Name"] != "":
                 matches = re.fullmatch(r"ENS.+\((.+)\):.+_ENS.+\((.+)\):.+", record["Translocation Name"])  # ENST00000324093.4(PLXND1):r.1_2864_ENST00000393238.3(TMCC1):r.918_5992
                 if matches is None:
-                    print("warning", "cosmic", db_version, record["Translocation Name"], sep="\t")
+                    log.warning(
+                        "Error to parse gene names {} from cosmic (PMID: {}).".format(
+                            record["Translocation Name"],
+                            record["Pubmed_PMID"]
+                        )
+                    )
                 else:
                     up_gene, down_gene = matches.groups()
                     up_gene = selectAnnotSymbol(up_gene, annotation_symbols, aliases_by_symbol)
@@ -288,7 +297,11 @@ def loadGeneric(db_path, db_name, db_version, fusions_by_partners, aliases_by_sy
                 up_gene = selectAnnotSymbol(record[up_title], annotation_symbols, aliases_by_symbol)
                 down_gene = selectAnnotSymbol(record[down_title], annotation_symbols, aliases_by_symbol)
             except Exception:
-                print("warning", db_name, db_version, record["up_gene"], record["down_gene"], sep="\t")
+                log.warning(
+                    "Error to parse gene names [{}, {}] from {}.".format(
+                        record[up_title], record[down_title], db_name
+                    )
+                )
             if up_gene and down_gene:
                 fusion_partners = "{}_@_{}".format(up_gene, down_gene)
                 if fusion_partners not in fusions_by_partners:
@@ -332,7 +345,11 @@ def loadMitelman(db_path, db_version, fusions_by_partners, aliases_by_symbol, an
                                 down_gene = selectAnnotSymbol(down_gene, annotation_symbols, aliases_by_symbol)
                                 found = True
                             except Exception:
-                                print("warning", "mitelman", db_version, "\t".join(fusion.split("/")), sep="\t")
+                                log.warning(
+                                    "Error to parse gene names [{}, {}] from Mitelman (PMID: {}).".format(
+                                        up_gene, down_gene, record["RefNo"]
+                                    )
+                                )
                             if found:
                                 fusion_partners = "{}_@_{}".format(up_gene, down_gene)
                                 source = "mitelman_{}".format(db_version)
