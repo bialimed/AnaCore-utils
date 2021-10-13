@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.5.1'
+__version__ = '1.5.2'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -328,7 +328,7 @@ if __name__ == "__main__":
     # Process
     nb_fusions = 0
     nb_filtered = 0
-    normal_fusions = None if len(args.inputs_normal) == 0 else loadNormalDb(args.inputs_normal)
+    normal_fusions = loadNormalDb(args.inputs_normal) if args.inputs_normal else None
     genes = AnnotGetter(args.input_annotations)
     with BreakendVCFIO(args.input_variants, "r", args.annotation_field) as reader:
         with BreakendVCFIO(args.output_variants, "w", args.annotation_field) as writer:
