@@ -1,7 +1,7 @@
 # Releases notes
 
 
-## Release 3.4.0 [DEV]
+## Release 3.4.0 [2021-10-13]
 
 ### Improvements:
   * Add script to report depths on panel: `bin/depthsPanel.py`.
