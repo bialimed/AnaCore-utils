@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.5.0'
+__version__ = '1.5.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -53,22 +53,19 @@ class AnnotGetter:
         return self.model[chr]
 
 
-def loadNormalDb(databases):
+def annCmpNameFct(use_id):
     """
-    Return the set of normal fusions from a list of databases.
+    Return callable used to return gene unique name from one VCF annotation.
 
-    :param databases: Paths to recurrent chimeric fusion in non-cancer samples (format: TSV). First column contains the gene ID of the 5' gene in fusion and second column contains the gene ID of the 3' gene in fusion.
-    :type databases: list
-    :return: Set of normal fusions.
-    :rtype: set
+    :param use_id: If True use gene ID instead of symbol.
+    :type use_id: bool
+    :return: Callable used to return gene unique name from one VCF annotation.
+    :rtype: callable(annot)
     """
-    normal_fusions = set()
-    for curr_db in databases:
-        with open(curr_db) as reader:
-            for line in reader:
-                fusions_partners = "\t".join(line.strip().split("\t")[0:2])  # Remove additionnal columns
-                normal_fusions.add(fusions_partners)
-    return normal_fusions
+    if use_id:
+        return lambda elt: elt["Gene"]
+    else:
+        return lambda elt: elt["SYMBOL"]
 
 
 def hasLowSupport(record, min_support):
@@ -90,6 +87,82 @@ def hasLowSupport(record, min_support):
         if support < min_support:
             has_low_support = True
     return has_low_support
+
+
+def isHLA(first, second, annotation_field):
+    """
+    Return True if one of the two breakends falls in a gene of human leukocyte antigen.
+
+    :param first: The breakend of the first shard in fusion.
+    :type first: anacore.vcf.VCFRecord
+    :param second: The breakend of the second shard in fusion.
+    :type second: anacore.vcf.VCFRecord
+    :param annotation_field: Field used to store annotations.
+    :type annotation_field: str
+    :return: True if one of the two breakend falls in a gene of human leukocyte antigen.
+    :rtype: boolean
+    """
+    is_HLA = False
+    record_gene = {annot["SYMBOL"][0:4] for annot in first.info[annotation_field] if annot["SYMBOL"] is not None}
+    mate_gene = {annot["SYMBOL"][0:4] for annot in second.info[annotation_field] if annot["SYMBOL"] is not None}
+    if "HLA-" in record_gene | mate_gene:
+        is_HLA = True
+    return is_HLA
+
+
+def isIG(first, second, annotation_field):
+    """
+    Return True if one of the two breakends falls in a gene of immunoglobulin.
+
+    :param first: The breakend of the first shard in fusion.
+    :type first: anacore.vcf.VCFRecord
+    :param second: The breakend of the second shard in fusion.
+    :type second: anacore.vcf.VCFRecord
+    :param annotation_field: Field used to store annotations.
+    :type annotation_field: str
+    :return: True if one of the two breakend falls in a gene of immunoglobulin.
+    :rtype: boolean
+    """
+    is_IG = False
+    immunoglobulin = {"IGH", "IGK", "IGL", "IGS"}
+    record_gene = {annot["SYMBOL"][0:3] for annot in first.info[annotation_field] if annot["SYMBOL"] is not None}
+    mate_gene = {annot["SYMBOL"][0:3] for annot in second.info[annotation_field] if annot["SYMBOL"] is not None}
+    if len(immunoglobulin & (record_gene | mate_gene)) > 0:
+        is_IG = True
+    return is_IG
+
+
+def isInner(first, second, annotation_field, annCmpName, regCmpName):
+    """
+    Return True if the two breakends fall in the same gene (in at least one overlapped gene).
+
+    :param first: The breakend of the first shard in fusion.
+    :type first: anacore.vcf.VCFRecord
+    :param second: The breakend of the second shard in fusion.
+    :type second: anacore.vcf.VCFRecord
+    :param annotation_field: Field used to store annotations.
+    :type annotation_field: str
+    :param annCmpName: Callable used to return gene unique name from one VCF annotation.
+    :type annCmpName: callable(annot)
+    :param regCmpName: Callable used to return gene unique name from a gene region.
+    :type regCmpName: callable(anacore.genomicRegion.Gene)
+    :return: True if the two breakends falls in the same gene (in at least one overlapped gene).
+    :rtype: boolean
+    """
+    is_inner_gene = False
+    record_gene = {annCmpName(annot) for annot in first.info[annotation_field]}
+    mate_gene = {annCmpName(annot) for annot in second.info[annotation_field]}
+    full_overlapping = record_gene & mate_gene
+    if len(full_overlapping) > 0:
+        first_strand = getStrand(first, True)
+        second_strand = getStrand(second, False)
+        if first_strand != second_strand:
+            is_inner_gene = True
+        else:
+            genes_strands = {annot["STRAND"] for annot in first.info[annotation_field] + second.info[annotation_field] if annCmpName(annot) in full_overlapping}
+            if first_strand in genes_strands:
+                is_inner_gene = True
+    return is_inner_gene
 
 
 def inNormal(first, second, annotation_field, normal_fusions, normal_key="id"):
@@ -116,87 +189,15 @@ def inNormal(first, second, annotation_field, normal_fusions, normal_key="id"):
         first_genes = {annot["Gene"].split(".")[0] for annot in first.info[annotation_field]}
         second_genes = {annot["Gene"].split(".")[0] for annot in second.info[annotation_field]}
     else:
-        first_genes = {annot["SYMBOL"] for annot in first.info[annotation_field]}
-        second_genes = {annot["SYMBOL"] for annot in second.info[annotation_field]}
+        first_genes = {annot["SYMBOL"] for annot in first.info[annotation_field] if annot["SYMBOL"] is not None}
+        second_genes = {annot["SYMBOL"] for annot in second.info[annotation_field] if annot["SYMBOL"] is not None}
     for curr_first_gene, curr_second_gene in product(first_genes, second_genes):
         if curr_first_gene + "\t" + curr_second_gene in normal_fusions:
             in_normal = True
     return in_normal
 
 
-def isIG(first, second, annotation_field):
-    """
-    Return True if one of the two breakends falls in a gene of immunoglobulin.
-
-    :param first: The breakend of the first shard in fusion.
-    :type first: anacore.vcf.VCFRecord
-    :param second: The breakend of the second shard in fusion.
-    :type second: anacore.vcf.VCFRecord
-    :param annotation_field: Field used to store annotations.
-    :type annotation_field: str
-    :return: True if one of the two breakend falls in a gene of immunoglobulin.
-    :rtype: boolean
-    """
-    is_IG = False
-    immunoglobulin = {"IGH", "IGK", "IGL", "IGS"}
-    record_gene = {annot["SYMBOL"][0:3] for annot in first.info[annotation_field]}
-    mate_gene = {annot["SYMBOL"][0:3] for annot in second.info[annotation_field]}
-    if len(immunoglobulin & (record_gene | mate_gene)) > 0:
-        is_IG = True
-    return is_IG
-
-
-def isHLA(first, second, annotation_field):
-    """
-    Return True if one of the two breakends falls in a gene of human leukocyte antigen.
-
-    :param first: The breakend of the first shard in fusion.
-    :type first: anacore.vcf.VCFRecord
-    :param second: The breakend of the second shard in fusion.
-    :type second: anacore.vcf.VCFRecord
-    :param annotation_field: Field used to store annotations.
-    :type annotation_field: str
-    :return: True if one of the two breakend falls in a gene of human leukocyte antigen.
-    :rtype: boolean
-    """
-    is_HLA = False
-    record_gene = {annot["SYMBOL"][0:4] for annot in first.info[annotation_field]}
-    mate_gene = {annot["SYMBOL"][0:4] for annot in second.info[annotation_field]}
-    if "HLA-" in record_gene | mate_gene:
-        is_HLA = True
-    return is_HLA
-
-
-def isInner(first, second, annotation_field):
-    """
-    Return True if the two breakends falls in the same gene (in at least one overlapped gene).
-
-    :param first: The breakend of the first shard in fusion.
-    :type first: anacore.vcf.VCFRecord
-    :param second: The breakend of the second shard in fusion.
-    :type second: anacore.vcf.VCFRecord
-    :param annotation_field: Field used to store annotations.
-    :type annotation_field: str
-    :return: True if the two breakends falls in the same gene (in at least one overlapped gene).
-    :rtype: boolean
-    """
-    is_inner_gene = False
-    record_gene = {annot["SYMBOL"] for annot in first.info[annotation_field]}
-    mate_gene = {annot["SYMBOL"] for annot in second.info[annotation_field]}
-    full_overlapping = record_gene & mate_gene
-    if len(full_overlapping) > 0:
-        first_strand = getStrand(first, True)
-        second_strand = getStrand(second, False)
-        if first_strand != second_strand:
-            is_inner_gene = True
-        else:
-            genes_strands = {annot["STRAND"] for annot in first.info[annotation_field] + second.info[annotation_field] if annot["SYMBOL"] in full_overlapping}
-            if first_strand in genes_strands:
-                is_inner_gene = True
-    return is_inner_gene
-
-
-def isReadthrough(up, down, annotation_field, genes, rt_max_dist):
+def isReadthrough(up, down, annotation_field, genes, rt_max_dist, annCmpName, regCmpName):
     """
     Return True if the two breakends can be a readthrough.
 
@@ -210,6 +211,10 @@ def isReadthrough(up, down, annotation_field, genes, rt_max_dist):
     :type genes: AnnotGetter
     :param rt_max_dist: Maximum distance to evaluate if the fusion is a readthrough.
     :type rt_max_dist: int
+    :param annCmpName: Callable used to return gene unique name from one VCF annotation.
+    :type annCmpName: callable(annot)
+    :param regCmpName: Callable used to return gene unique name from a gene region.
+    :type regCmpName: callable(anacore.genomicRegion.Gene)
     :return: True if the two breakends can be a readthrough.
     :rtype: boolean
     """
@@ -228,32 +233,66 @@ def isReadthrough(up, down, annotation_field, genes, rt_max_dist):
             interval_start = min(first_start, second_start)
             interval_end = max(first_end, second_end) + 1
             if interval_end - interval_start <= rt_max_dist:
-                first_bp_gene = {annot["SYMBOL"] for annot in first.info[annotation_field]}
-                second_bp_gene = {annot["SYMBOL"] for annot in second.info[annotation_field]}
+                first_bp_gene = {annCmpName(annot) for annot in first.info[annotation_field]}
+                second_bp_gene = {annCmpName(annot) for annot in second.info[annotation_field]}
                 full_overlapping_gene = first_bp_gene & second_bp_gene
                 only_first_bp_gene = first_bp_gene - second_bp_gene
                 only_second_bp_gene = second_bp_gene - first_bp_gene
                 if len(only_first_bp_gene) != 0 and len(only_second_bp_gene) != 0:
-                    strand_by_gene = {annot["SYMBOL"]: annot["STRAND"] for annot in first.info[annotation_field] + second.info[annotation_field]}
+                    strand_by_gene = {annCmpName(annot): annot["STRAND"] for annot in first.info[annotation_field] + second.info[annotation_field]}
                     only_first_bp_gene = {gene for gene in only_first_bp_gene if strand_by_gene[gene] == up_strand}
                     only_second_bp_gene = {gene for gene in only_second_bp_gene if strand_by_gene[gene] == up_strand}
                     possible_on_strand = len(only_first_bp_gene) != 0 and len(only_second_bp_gene) != 0
                     if possible_on_strand:
                         interval_region = Region(interval_start, interval_end, up_strand, first.chrom)
                         overlapped_genes = genes.getChr(first.chrom).getOverlapped(interval_region)
-                        overlapped_genes = RegionList([gene for gene in overlapped_genes if gene.name not in full_overlapping_gene and gene.strand == up_strand])
-                        overlapped_genes_by_name = {gene.name: gene for gene in overlapped_genes}
+                        overlapped_genes = RegionList([gene for gene in overlapped_genes if regCmpName(gene) not in full_overlapping_gene and gene.strand == up_strand])
+                        overlapped_genes_by_id = {regCmpName(gene): gene for gene in overlapped_genes}
                         contradict_readthrough = False
-                        for start_gene_name in only_first_bp_gene:
-                            start_gene = overlapped_genes_by_name[start_gene_name]
-                            for end_gene_name in only_second_bp_gene:
-                                end_gene = overlapped_genes_by_name[end_gene_name]
+                        for start_gene_id in only_first_bp_gene:
+                            start_gene = overlapped_genes_by_id[start_gene_id]
+                            for end_gene_id in only_second_bp_gene:
+                                end_gene = overlapped_genes_by_id[end_gene_id]
                                 for interval_gene in overlapped_genes:
-                                    if interval_gene.name != start_gene.name and interval_gene.name != end_gene.name:
+                                    if regCmpName(interval_gene) != regCmpName(start_gene) and \
+                                       regCmpName(interval_gene) != regCmpName(end_gene):
                                         if not interval_gene.hasOverlap(start_gene) and not interval_gene.hasOverlap(end_gene):
                                             contradict_readthrough = True
                         is_readthrough = not contradict_readthrough
     return is_readthrough
+
+
+def loadNormalDb(databases):
+    """
+    Return the set of normal fusions from a list of databases.
+
+    :param databases: Paths to recurrent chimeric fusion in non-cancer samples (format: TSV). First column contains the gene ID of the 5' gene in fusion and second column contains the gene ID of the 3' gene in fusion.
+    :type databases: list
+    :return: Set of normal fusions.
+    :rtype: set
+    """
+    normal_fusions = set()
+    for curr_db in databases:
+        with open(curr_db) as reader:
+            for line in reader:
+                fusions_partners = "\t".join(line.strip().split("\t")[0:2])  # Remove additionnal columns
+                normal_fusions.add(fusions_partners)
+    return normal_fusions
+
+
+def regCmpNameFct(use_id):
+    """
+    Return callable used to return gene unique name from a gene region.
+
+    :param use_id: If True use gene ID instead of symbol.
+    :type use_id: bool
+    :return: Callable used to return gene unique name from a gene region.
+    :rtype: callable(anacore.genomicRegion.Gene)
+    """
+    if use_id:
+        return lambda elt: elt.annot["id"]
+    else:
+        return lambda elt: elt.name
 
 
 ########################################################################
@@ -310,6 +349,11 @@ if __name__ == "__main__":
                     "The fusion of these two genes are known in databases of normal samples" + source
                 )
             writer.writeHeader()
+            # Gene comparison functions: genes are compared by gene ID (missing
+            # in Arriba standard annotation) or by SYMBOL (None for certain lncRNA)
+            has_gene_id = "Gene" in writer.info[args.annotation_field]
+            annCmpName = annCmpNameFct(has_gene_id)
+            regCmpName = regCmpNameFct(has_gene_id)
             # Records
             for first, second in reader:
                 nb_fusions += 1
@@ -321,10 +365,10 @@ if __name__ == "__main__":
                 if isHLA(first, second, args.annotation_field):
                     new_filters.add("HLA")
                 # Inner gene
-                if isInner(first, second, args.annotation_field):
+                if isInner(first, second, args.annotation_field, annCmpName, regCmpName):
                     new_filters.add("Inner")
                 # Readthrough
-                if isReadthrough(first, second, args.annotation_field, genes, args.rt_max_dist):
+                if isReadthrough(first, second, args.annotation_field, genes, args.rt_max_dist, annCmpName, regCmpName):
                     new_filters.add("Readthrough")
                 # In normals databases
                 if inNormal(first, second, args.annotation_field, normal_fusions, args.normal_key):

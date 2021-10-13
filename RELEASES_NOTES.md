@@ -1,17 +1,25 @@
-# Release 3.4.0 [DEV]
+# Releases notes
+
+
+## Release 3.4.0 [DEV]
 
 ### Improvements:
   * Add script to report depths on panel: `bin/depthsPanel.py`.
   * Add script to create known fusions partners database: `bin/buildKnownBNDDb.py`.
   * Add script to create data for saturation curve `bin/saturationCurve.py`.
 
-# Release 3.3.0 [2020-04-28]
+### Bug fixes:
+  * Fix bug in `bin/filterBND.py` when a gene SYMBOL is None (in some lncRNA).
+
+
+## Release 3.3.0 [2020-04-28]
 
 ### Improvements:
   * Replace non-allele specific COSMIC annotations produced by VEP to
   allelle-specific annotations in `bin/fixVEPAnnot.py`.
 
-# Release 3.2.0 [2020-11-11]
+
+## Release 3.2.0 [2020-11-11]
 
 ### Improvements:
   * Manage new ID format from COSMIC in `bin/VCFToJSON.py`: COSM* -> COS*.
@@ -30,7 +38,8 @@
   * Fix bug in writeJSON of `bin/shallowsAnalysis.py` when optional parameters
   input-annotations and inputs-variants are not provided.
 
-# Release 3.1.0 [2020-05-13]
+
+## Release 3.1.0 [2020-05-13]
 
 ### Improvements:
   * Add count by target in `--output-summary` file from `bin/addAmpliRG.py`.
@@ -42,7 +51,8 @@
   * Fix bug in `bin/splitBAMByRG.py` with change in pysam.AlignmentHeader v1.5:
   `reader.header.copy()` to `reader.header.to_dict()`.
 
-# Release 3.0.0 [2020-01-03]
+
+## Release 3.0.0 [2020-01-03]
 Split AnaCore project in:
 * AnaCore (python libraries),
 * AnaCore-utils (scripts),
@@ -51,5 +61,6 @@ Split AnaCore project in:
 Replace section workflows managers utilities by the project AnaCore-snakemake
 (AnaCore-jflow is dropped).
 
-# Release 1.0.0 [2017‑10‑07]
+
+## Release 1.0.0 [2017‑10‑07]
 First release

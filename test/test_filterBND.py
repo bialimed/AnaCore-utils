@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.0'
+__version__ = '1.5.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -20,7 +20,8 @@ BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
-from filterBND import AnnotGetter, hasLowSupport, inNormal, isHLA, isIG, isInner, isReadthrough, loadNormalDb
+from filterBND import AnnotGetter, annCmpNameFct, hasLowSupport, isHLA, isIG, \
+                      isInner, inNormal, isReadthrough, loadNormalDb, regCmpNameFct
 
 
 ########################################################################
@@ -197,7 +198,11 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(not isInner(up, down, "TESTANN"))  # +/+ not inner (starts on limit)
+        self.assertTrue(
+            not isInner(
+                up, down, "TESTANN", annCmpNameFct(False), regCmpNameFct(False)
+            )
+        )  # +/+ not inner (starts on limit)
         up = VCFRecord(
             "chr1", 140, "id_01", "A", ["A[chr1:199["],
             info={
@@ -219,7 +224,11 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(isInner(up, down, "TESTANN"))  # +/+ inner gene 4 (starts on limit)
+        self.assertTrue(
+            isInner(
+                up, down, "TESTANN", annCmpNameFct(False), regCmpNameFct(False)
+            )
+        )  # +/+ inner gene 4 (starts on limit)
         up = VCFRecord(
             "chr1", 298, "id_01", "A", ["]chr1:320]A"],
             info={
@@ -240,7 +249,11 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(isInner(up, down, "TESTANN"))  # -/- inner gene 6
+        self.assertTrue(
+            isInner(
+                up, down, "TESTANN", annCmpNameFct(False), regCmpNameFct(False)
+            )
+        )  # -/- inner gene 6
         up = VCFRecord(
             "chr1", 298, "id_01", "A", ["A[chr1:320["],
             info={
@@ -261,7 +274,11 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(not isInner(up, down, "TESTANN"))  # +/+ inner gene 6 => not valid strand
+        self.assertTrue(
+            not isInner(
+                up, down, "TESTANN", annCmpNameFct(False), regCmpNameFct(False)
+            )
+        )  # +/+ inner gene 6 => not valid strand
         up = VCFRecord(
             "chr1", 298, "id_01", "A", ["A[chr1:320["],
             info={
@@ -282,7 +299,11 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(isInner(up, down, "TESTANN"))  # +/- inner gene 6
+        self.assertTrue(
+            isInner(
+                up, down, "TESTANN", annCmpNameFct(False), regCmpNameFct(False)
+            )
+        )  # +/- inner gene 6
 
     def testIsIG(self):
         up = VCFRecord(
@@ -474,7 +495,12 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(isReadthrough(up, down, "TESTANN", genes, 1000))
+        self.assertTrue(
+            isReadthrough(
+                up, down, "TESTANN", genes, 1000, annCmpNameFct(False),
+                regCmpNameFct(False)
+            )
+        )
         up = VCFRecord(
             "chr1",
             110,
@@ -504,7 +530,12 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(not isReadthrough(up, down, "TESTANN", genes, 1000))
+        self.assertTrue(
+            not isReadthrough(
+                up, down, "TESTANN", genes, 1000, annCmpNameFct(False),
+                regCmpNameFct(False)
+            )
+        )
         up = VCFRecord(
             "chr1",
             140,
@@ -533,7 +564,12 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(isReadthrough(up, down, "TESTANN", genes, 1000))
+        self.assertTrue(
+            isReadthrough(
+                up, down, "TESTANN", genes, 1000, annCmpNameFct(False),
+                regCmpNameFct(False)
+            )
+        )
         up = VCFRecord(
             "chr1",
             289,
@@ -562,7 +598,12 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(isReadthrough(up, down, "TESTANN", genes, 1000))
+        self.assertTrue(
+            isReadthrough(
+                up, down, "TESTANN", genes, 1000, annCmpNameFct(False),
+                regCmpNameFct(False)
+            )
+        )
         up = VCFRecord(
             "chr1",
             180,
@@ -592,7 +633,12 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(not isReadthrough(up, down, "TESTANN", genes, 1000))
+        self.assertTrue(
+            not isReadthrough(
+                up, down, "TESTANN", genes, 1000, annCmpNameFct(False),
+                regCmpNameFct(False)
+            )
+        )
         up = VCFRecord(
             "chr1",
             285,
@@ -622,7 +668,12 @@ GENE_ID02	GENE_ID05""")
                 ]
             }
         )
-        self.assertTrue(isReadthrough(up, down, "TESTANN", genes, 1000))
+        self.assertTrue(
+            isReadthrough(
+                up, down, "TESTANN", genes, 1000, annCmpNameFct(False),
+                regCmpNameFct(False)
+            )
+        )
 
 
 ########################################################################
