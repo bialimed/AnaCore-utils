@@ -351,7 +351,7 @@ if __name__ == "__main__":
             writer.writeHeader()
             # Gene comparison functions: genes are compared by gene ID (missing
             # in Arriba standard annotation) or by SYMBOL (None for certain lncRNA)
-            has_gene_id = "Gene" in writer.info[args.annotation_field]
+            has_gene_id = "Gene" in writer.ANN_titles
             annCmpName = annCmpNameFct(has_gene_id)
             regCmpName = regCmpNameFct(has_gene_id)
             # Records
