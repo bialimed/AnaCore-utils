@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.2.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -59,8 +59,8 @@ def getHGVSByTr(res_data):
 
     :param res_data: Results from runMutalyzer[Light] (required fields: legend, genomicDescription, transcriptDescriptions and proteinDescriptions).
     :type res_data: list
-    :return: HGVSg, HGVSc/n and HGVSp by transcript base RefSeq accession.
-    :rtype: dict
+    :return: HGVSg and HGVSg, HGVSc/n and HGVSp by transcript base RefSeq accession.
+    :rtype: str, dict
     """
     legend = RunMutalyzerLegend(res_data["legend"])
     id_by_name = legend.getIdByName()
@@ -83,7 +83,7 @@ def getHGVSByTr(res_data):
                 "HGVSc": HGVSc,
                 "HGVSp": HGVSp
             }
-    return HGVS_by_tr
+    return new_HGVSg, HGVS_by_tr
 
 
 def getConsistentHGVS(new_hgvs_str, old_hgvs_str):
@@ -111,7 +111,7 @@ def getConsistentHGVS(new_hgvs_str, old_hgvs_str):
             else:
                 # No change because ref sequence from HGVS database contains the alt
                 if "=" in new_hgvs.change and new_hgvs.type != "p":
-                    match = re.search("\d([ATGCN]+>[ATGCN]+)$", old_hgvs)
+                    match = re.search(r"\d([ATGCN]+>[ATGCN]+)$", old_hgvs)
                     if match is not None:
                         final_hgvs_str = final_hgvs_str.replace("=", match.group(1))
                 # Keep consistency on accession version
@@ -213,10 +213,10 @@ if __name__ == "__main__":
                     else:
                         # Store all HGVS by transcript base accession
                         mutalyzer_tr = {elt["id"].split(".")[0] for elt in res_data["legend"] if "id" in elt and not elt["id"].startswith("ENS")}
-                        annot_tr = {annot["Feature"].split(".")[0] for annot in record.info[args.annotations_field] if not annot["Feature"].startswith("ENS")}
+                        annot_tr = {annot["Feature"].split(".")[0] for annot in record.info[args.annotations_field] if annot["Feature"] and not annot["Feature"].startswith("ENS")}
                         if len(annot_tr - mutalyzer_tr) != 0:
                             log.warning("All the transcripts annotated for variant {} cannot be found in used version of mutalyzer. Missing transcripts: {}".format(record.getName(), sorted(annot_tr - mutalyzer_tr)))
-                        HGVS_by_tr = getHGVSByTr(res_data)
+                        new_HGVSg, HGVS_by_tr = getHGVSByTr(res_data)
                         # Update annotations
                         is_fixed_HGVSg = False
                         is_fixed_HGVSc = False
@@ -227,26 +227,25 @@ if __name__ == "__main__":
                             if annot["Allele"] != record.alt[0]:  # Annotation come from a collocated alternative allele
                                 contains_colloc_annot = True
                             else:  # Annotation come from the alternative allele
-                                tr_base_acc = annot["Feature"].split(".")[0]
-                                if tr_base_acc in HGVS_by_tr:
-                                    # Trace
-                                    old = {
-                                        "g": "" if "HGVSg" not in annot or annot["HGVSg"] is None else annot["HGVSg"],
-                                        "c": "" if "HGVSc" not in annot or annot["HGVSc"] is None else annot["HGVSc"],
-                                        "p": "" if "HGVSp" not in annot or annot["HGVSp"] is None else annot["HGVSp"]
-                                    }
-                                    # HGVSg
-                                    annot["HGVSg"] = getConsistentHGVS(HGVS_by_tr[tr_base_acc]["HGVSg"], old["g"])
-                                    if old["g"] != annot["HGVSg"]:
-                                        is_fixed_HGVSg = True
-                                    # HGVSc
-                                    annot["HGVSc"] = getConsistentHGVS(HGVS_by_tr[tr_base_acc]["HGVSc"], old["c"])
-                                    if old["c"] != annot["HGVSc"]:
-                                        is_fixed_HGVSc = True
-                                    # HGVSp
-                                    annot["HGVSp"] = getConsistentHGVS(HGVS_by_tr[tr_base_acc]["HGVSp"], old["p"])
-                                    if old["p"] != annot["HGVSp"]:
-                                        is_fixed_HGVSp = True
+                                # HGVSg
+                                old_HGVSg = "" if "HGVSg" not in annot or annot["HGVSg"] is None else annot["HGVSg"]
+                                annot["HGVSg"] = getConsistentHGVS(new_HGVSg, old_HGVSg)
+                                if old_HGVSg != annot["HGVSg"]:
+                                    is_fixed_HGVSg = True
+                                # HGVSc and p
+                                if annot["Feature"]:
+                                    tr_base_acc = annot["Feature"].split(".")[0]
+                                    if tr_base_acc in HGVS_by_tr:
+                                        # HGVSc
+                                        old_HGVSc = "" if "HGVSc" not in annot or annot["HGVSc"] is None else annot["HGVSc"]
+                                        annot["HGVSc"] = getConsistentHGVS(HGVS_by_tr[tr_base_acc]["HGVSc"], old_HGVSc)
+                                        if old_HGVSc != annot["HGVSc"]:
+                                            is_fixed_HGVSc = True
+                                        # HGVSp
+                                        old_HGVSp = "" if "HGVSp" not in annot or annot["HGVSp"] is None else annot["HGVSp"]
+                                        annot["HGVSp"] = getConsistentHGVS(HGVS_by_tr[tr_base_acc]["HGVSp"], old_HGVSp)
+                                        if old_HGVSp != annot["HGVSp"]:
+                                            is_fixed_HGVSp = True
                                 new_annot.append(annot)
                         record.info[args.annotations_field] = new_annot
                         # Trace results
