@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.3.2'
+__version__ = '1.4.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -371,12 +371,12 @@ def writeJSON(out_path, shallow, args):
     with open(out_path, "w") as FH_out:
         FH_out.write("{\n")
         FH_out.write(
-            '  "parameters": {{"depth_mode": "{}", "min_depth": {}, "use_annotations": {}, "use_variants": {}, "known_min_count": {}}},\n'.format(
+            '  "parameters": {{"depth_mode": "{}", "known_min_count": {}, "min_depth": {}, "shallow_mode": "areas", "use_annotations": {}, "use_variants": {}}},\n'.format(
                 args.depth_mode,
+                args.known_min_count,
                 args.min_depth,
                 str(args.input_annotations is not None).lower(),
-                str(len(args.inputs_variants) != 0).lower(),
-                args.known_min_count
+                str(len(args.inputs_variants) != 0).lower()
             )
         )
         FH_out.write('  "results": [\n')
@@ -447,10 +447,11 @@ def writeGenesJSON(out_path, shallow, args):
             json.dumps({
                 "parameters": {
                     "depth_mode": args.depth_mode,
+                    "known_min_count": args.known_min_count,
                     "min_depth": args.min_depth,
+                    "shallow_mode": "genes",
                     "use_annotations": args.input_annotations is not None,
-                    "use_variants": len(args.inputs_variants) != 0,
-                    "known_min_count": args.known_min_count
+                    "use_variants": len(args.inputs_variants) != 0
                 },
                 "results": genes_data
             })
