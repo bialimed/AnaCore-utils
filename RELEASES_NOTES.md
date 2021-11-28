@@ -1,3 +1,9 @@
+# Release 3.5.0 [DEV]
+
+### Improvements:
+  * Manage annotations out of transcript in `bin/fixHGVSMutalyzer.py`.
+
+
 # Release 3.4.0 [2021-10-13]
 
 ### Improvements:
