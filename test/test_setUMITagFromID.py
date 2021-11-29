@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2021 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -85,8 +85,8 @@ class TestSetUMITagFromID(unittest.TestCase):
                 observed = {}
                 with pysam.AlignmentFile(self.tmp_out_bam, "rb") as reader:
                     for curr_read in reader.fetch(until_eof=True):
-                        umi_seq = curr_read.get_tag(umi_tag)
-                        observed[curr_read.query_name[:-(len(umi_seq) + 1)]] = curr_read.get_tag(umi_tag)
+                        umi_seq = curr_read.get_tag(umi_tag).replace("-", "+")
+                        observed[curr_read.query_name[:-(len(umi_seq) + 1)]] = umi_seq
                 self.assertEqual(
                     self.umi_by_read,
                     observed

@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2021 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -43,6 +43,6 @@ if __name__ == "__main__":
         with pysam.AlignmentFile(args.output_aln, "wb", header=reader.header.to_dict()) as writer:
             for curr_read in reader.fetch(until_eof=True):
                 umi_seq = curr_read.query_name.rsplit(args.umi_separator, 1)[1]
-                curr_read.set_tag(args.umi_tag, umi_seq)
+                curr_read.set_tag(args.umi_tag, umi_seq.replace("+", "-"))  # fgbio use hyphen as UMI pair separator
                 writer.write(curr_read)
     log.info("End of job")
