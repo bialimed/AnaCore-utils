@@ -1,7 +1,12 @@
 # Release 3.5.0 [DEV]
 
 ### Improvements:
+  * Now `bin/evalVariantControl.py` takes into account false positives variants
+  by default. The previous behavior can be recovered with the `--only-expected`
+  option: exclude FP from the analysis.
   * Manage annotations out of transcript in `bin/fixHGVSMutalyzer.py`.
+  * Add script to add UMI sequence in SAM RX tag from reads ID:
+  `bin/setUMITagFromID.py`.
 
 
 # Release 3.4.0 [2021-10-13]

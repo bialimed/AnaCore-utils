@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.0'
+__version__ = '2.0.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -198,7 +198,8 @@ def writeJSONResults(variants, out_path):
 ########################################################################
 if __name__ == "__main__":
     # Manage parameters
-    parser = argparse.ArgumentParser(description='Compare variant calling result to expected variants. This comparison is only processed on expected variants.')
+    parser = argparse.ArgumentParser(description='Compare variant calling result to expected variants.')
+    parser.add_argument('-n', '--only-expected', action='store_true', help='The comparison is only processed on expected variants (FP are excluded).')
     parser.add_argument('-t', '--error-threshold', type=float, default=0.2, help='In TSV output, variants with a percentage difference compared to expected frequency superior than this value are tagged "out of threshold". Difference percentage calculation: abs(1 - detected_freq/expected_freq). Examples: diff=50prct for expected_freq=0.1 and detected_freq=0.05 ; diff=300prct for expected_freq=0.1 and detected_freq=0.4. [Default: %(default)s]')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs
@@ -218,7 +219,8 @@ if __name__ == "__main__":
     all_variants = dict()
     addVCFVariants(all_variants, args.expected_file, 0)
     addVCFVariants(all_variants, args.detected_file, 1)
-    filterVarNotIn(all_variants, 0)
+    if args.only_expected:
+        filterVarNotIn(all_variants, 0)
     if args.output_file.endswith("json"):
         writeJSONResults(all_variants, args.output_file)
     else:
