@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -67,8 +67,6 @@ if __name__ == "__main__":
                                     description,
                                     "".join([chr(elt + args.qual_offset) for elt in curr_read.get_forward_qualities()])
                                 )
-                                if curr_read.is_reverse:
-                                    read = read.dnaRevCom()
                                 if curr_read.is_read1:
                                     writer_r1.write(read)
                                 else:
@@ -95,7 +93,5 @@ if __name__ == "__main__":
                                 description,
                                 "".join([chr(elt + args.qual_offset) for elt in curr_read.get_forward_qualities()])
                             )
-                            if curr_read.is_reverse:
-                                read = read.dnaRevCom()
                             writer.write(read)
     log.info("End of job")
