@@ -103,7 +103,103 @@ def filterVarNotIn(variants, vcf_idx):
         del(variants[variant_id])
 
 
-def writeTSVResults(variants, out_path, error_threshold=0.2, separator="\t"):
+def writeTSVSummary(writer, variants, error_threshold, only_expected):
+    """
+    Write comparison summary metrics.
+
+    :param writer: File handle to output.
+    :type writer: csv.writer
+    :param variants: By uniq ID the variants (see addVCFVariants).
+    :type variants: dict
+    :param error_threshold: Maximum percentage difference between expected and detected.
+    :type error_threshold: float
+    :param only_expected: If True comparison is only processed on expected variants (FP are excluded).
+    :type only_expected: bool
+    """
+    # Process summary metrics
+    summary_data = {
+        "error_ratio_sum": 0,
+        "error_values_sum": 0,
+        "nb_checked": len(variants),
+        "nb_by_status": {"TP": 0, "FP": 0, "FN": 0},
+        "nb_out_threshold": 0
+    }
+    for id, curr_variant in variants.items():
+        summary_data["nb_by_status"][curr_variant["status"]] += 1
+        # Dissimilarity
+        summary_data["error_values_sum"] += abs(curr_variant["error"])
+        summary_data["error_ratio_sum"] += curr_variant["error_ratio"]
+        # Error out of threshold
+        if curr_variant["error_ratio"] > error_threshold:
+            summary_data["nb_out_threshold"] += 1
+    # Titles
+    summary_titles = [
+        "#Nb_checked",
+        "Errors_sum",
+        "Errors_ratio_sum",
+        "Error_out_of_threshold_(" + str(error_threshold) + ")",
+        "TP",
+        "FN"
+    ]
+    if not only_expected:
+        summary_titles.append("FP")
+    writer.writerow(summary_titles)
+    # Values
+    summary_values = [
+        summary_data["nb_checked"],
+        "{:.5f}".format(summary_data["error_values_sum"]),
+        "{:.5f}".format(summary_data["error_ratio_sum"]),
+        "{}/{}".format(summary_data["nb_out_threshold"], summary_data["nb_checked"]),
+        summary_data["nb_by_status"]["TP"],
+        summary_data["nb_by_status"]["FN"]
+    ]
+    if not only_expected:
+        summary_values.append(summary_data["nb_by_status"]["FP"])
+    writer.writerow(summary_values)
+
+
+def writeTSVResByVar(writer, variants, error_threshold, idx_expec, idx_detec):
+    """
+    Write comparison for each variants.
+
+    :param writer: File handle to output.
+    :type writer: csv.writer
+    :param variants: By uniq ID the variants (see addVCFVariants).
+    :type variants: dict
+    :param error_threshold: Maximum percentage difference between expected and detected.
+    :type error_threshold: float
+    :param idx_expec: Index of the expected AF in list curr_variant["freq"].
+    :type idx_expec: int
+    :param idx_detec: Index of the observed AF in list curr_variant["freq"].
+    :type idx_detec: int
+    """
+    # Titles
+    writer.writerow([
+        "#Chr:Pos",
+        "Ref/Alt",
+        "Expected",
+        "Detected",
+        "Status"
+        "Error",
+        "Error_ratio",
+        "Out_of_threshold"
+    ])
+    # Variants
+    for variant_id in sorted(variants):
+        curr_variant = variants[variant_id]
+        writer.writerow([
+            curr_variant["chrom"] + ":" + str(curr_variant["pos"]),
+            curr_variant["ref"] + "/" + curr_variant["alt"],
+            "{:.5f}".format(curr_variant["freq"][idx_expec]),
+            "{:.5f}".format(curr_variant["freq"][idx_detec]),
+            curr_variant["status"],
+            "{:.5f}".format(curr_variant["error"]),
+            "{:.5f}".format(curr_variant["error_ratio"]),
+            (curr_variant["error_ratio"] > error_threshold)
+        ])
+
+
+def writeTSVResults(variants, out_path, error_threshold=0.2, only_expected=False, separator="\t"):
     """
     Write expected and detected fequency for each expected variant in TSV file.
 
@@ -111,60 +207,39 @@ def writeTSVResults(variants, out_path, error_threshold=0.2, separator="\t"):
     :type variants: dict
     :param out_path: Path to the output file.
     :type out_path: str
-    :param error_threshold: The maximum percentage difference between expected and detected.
+    :param error_threshold: Maximum percentage difference between expected and detected.
     :type error_threshold: float
-    :param separator: The  column separator in output file.
+    :param only_expected: If True comparison is only processed on expected variants (FP are excluded).
+    :type only_expected: bool
+    :param separator: Column separator in output file.
     :type separator: str
     """
     idx_expec = 0
     idx_detec = 1
-
-    # Process summary
-    nb_checked = len(variants)
-    nb_out_threshold = 0
-    error_ratio_sum = 0
-    error_values_sum = 0
-    for variant_id in variants:
-        current_variant = variants[variant_id]
-        error = current_variant["freq"][idx_expec] - current_variant["freq"][idx_detec]
-        error_ratio = abs(1 - (current_variant["freq"][idx_detec] / current_variant["freq"][idx_expec]))
-        # Dissimilarity
-        error_values_sum += abs(error)
-        error_ratio_sum += error_ratio
-        # Error out of threshold
-        if error_ratio > error_threshold:
-            nb_out_threshold += 1
-
+    # Process error, status and summary metrics
+    for id, curr_variant in variants.items():
+        exp_AF = curr_variant["freq"][idx_expec]
+        obs_AF = curr_variant["freq"][idx_detec]
+        # Error
+        curr_variant["error"] = exp_AF - obs_AF
+        curr_variant["error_ratio"] = 1 if exp_AF == 0 else abs(1 - (obs_AF / exp_AF))
+        # Status
+        curr_variant["status"] = "TP"
+        if exp_AF == 0:
+            curr_variant["status"] = "FP"
+        elif obs_AF == 0:
+            curr_variant["status"] = "FN"
     # Write
     with open(out_path, "w") as FH_out:
         FH_csv = csv.writer(FH_out, delimiter=separator)
         # Summary section
         FH_csv.writerow(["[Summary]"])
-        FH_csv.writerow(["#Nb_checked", "Errors_sum", "Errors_ratio_sum", "Error_out_of_threshold_(" + str(error_threshold) + ")"])
-        FH_csv.writerow([
-            nb_checked,
-            error_values_sum,
-            error_ratio_sum,
-            str(nb_out_threshold) + "/" + str(nb_checked)
-        ])
+        writeTSVSummary(FH_csv, variants, error_threshold, only_expected)
         # Section separator
         FH_csv.writerow([])
         # Details section
         FH_csv.writerow(["[Details]"])
-        FH_csv.writerow(["#Chr:Pos", "Ref/Alt", "Expected", "Detected", "Error", "Error_ratio", "Out_of_threshold"])
-        for variant_id in sorted(variants):
-            current_variant = variants[variant_id]
-            error = current_variant["freq"][idx_expec] - current_variant["freq"][idx_detec]
-            error_ratio = abs(1 - (current_variant["freq"][idx_detec] / current_variant["freq"][idx_expec]))
-            FH_csv.writerow([
-                current_variant["chrom"] + ":" + str(current_variant["pos"]),
-                current_variant["ref"] + "/" + current_variant["alt"],
-                current_variant["freq"][idx_expec],
-                current_variant["freq"][idx_detec],
-                error,
-                error_ratio,
-                (error_ratio > error_threshold)
-            ])
+        writeTSVResByVar(FH_csv, variants, error_threshold, idx_expec, idx_detec)
 
 
 def writeJSONResults(variants, out_path):
