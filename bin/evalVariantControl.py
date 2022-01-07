@@ -179,7 +179,7 @@ def writeTSVResByVar(writer, variants, error_threshold, idx_expec, idx_detec):
         "Ref/Alt",
         "Expected",
         "Detected",
-        "Status"
+        "Status",
         "Error",
         "Error_ratio",
         "Out_of_threshold"

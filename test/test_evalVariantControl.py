@@ -79,7 +79,7 @@ class EvalVariantControl(unittest.TestCase):
 4	0.11200	2.45000	4/4	3	1	0
 
 [Details]
-#Chr:Pos	Ref/Alt	Expected	Detected	StatusError	Error_ratio	Out_of_threshold
+#Chr:Pos	Ref/Alt	Expected	Detected	Status	Error	Error_ratio	Out_of_threshold
 12:25225628	C/T	0.05000	0.04000	TP	0.01000	0.20000	True
 7:140753336	A/T	0.08000	0.06000	TP	0.02000	0.25000	True
 7:140753337	C/T	0.04000	0.08000	TP	-0.04000	1.00000	True
@@ -104,7 +104,7 @@ class EvalVariantControl(unittest.TestCase):
 5	0.13200	3.45000	5/5	3	1	1
 
 [Details]
-#Chr:Pos	Ref/Alt	Expected	Detected	StatusError	Error_ratio	Out_of_threshold
+#Chr:Pos	Ref/Alt	Expected	Detected	Status	Error	Error_ratio	Out_of_threshold
 12:25225628	C/T	0.05000	0.04000	TP	0.01000	0.20000	True
 7:140753336	A/T	0.08000	0.06000	TP	0.02000	0.25000	True
 7:140753337	C/T	0.04000	0.08000	TP	-0.04000	1.00000	True
