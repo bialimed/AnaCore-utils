@@ -1,25 +1,9 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2017 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.4.1'
+__version__ = '2.4.2'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -99,13 +83,20 @@ def getADPReads(chrom, pos, ref, alt, aln_file, selected_RG=None):
     """
     ref_start = pos
     ref_end = pos + len(ref.replace("-", "")) - 1
-    if selected_RG is not None: selected_RG = {RG: 1 for RG in selected_RG}
+    if selected_RG is not None:
+        selected_RG = {RG: 1 for RG in selected_RG}
     # Retrieve reads
     inspect_start = ref_start - 1
     inspect_end = ref_end
     reads = dict()
     with pysam.AlignmentFile(aln_file, "rb") as FH_sam:
-        for pileupcolumn in FH_sam.pileup(chrom, inspect_start, inspect_end, max_depth=100000):
+        for pileupcolumn in FH_sam.pileup(
+            chrom,
+            inspect_start,
+            inspect_end,
+            max_depth=100000,
+            ignore_overlaps=False  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
+        ):
             for pileupread in pileupcolumn.pileups:
                 if selected_RG is None or (pileupread.alignment.get_tag("RG") in selected_RG):
                     if not pileupread.alignment.is_secondary:
@@ -257,11 +248,18 @@ def getAlnAndQual(aln_file, chrom, inspect_start, inspect_end, selected_RG, max_
               provide inspected_start equal to the previous position of the insertion (example:
               position of A in A/ATC).
     """
-    if selected_RG is not None: selected_RG = {RG: 1 for RG in selected_RG}
+    if selected_RG is not None:
+        selected_RG = {RG: 1 for RG in selected_RG}
     reads = dict()
     quals = dict()
     with pysam.AlignmentFile(aln_file, "rb") as FH_sam:
-        for pileupcolumn in FH_sam.pileup(chrom, inspect_start, inspect_end, max_depth=max_depth):
+        for pileupcolumn in FH_sam.pileup(
+            chrom,
+            inspect_start,
+            inspect_end,
+            max_depth=max_depth,
+            ignore_overlaps=False  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
+        ):
             for pileupread in pileupcolumn.pileups:
                 if selected_RG is None or (pileupread.alignment.get_tag("RG") in selected_RG):
                     if not pileupread.alignment.is_secondary:
@@ -506,4 +504,4 @@ if __name__ == "__main__":
             curr_var.info["AF"][0] = round(curr_var.info["AD"][0] / curr_var.info["DP"], args.AF_precision)
             # Write variant
             FH_out.write(curr_var)
-    logging.info("End of process")
+    logging.info("End of job")

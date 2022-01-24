@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2021 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -53,7 +53,13 @@ def depthsTargets(aln_path, targets, depth_mode, min_depths, log):
             target_depths = []
             for curr_sub_region in curr_target["locations"]:
                 curr_checked = curr_sub_region.start - 1
-                for pileupcolumn in FH_bam.pileup(curr_sub_region.reference.name, curr_sub_region.start - 1, curr_sub_region.end, max_depth=100000000):
+                for pileupcolumn in FH_bam.pileup(
+                    curr_sub_region.reference.name,
+                    curr_sub_region.start - 1,
+                    curr_sub_region.end,
+                    max_depth=100000000,
+                    ignore_overlaps=False  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
+                ):
                     if pileupcolumn.reference_pos + 1 >= curr_sub_region.start and pileupcolumn.reference_pos + 1 <= curr_sub_region.end:
                         # Missing positions
                         while curr_checked < pileupcolumn.reference_pos:

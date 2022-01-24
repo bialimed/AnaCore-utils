@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.0'
+__version__ = '1.4.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -112,7 +112,13 @@ def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_depth, log)
             idx_in_part += 1
             prev_opened = {"start": None, "end": None}
             curr_checked = region.start - 1
-            for pileupcolumn in FH_bam.pileup(region.reference.name, region.start - 1, region.end, max_depth=100000000):
+            for pileupcolumn in FH_bam.pileup(
+                region.reference.name,
+                region.start - 1,
+                region.end,
+                max_depth=100000000,
+                ignore_overlaps=False  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
+            ):
                 if pileupcolumn.reference_pos + 1 >= region.start and pileupcolumn.reference_pos + 1 <= region.end:
                     # Missing positions
                     while curr_checked < pileupcolumn.reference_pos:

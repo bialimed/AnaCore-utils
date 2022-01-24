@@ -8,6 +8,12 @@
   * Add script to add UMI sequence in SAM RX tag from reads ID:
   `bin/setUMITagFromID.py`.
 
+### Bug fixes:
+  * Fix bug on depths in `bin/depthsPanel.py`, `bin/inspectBND.py`,
+  `bin/mergeVCF.py`, `bin/mergeVCFAmpli.py` and `bin/shallowsAnalysis.py`. In
+  overlapping read pairs, overlapping bases were only taken into account for one
+  of the reads.
+
 
 # Release 3.4.0 [2021-10-13]
 

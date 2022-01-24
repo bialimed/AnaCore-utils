@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -191,7 +191,8 @@ def getDepths(reader_aln, region):
         region.start - 1,  # 0-based
         region.end,  # 1-based
         truncate=True,
-        max_depth=1000000
+        max_depth=1000000,
+        ignore_overlaps=False  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
     ):  # By defaul filter out unmap, secondary, qcfail and duplicate
         pileup_pos = aln_col.pos + 1  # 0-based
         while expected_pos != pileup_pos:  # Take into account positions without alingment
@@ -226,7 +227,8 @@ def getStrandedDepths(reader_aln, region):
         region.start - 1,  # 0-based
         region.end,  # 1-based
         truncate=True,
-        max_depth=1000000
+        max_depth=1000000,
+        ignore_overlaps=False  # Prevent bases qualities modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
     ):  # By defaul filter out unmap, secondary, qcfail and duplicate
         pileup_pos = aln_col.pos + 1  # 0-based
         while expected_pos != pileup_pos:  # Take into account positions without alingment
