@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.1.0'
+__version__ = '2.1.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -42,7 +42,7 @@ def getAlnCmp(read, ref_seq):
     for operation_id, operation_lg in read.cigartuples:
         for operation_pos in range(operation_lg):
             if operation_id != 5 and operation_id != 4:  # Is not clipped
-                if operation_id in [0, 7, 8]:  # Match or mismatch
+                if operation_id in {0, 7, 8}:  # Match or mismatch
                     read_aln.append(read_seq.pop(0))
                     ref_aln.append(ref_seq.pop(0))
                 elif operation_id == 1:  # Insertion
@@ -51,8 +51,8 @@ def getAlnCmp(read, ref_seq):
                     read_aln.append("")
                     ref_aln.append(ref_seq.pop(0))
                 elif operation_id == 3:  # Refskip ########################### Are the introns in the variant ?
-                    # next nt in ref but current read
-                    ref_aln.pop(0)
+                    # next nt in ref but not in current read
+                    ref_seq.pop(0)
                 elif operation_id == 9:  # Back (www.seqanswers.com/forums/showthread.php?t=34440)
                     raise Exception("Parsing error on read {}. The management for the CIGAR operator B is not implemented.".format(read.query_name))
                 # elif operation_id == 6:  # Padding

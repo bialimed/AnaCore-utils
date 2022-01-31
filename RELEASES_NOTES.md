@@ -9,6 +9,7 @@
   `bin/setUMITagFromID.py`.
 
 ### Bug fixes:
+  * Fix bug with refskip for spliced alignment in `mergeCoOccurVar.py`.
   * Fix bug on depths in `bin/depthsPanel.py`, `bin/inspectBND.py`,
   `bin/mergeVCF.py`, `bin/mergeVCFAmpli.py` and `bin/shallowsAnalysis.py`. In
   overlapping read pairs, overlapping bases were only taken into account for one
