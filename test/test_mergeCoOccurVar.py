@@ -15,13 +15,14 @@ import tempfile
 import unittest
 from anacore.vcf import VCFRecord, HeaderFormatAttr, HeaderInfoAttr
 from anacore.sequenceIO import IdxFastaIO
-from mergeCoOccurVar import mergedRecord, getIncludingReads, getSupportingReads, setRefPos
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_DIR = os.path.dirname(TEST_DIR)
 BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
+
+from mergeCoOccurVar import mergedRecord, getIncludingReads, getSupportingReads, setRefPos
 
 
 ########################################################################
@@ -301,7 +302,7 @@ insDelNoStd_CAAA/CGTGA_2_alt	0	chr1	3	60	15M3I1M2D103M	*	0	0	AAGCCCTGATCACGCGTGA
                         sorted(first.supporting_reads),
                         expected
                     )
-                    # Check supporting first
+                    # Check supporting second
                     expected = sorted([
                         "{}_{}".format(second.id, curr_suffix) for curr_suffix in ["1_alt", "2_alt", "5_mixDown"]
                     ])

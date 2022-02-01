@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.1.1'
+__version__ = '2.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -40,23 +40,26 @@ def getAlnCmp(read, ref_seq):
     ref_seq = [elt for elt in ref_seq]  # reference sequence on alignment (read.get_reference_sequence() can be incorrect)
     read_seq = [elt for elt in read.query_alignment_sequence]  # query sequence without clipped
     for operation_id, operation_lg in read.cigartuples:
-        for operation_pos in range(operation_lg):
-            if operation_id != 5 and operation_id != 4:  # Is not clipped
-                if operation_id in {0, 7, 8}:  # Match or mismatch
-                    read_aln.append(read_seq.pop(0))
-                    ref_aln.append(ref_seq.pop(0))
-                elif operation_id == 1:  # Insertion
-                    read_aln[-1] += read_seq.pop(0)
-                elif operation_id == 2:  # Deletion
-                    read_aln.append("")
-                    ref_aln.append(ref_seq.pop(0))
-                elif operation_id == 3:  # Refskip ########################### Are the introns in the variant ?
-                    # next nt in ref but not in current read
-                    ref_seq.pop(0)
-                elif operation_id == 9:  # Back (www.seqanswers.com/forums/showthread.php?t=34440)
-                    raise Exception("Parsing error on read {}. The management for the CIGAR operator B is not implemented.".format(read.query_name))
-                # elif operation_id == 6:  # Padding
-                #     pass
+        if operation_id != 5 and operation_id != 4:  # Is not clipped
+            if operation_id in {0, 7, 8}:  # Match or mismatch
+                read_aln.extend(read_seq[:operation_lg])
+                read_seq = read_seq[operation_lg:]
+                ref_aln.extend(ref_seq[:operation_lg])
+                ref_seq = ref_seq[operation_lg:]
+            elif operation_id == 1:  # Insertion
+                read_aln[-1] += "".join(read_seq[:operation_lg])
+                read_seq = read_seq[operation_lg:]
+            elif operation_id == 2:  # Deletion
+                read_aln.extend(["" for operation_pos in range(operation_lg)])
+                ref_aln.extend(ref_seq[:operation_lg])
+                ref_seq = ref_seq[operation_lg:]
+            elif operation_id == 3:  # Refskip ########################### Are the introns in the variant ?
+                # next nt in ref but not in current read
+                ref_seq = ref_seq[operation_lg:]
+            elif operation_id == 9:  # Back (www.seqanswers.com/forums/showthread.php?t=34440)
+                raise Exception("Parsing error on read {}. The management for the CIGAR operator B is not implemented.".format(read.query_name))
+            # elif operation_id == 6:  # Padding
+            #     pass
     return ref_aln, read_aln
 
 
