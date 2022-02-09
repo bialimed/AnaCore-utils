@@ -10,7 +10,7 @@ def get_version():
     if os.path.exists(notes_filepath):
         with open(notes_filepath) as FH:
             first_line = FH.readline()
-            version = re.search("^\#\s+.+\s+(.+)\s+\[", first_line).groups()[0]  # Example: "# v2.5.0 [DEV]"
+            version = re.search(r"^\#\s+.+\s+(.+)\s+\[", first_line).groups()[0]  # Example: "# v2.5.0 [DEV]"
     return version
 
 
@@ -43,6 +43,7 @@ setup(
     author_email='escudie.frederic@iuct-oncopole.fr',
     license='GNU GPL v3',
     packages=["bin"],
+    python_requires='>=3.5',
     install_requires=load_requirements("requirements.txt"),
     scripts=load_scripts("bin")
 )
