@@ -1,6 +1,9 @@
 # Release 3.5.0 [DEV]
 
 ### Improvements:
+  * Change JSON structure from `bin/fusionsToJSON.py` to improve usage in
+  document databases: replacement of the dict feature_by_id by a list with _id
+  in each feature.
   * Now `bin/evalVariantControl.py` takes into account false positives variants
   by default. The previous behavior can be recovered with the `--only-expected`
   option: exclude FP from the analysis.

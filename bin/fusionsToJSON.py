@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.3.0'
+__version__ = '2.0.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -32,12 +32,13 @@ def getBreakendInfo(record, annot_field="ANN", assembly_id=None):
         "assembly": (None if assembly_id is None else assembly_id),
         "strand": getStrand(record)
     }
-    features = {}
+    features = []
     for idx, feature in enumerate(record.info[annot_field]):
         cp_feature = deepcopy(feature)
+        cp_feature["_id"] = idx
         del(cp_feature["IN_FRAME"])
-        features[str(idx)] = cp_feature
-    return {"coordinates": coordinates, "features_by_id": features}
+        features.append(cp_feature)
+    return {"coordinates": coordinates, "features": features}
 
 
 def getSupportMergedSources(record, id_by_src):
@@ -91,14 +92,14 @@ def getFusionAnnot(record, mate, annot_field="ANN"):
         if len(mate.info[annot_field]) != 0:  # record: no annot ; mate: annot
             for mate_idx, mate_annot in enumerate(mate.info[annot_field]):
                 fusion_annot.append({
-                    "features_annotation": [None, str(mate_idx)],
+                    "features_annotation": [None, mate_idx],
                     "inframe": "."
                 })
     else:
         if len(mate.info[annot_field]) == 0:  # record: annot ; mate: no annot
             for record_idx, record_annot in enumerate(record.info[annot_field]):
                 fusion_annot.append({
-                    "features_annotation": [str(record_idx), None],
+                    "features_annotation": [record_idx, None],
                     "inframe": "."
                 })
         else:  # record: annot ; mate: annot
@@ -113,7 +114,7 @@ def getFusionAnnot(record, mate, annot_field="ANN"):
                     inframe_by_partner[partner] = inframe
                 for mate_idx, mate_annot in enumerate(mate.info[annot_field]):
                     fusion_annot.append({
-                        "features_annotation": [str(record_idx), str(mate_idx)],
+                        "features_annotation": [record_idx, mate_idx],
                         "inframe": inframe_by_partner[mate_annot["Feature"]]
                     })
     return fusion_annot
