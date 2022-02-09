@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.2'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -161,8 +161,7 @@ def getAnnotByGene(tr_by_id, in_alignments, in_variants, stranded=None, annotati
                             if gene_id not in annot_by_gene_id:
                                 annot_by_gene_id[gene_id] = {
                                     "name": gene_id,
-                                    "transcripts": [],
-                                    "annot": {}
+                                    "transcripts": []
                                 }
                             annot_by_gene_id[gene_id]["transcripts"].append({
                                 "name": tr_id,
