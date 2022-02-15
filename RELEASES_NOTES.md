@@ -12,7 +12,9 @@
   `bin/setUMITagFromID.py`.
 
 ### Bug fixes:
-  * Fix bug with refskip for spliced alignment in `mergeCoOccurVar.py`.
+  * Fix bug with insertion and substitution of same nucleotid at same position
+  in `bin/evalVariantControl.py`. Example: with *1:587874=A/T* and *1:587874=./T*
+  only the last in VCF was taking into account.
   * Fix bug on depths in `bin/depthsPanel.py`, `bin/inspectBND.py`,
   `bin/mergeVCF.py`, `bin/mergeVCFAmpli.py` and `bin/shallowsAnalysis.py`. In
   overlapping read pairs, overlapping bases were only taken into account for one

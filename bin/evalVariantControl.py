@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -29,19 +29,19 @@ def addVCFVariants(variants, vcf_path, vcf_idx, spl_name=None):
     :param variants: By uniq ID the variants. The content of this variable is set by the call of this function.
                      Content example:
                      {
-                       "chr1:10=T":{
+                       "chr1:10=A/T":{
                          "chrom":"chr1",
                          "pos":10,
                          "ref":"A",
                          "alt":"T",
                          "freq":[0.2, 0.5] },
-                       "chr1:10=G":{
+                       "chr1:10=A/G":{
                          "chrom":"chr1",
                          "pos":10,
                          "ref":"A",
                          "alt":"G",
                          "freq":[0.01, 0] },
-                       "chr3:20=T":{
+                       "chr3:20=G/T":{
                          "chrom":"chr3",
                          "pos":20,
                          "ref":"G",
@@ -66,7 +66,7 @@ def addVCFVariants(variants, vcf_path, vcf_idx, spl_name=None):
             for idx_alt, alt in enumerate(record.alt):
                 allele_record = getAlleleRecord(FH_vcf, record, idx_alt)
                 allele_record.normalizeSingleAllele()
-                variant_id = allele_record.chrom + ":" + str(allele_record.pos) + "=" + allele_record.alt[0]
+                variant_id = allele_record.getName()
                 if variant_id not in variants:
                     variants[variant_id] = {
                         "chrom": allele_record.chrom,
