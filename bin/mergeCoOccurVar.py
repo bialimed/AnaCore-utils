@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.2.0'
+__version__ = '2.2.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -56,6 +56,8 @@ def getAlnCmp(read, ref_seq):
             elif operation_id == 3:  # Refskip ########################### Are the introns in the variant ?
                 # next nt in ref but not in current read
                 ref_seq = ref_seq[operation_lg:]
+                ref_aln.extend(["/" for operation_pos in range(operation_lg)])
+                read_aln.extend(["/" for operation_pos in range(operation_lg)])
             elif operation_id == 9:  # Back (www.seqanswers.com/forums/showthread.php?t=34440)
                 raise Exception("Parsing error on read {}. The management for the CIGAR operator B is not implemented.".format(read.query_name))
             # elif operation_id == 6:  # Padding
@@ -132,12 +134,14 @@ def getReadRefAlt(ref_aln, read_aln, ref_start, target_is_ins, target_start, tar
     return ref, alt
 
 
-def getIncludingReads(FH_aln, chrom_id, target_start, target_end):
+def getIncludingReadsDNA(FH_aln, FH_seq, chrom_id, target_start, target_end):
     """
     Return read ID of reads including the target.
 
     :param FH_aln: The file handle to the alignments file.
     :type FH_aln: pysam.AlignmentFile
+    :param FH_seq: File handle to the refersence sequence file. Unused in this function but add to keep the same interface with getIncludingReadsRNA.
+    :type FH_seq: IdxFastaIO
     :param chrom_id: Chromosome ID.
     :type chrom_id: str
     :param target_start: Start position for target.
@@ -160,14 +164,49 @@ def getIncludingReads(FH_aln, chrom_id, target_start, target_end):
     return including_reads
 
 
-def getSupportingReads(var, chrom_seq, FH_aln, log):
+def getIncludingReadsRNA(FH_aln, FH_seq, chrom_id, target_start, target_end):
+    """
+    Return read ID of reads including the target.
+
+    :param FH_aln: File handle to the alignments file.
+    :type FH_aln: pysam.AlignmentFile
+    :param FH_seq: File handle to the refersence sequence file.
+    :type FH_seq: IdxFastaIO
+    :param chrom_id: Chromosome ID.
+    :type chrom_id: str
+    :param target_start: Start position for target.
+    :type target_start: int
+    :param target_end: End position for target.
+    :type target_end: int
+    :return: Reads IDs of reads including the target.
+    :rtype: set
+    """
+    including_reads = set()
+    for read in FH_aln.fetch(chrom_id, target_start - 1, target_end):
+        if not read.is_duplicate:
+            reads_pos = read.get_reference_positions()
+            if len(reads_pos) != 0:  # Skip alignment with problem
+                ref_start = reads_pos[0] + 1  # 0-based to 1-based
+                ref_end = reads_pos[-1] + 1  # 0-based to 1-based
+                includes = (ref_start <= target_start and ref_end >= target_end)
+                if includes:
+                    ref_aln, read_aln = getAlnCmp(read, FH_seq.getSub(chrom_id, ref_start, ref_end))
+                    target_ref_aln = ref_aln[target_start - ref_start:target_end - ref_start + 1]
+                    if "/" not in set(target_ref_aln):
+                        including_reads.add(read.query_name)
+    return including_reads
+
+
+def getSupportingReads(var, FH_seq, chrom_id, FH_aln, log):
     """
     Return read ID of reads supporting the altenative variant.
 
     :param var: The variant.
     :type var: anacore.vcf.VCFRecord updated with iniVariant() and isIns
-    :param chrom_seq: The sequence of the chromosome.
-    :type chrom_seq: str
+    :param FH_seq: File handle to the refersence sequence file.
+    :type FH_seq: IdxFastaIO
+    :param chrom_id: Chromosome ID.
+    :type chrom_id: str
     :param FH_aln: The file handle to the alignments file. The variants must have been defined from this alignments file.
     :type FH_aln: pysam.AlignmentFile
     :param log: The logger object.
@@ -185,7 +224,7 @@ def getSupportingReads(var, chrom_seq, FH_aln, log):
                 ref_end = reads_pos[-1] + 1  # 0-based to 1-based
                 overlap_var = (ref_start <= var.upstream_start and ref_end >= var.downstream_end)
                 if overlap_var:
-                    ref_aln, read_aln = getAlnCmp(read, chrom_seq[ref_start - 1:ref_end])
+                    ref_aln, read_aln = getAlnCmp(read, FH_seq.getSub(chrom_id, ref_start, ref_end))
                     var_alt = var.alt[0].upper().replace(VCFRecord.getEmptyAlleleMarker(), "")
                     var_ref = var.ref.upper().replace(VCFRecord.getEmptyAlleleMarker(), "")
                     # Test with upstream coordinates
@@ -274,7 +313,7 @@ def traceMerge(record, intersection_rate, intersection_count):
     record.info["MCO_IC"].append(intersection_count)
 
 
-def mergedRecord(vcf, first, first_std_name, second, second_std_name, ref_seq):
+def mergedRecord(vcf, first, first_std_name, second, second_std_name, FH_seq, chrom_id):
     """
     Return the VCFRecord corresponding to the merge of first and second.
 
@@ -288,8 +327,10 @@ def mergedRecord(vcf, first, first_std_name, second, second_std_name, ref_seq):
     :type second: anacore.vcf.VCFRecord
     :param second_std_name: The initial name of the downstream variant to merge (before normalisation).
     :type second_std_name: str
-    :param ref_seq: The sequence of the chromosome.
-    :type ref_seq: str
+    :param FH_seq: File handle to the refersence sequence file.
+    :type FH_seq: IdxFastaIO
+    :param chrom_id: Chromosome ID.
+    :type chrom_id: str
     :return: The variant corresponding to the merge of first and second.
     :rtype: anacore.vcf.VCFRecord
     :todo: Keep INFO and format on strand from FreeBayes, VarDict, ...
@@ -304,7 +345,7 @@ def mergedRecord(vcf, first, first_std_name, second, second_std_name, ref_seq):
     second_start = int(round(second.refStart() + 0.49, 0))
     ref_add = ""
     if second_start - first_end > 0:
-        ref_add = ref_seq[first_end:second_start - 1]
+        ref_add = FH_seq.getSub(chrom_id, first_end + 1, second_start - 1)
     merged.ref = first.ref + ref_add + second.ref
     merged.ref = merged.ref.replace(VCFRecord.getEmptyAlleleMarker(), "")
     merged.alt = [first.alt[0] + ref_add + second.alt[0]]
@@ -408,12 +449,13 @@ if __name__ == "__main__":
     """
     # Manage parameters
     parser = argparse.ArgumentParser(description='Groups variants occuring in same reads.')
-    parser.add_argument('-v', '--version', action='version', version=__version__)
-    parser.add_argument('-l', '--logging-level', default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], action=LoggerAction, help='The logger level. [Default: %(default)s]')
-    parser.add_argument('-r', '--intersection-rate', default=0.9, type=float, help='Minimum ratio of co-occurancy (nb_reads_containing_the_two_variants / nb_reads_overlapping_the_two_variants_but_containing_only_one). [Default: %(default)s]')
-    parser.add_argument('-n', '--intersection-count', default=3, type=int, help='Minimum number of reads containing co-occurancy. [Default: %(default)s]')
-    parser.add_argument('-f', '--AF-diff-rate', default=0.2, type=float, help='Maximum difference rate between AF of two merged variants. [Default: %(default)s]')
     parser.add_argument('-d', '--max-distance', default=10, type=int, help='Maximum distance between two merged variants. [Default: %(default)s]')
+    parser.add_argument('-f', '--AF-diff-rate', default=0.2, type=float, help='Maximum difference rate between AF of two merged variants. [Default: %(default)s]')
+    parser.add_argument('-l', '--logging-level', default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], action=LoggerAction, help='The logger level. [Default: %(default)s]')
+    parser.add_argument('-n', '--intersection-count', default=3, type=int, help='Minimum number of reads containing co-occurancy. [Default: %(default)s]')
+    parser.add_argument('-p', '--spliced-aln', action='store_true', help='Use this option to manage spliced alignment.')
+    parser.add_argument('-r', '--intersection-rate', default=0.9, type=float, help='Minimum ratio of co-occurancy (nb_reads_containing_the_two_variants / nb_reads_overlapping_the_two_variants_but_containing_only_one). [Default: %(default)s]')
+    parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-a', '--input-aln', required=True, help='Path to the alignment file (format: BAM).')
     group_input.add_argument('-i', '--input-variants', required=True, help='Path to the variants file (format: VCF). Variants must be ordered by position and should be move to upstream.')
@@ -429,7 +471,8 @@ if __name__ == "__main__":
     log.info("Command: " + " ".join(sys.argv))
 
     # Merge variants
-    with IdxFastaIO(args.input_sequences, use_cache=True) as FH_seq:
+    getIncludingReads = getIncludingReadsRNA if args.spliced_aln else getIncludingReadsDNA
+    with IdxFastaIO(args.input_sequences) as FH_seq:
         with VCFIO(args.output_variants, "w") as FH_out:
             with pysam.AlignmentFile(args.input_aln, "rb") as FH_aln:
                 with VCFIO(args.input_variants) as FH_vcf:
@@ -476,13 +519,13 @@ if __name__ == "__main__":
                                         if AF_diff <= args.AF_diff_rate:  # The two records have similar frequencies
                                             # Set supporting reads
                                             if prev.supporting_reads is None:
-                                                prev.supporting_reads = getSupportingReads(prev, chrom_seq, FH_aln, log)
+                                                prev.supporting_reads = getSupportingReads(prev, FH_seq, curr.chrom, FH_aln, log)
                                             if curr.supporting_reads is None:
-                                                curr.supporting_reads = getSupportingReads(curr, chrom_seq, FH_aln, log)
-                                            shared_reads = getIncludingReads(FH_aln, curr.chrom, min(prev.upstream_start, curr.upstream_start), max(prev.downstream_end, curr.downstream_end))
+                                                curr.supporting_reads = getSupportingReads(curr, FH_seq, curr.chrom, FH_aln, log)
+                                            shared_reads = getIncludingReads(FH_aln, FH_seq, curr.chrom, min(prev.upstream_start, curr.upstream_start), max(prev.downstream_end, curr.downstream_end))
                                             # Check co-occurence
                                             if len(shared_reads) == 0:
-                                                log.warning("Nothing read overlapp the two evaluated variants: {} and {}. In this condition the merge cannot be evaluated.".format(prev.getName(), curr.getName()))
+                                                log.warning("No read overlap the two evaluated variants: {} and {}. In this condition the merge cannot be evaluated.".format(prev.getName(), curr.getName()))
                                             else:
                                                 prev_support_shared = (prev.supporting_reads & shared_reads)
                                                 curr_support_shared = (curr.supporting_reads & shared_reads)

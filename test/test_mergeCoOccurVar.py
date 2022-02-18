@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.1.0'
+__version__ = '2.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -22,7 +22,8 @@ BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
-from mergeCoOccurVar import mergedRecord, getIncludingReads, getSupportingReads, setRefPos
+from mergeCoOccurVar import getIncludingReadsDNA, getIncludingReadsRNA, \
+    getSupportingReads, mergedRecord, setRefPos
 
 
 ########################################################################
@@ -36,6 +37,133 @@ class LoggerSilencer:
 
     def info(self, args):
         pass
+
+
+class getIncludingReads(unittest.TestCase):
+    def tearDown(self):
+        # Clean temporary files
+        for curr_file in [self.tmp_fasta_path, self.tmp_faidx_path, self.tmp_sam_path, self.tmp_bam_path, self.tmp_bam_path + ".bai"]:
+            if os.path.exists(curr_file):
+                os.remove(curr_file)
+
+    def setUp(self):
+        tmp_folder = tempfile.gettempdir()
+        unique_id = str(uuid.uuid1())
+        self.tmp_sam_path = os.path.join(tmp_folder, unique_id + ".sam")
+        self.tmp_bam_path = os.path.join(tmp_folder, unique_id + ".bam")
+        #               11  15   20        30        40        50        60        70        80        90        100
+        # pos 1 3 5 7 9 | 13|    |         |         |         |   54    |         |      77 |         |         |
+        # ref TCTGGAAGCCCTGATCACGCCACTCTCGGCATGCCGATTAAGTGTGCTCTGAACAGGACGAACTGGATTTCCTCATGGAAGCCCTGATCATCAGCAAATTCAACCACCAGAACATTGTTCGCTGCATCT
+        # aln    GGAAGCCCTGATCACGCCACTCTCGGCATGCCGATTAAGTGTGCTCTGAA///////////////////////GGAAGCCCTGATCATCAGCAAATTCAACCACCAGAACATTGTTCGCTGCA
+        # Write BAM
+        with open(self.tmp_sam_path, "w") as FH_sam:
+            FH_sam.write("""@SQ	SN:chr1	LN:131
+@PG	ID:bwa	PN:bwa	VN:0.7.17-r1188	CL:bwa mem ref.fa reads.fa
+read1	0	chr1	4	60	50M23N50M	*	0	0	GGAAGCCCTGATCACGCCACTCTCGGCATGCCGATTAAGTGTGCTCTGAAGGAAGCCCTGATCATCAGCAAATTCAACCACCAGAACATTGTTCGCTGCA	*	NM:i:0	MD:Z:100	AS:i:90	XS:i:0
+read2	0	chr1	4	60	123M	*	0	0	GGAAGCCCTGATCACGCCACTCTCGGCATGCCGATTAAGTGTGCTCTGAACAGGACGAACTGGATTTCCTCATGGAAGCCCTGATCATCAGCAAATTCAACCACCAGAACATTGTTCGCTGCA	*	NM:i:0	MD:Z:123	AS:i:113	XS:i:0
+read3	0	chr1	4	60	50M23N50M	*	0	0	GGAAGCCCTGATCACGCCACTCTCGGCATGCCGATTAAGTGTGCTCTGAAGGAAGCCCTGATCATCAGCAAATTCAACCACCAGAACATTGTTCGCTGCA	*	NM:i:0	MD:Z:100	AS:i:90	XS:i:0""")
+        with pysam.AlignmentFile(self.tmp_sam_path) as FH_sam:
+            with pysam.AlignmentFile(self.tmp_bam_path, "wb", template=FH_sam) as FH_bam:
+                for rec in FH_sam:
+                    FH_bam.write(rec)
+        pysam.index(self.tmp_bam_path)
+        # Reference seq
+        self.tmp_fasta_path = os.path.join(tmp_folder, unique_id + ".fa")
+        self.tmp_faidx_path = os.path.join(tmp_folder, unique_id + ".fa.fai")
+        with open(self.tmp_fasta_path, "w") as FH_seq:
+            FH_seq.write(""">chr1
+TCTGGAAGCCCTGATCACGCCACTCTCGGCATGCCGATTAAGTGTGCTCTGAACAGGACGAACTGGATTTCCTCATGGAAGCCCTGATCATCAGCAAATTCAACCACCAGAACATTGTTCGCTGCATCT""")
+        with open(self.tmp_faidx_path, "w") as FH_faidx:
+            FH_faidx.write("chr1\t123\t6\t200\t201")
+
+    def testRNA(self):
+        with pysam.AlignmentFile(self.tmp_bam_path) as FH_aln:
+            with IdxFastaIO(self.tmp_fasta_path) as FH_seq:
+                # Start of alignments
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 1, 2)),
+                    0
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 1, 1)),
+                    0
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 2, 2)),
+                    0
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 3, 3)),
+                    0
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 3, 8)),
+                    0
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 4, 4)),
+                    3
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 4, 8)),
+                    3
+                )
+                # End of alignments
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 129, 129)),
+                    0
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 127, 127)),
+                    0
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 125, 128)),
+                    0
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 126, 126)),
+                    3
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 123, 126)),
+                    3
+                )
+                # Start of skip
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 53, 53)),
+                    3
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 54, 54)),
+                    1
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 50, 57)),
+                    1
+                )
+                # End of skip
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 76, 76)),
+                    1
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 77, 77)),
+                    3
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 71, 80)),
+                    1
+                )
+                # Over skip
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 53, 77)),
+                    1
+                )
+                self.assertEqual(
+                    len(getIncludingReadsRNA(FH_aln, FH_seq, "chr1", 54, 76)),
+                    1
+                )
 
 
 class SetSupportingReads(unittest.TestCase):
@@ -291,9 +419,9 @@ insDelNoStd_CAAA/CGTGA_2_alt	0	chr1	3	60	15M3I1M2D103M	*	0	0	AAGCCCTGATCACGCGTGA
                     setRefPos(second, FH_seq)
                     first.isIns = first.isInsertion()
                     second.isIns = second.isInsertion()
-                    shared_reads = getIncludingReads(FH_aln, "chr1", first.upstream_start, second.downstream_end)
-                    first.supporting_reads = getSupportingReads(first, self.ref_seq, FH_aln, LoggerSilencer()) & shared_reads
-                    second.supporting_reads = getSupportingReads(second, self.ref_seq, FH_aln, LoggerSilencer()) & shared_reads
+                    shared_reads = getIncludingReadsDNA(FH_aln, FH_seq, "chr1", first.upstream_start, second.downstream_end)
+                    first.supporting_reads = getSupportingReads(first, FH_seq, "chr1", FH_aln, LoggerSilencer()) & shared_reads
+                    second.supporting_reads = getSupportingReads(second, FH_seq, "chr1", FH_aln, LoggerSilencer()) & shared_reads
                     # Check supporting first
                     expected = sorted([
                         "{}_{}".format(first.id, curr_suffix) for curr_suffix in ["1_alt", "2_alt", "4_mixUp"]
@@ -320,6 +448,7 @@ class FakeVCFIO:
 
 class MergeCoOccurVar(unittest.TestCase):
     def setUp(self):
+        # VCF
         self.vcfio = FakeVCFIO(
             {"AF": HeaderInfoAttr("AF", "Alternative alleles frequencies", "Float", "A")},
             {
@@ -327,9 +456,19 @@ class MergeCoOccurVar(unittest.TestCase):
                 "DP": HeaderFormatAttr("DP", "total depth", "Integer", "1")
             }
         )
+        # Ref seq
+        tmp_folder = tempfile.gettempdir()
+        unique_id = str(uuid.uuid1())
+        self.tmp_fasta_path = os.path.join(tmp_folder, unique_id + ".fa")
+        self.tmp_faidx_path = os.path.join(tmp_folder, unique_id + ".fa.fai")
         self.ref_seq = "ACGCAAATCTCGGCATGCCGATT"
         #               | | | | | |  |  |  |  |
         #               1 3 5 7 9 11 14 17 20 23
+        with open(self.tmp_fasta_path, "w") as FH_seq:
+            FH_seq.write(">chr1\n{}".format(self.ref_seq))
+        with open(self.tmp_faidx_path, "w") as FH_faidx:
+            FH_faidx.write("chr1\t{}\t6\t60\t61".format(len(self.ref_seq)))
+        # Variants
         self.variant_1 = VCFRecord(
             "chr1",  # chrom
             None,  # pos
@@ -376,6 +515,12 @@ class MergeCoOccurVar(unittest.TestCase):
             }
         )
 
+    def tearDown(self):
+        # Clean temporary files
+        for curr_file in [self.tmp_fasta_path, self.tmp_faidx_path]:
+            if os.path.exists(curr_file):
+                os.remove(curr_file)
+
     def testMergedRecord_1_substit(self):
         # Variant 1
         self.variant_1.pos = 5
@@ -391,7 +536,12 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["TAATCTCGGCATGCCC"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=A/T", "chr1:20=G/C"]}
         # Eval
-        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_1.getName(), self.variant_2, self.variant_2.getName(), self.ref_seq)
+        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
+            observed_merge = mergedRecord(
+                self.vcfio,
+                self.variant_1, self.variant_1.getName(),
+                self.variant_2, self.variant_2.getName(),
+                FH_ref, "chr1")
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -412,7 +562,12 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["TGCACGG"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/TGCA", "chr1:10=TC/GG"]}
         # Eval
-        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_1.getName(), self.variant_2, self.variant_2.getName(), self.ref_seq)
+        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
+            observed_merge = mergedRecord(
+                self.vcfio,
+                self.variant_1, self.variant_1.getName(),
+                self.variant_2, self.variant_2.getName(),
+                FH_ref, "chr1")
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -433,7 +588,12 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["TGCAGG"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/TGCA", "chr1:9=CT/GG"]}
         # Eval
-        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_1.getName(), self.variant_2, self.variant_2.getName(), self.ref_seq)
+        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
+            observed_merge = mergedRecord(
+                self.vcfio,
+                self.variant_1, self.variant_1.getName(),
+                self.variant_2, self.variant_2.getName(),
+                FH_ref, "chr1")
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -454,7 +614,12 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["CGGCATCT"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/-", "chr1:10=-/GGCATCT"]}
         # Eval
-        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_1.getName(), self.variant_2, self.variant_2.getName(), self.ref_seq)
+        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
+            observed_merge = mergedRecord(
+                self.vcfio,
+                self.variant_1, self.variant_1.getName(),
+                self.variant_2, self.variant_2.getName(),
+                FH_ref, "chr1")
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -475,7 +640,12 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["AGG"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/-", "chr1:9=-/AGG"]}
         # Eval
-        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_1.getName(), self.variant_2, self.variant_2.getName(), self.ref_seq)
+        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
+            observed_merge = mergedRecord(
+                self.vcfio,
+                self.variant_1, self.variant_1.getName(),
+                self.variant_2, self.variant_2.getName(),
+                FH_ref, "chr1")
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -496,7 +666,12 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["GTGTGAA"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=-/GTGTG", "chr1:7=ATC/-"]}
         # Eval
-        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_1.getName(), self.variant_2, self.variant_2.getName(), self.ref_seq)
+        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
+            observed_merge = mergedRecord(
+                self.vcfio,
+                self.variant_1, self.variant_1.getName(),
+                self.variant_2, self.variant_2.getName(),
+                FH_ref, "chr1")
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -517,7 +692,12 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["GTGTGA"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=-/GTGTG", "chr1:6=AA/-"]}
         # Eval
-        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_1.getName(), self.variant_2, self.variant_2.getName(), self.ref_seq)
+        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
+            observed_merge = mergedRecord(
+                self.vcfio,
+                self.variant_1, self.variant_1.getName(),
+                self.variant_2, self.variant_2.getName(),
+                FH_ref, "chr1")
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -538,7 +718,12 @@ class MergeCoOccurVar(unittest.TestCase):
         self.expected_merge.alt = ["GTGTG"]
         self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=-/GTGTG", "chr1:5=AA/-"]}
         # Eval
-        observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_1.getName(), self.variant_2, self.variant_2.getName(), self.ref_seq)
+        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
+            observed_merge = mergedRecord(
+                self.vcfio,
+                self.variant_1, self.variant_1.getName(),
+                self.variant_2, self.variant_2.getName(),
+                FH_ref, "chr1")
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -559,7 +744,12 @@ class MergeCoOccurVar(unittest.TestCase):
     #     self.expected_merge.alt = ["CGGCATCT"]
     #     self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:4=CAAAT/-", "chr1:9=C/CGGCATCT"]}
     #     # Eval
-    #     observed_merge = mergedRecord(self.vcfio, self.variant_1, self.variant_1.getName(), self.variant_2, self.variant_2.getName(), self.ref_seq)
+    #     with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
+    #         observed_merge = mergedRecord(
+    #             self.vcfio,
+    #             self.variant_1, self.variant_1.getName(),
+    #             self.variant_2, self.variant_2.getName(),
+    #             FH_ref, "chr1")
     #     self.assertEqual(
     #         strVariant(observed_merge),
     #         strVariant(self.expected_merge)

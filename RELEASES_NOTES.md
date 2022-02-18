@@ -12,6 +12,7 @@
   `bin/setUMITagFromID.py`.
 
 ### Bug fixes:
+  * Fix bug with refskip for spliced alignment in `bin/mergeCoOccurVar.py`.
   * Fix bug with insertion and substitution of same nucleotid at same position
   in `bin/evalVariantControl.py`. Example: with *1:587874=A/T* and *1:587874=./T*
   only the last in VCF was taking into account.
