@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -15,6 +15,7 @@ from anacore.region import iterOverlapped, RegionList
 import argparse
 import json
 import logging
+import numpy as np
 import os
 import pysam
 from statistics import mean, median
@@ -124,138 +125,117 @@ def getAnnotByGene(tr_by_id, in_alignments, in_variants, stranded=None, annotati
     """
     processed_tr = set()
     annot_by_gene_id = {}
-    with pysam.AlignmentFile(in_alignments, "rb") as reader_aln:
-        with BreakendVCFIO(in_variants, annot_field=annotation_field) as reader:
-            for first, second in reader:
-                for bnd in [first, second]:
-                    for curr_annot in bnd.info[annotation_field]:
-                        gene_id = curr_annot["Gene"]
-                        tr_id = curr_annot["Feature"]
-                        if tr_id not in processed_tr:
-                            processed_tr.add(tr_id)
-                            tr = tr_by_id[tr_id]
-                            exons = []
-                            for curr_exon in tr.children:
-                                annotations = {}
-                                if stranded is None:
-                                    depths = getDepths(reader_aln, curr_exon)
-                                    annotations["depth"] = {
-                                        "med": median(depths),
-                                        "mean": mean(depths)
-                                    }
-                                else:
-                                    depths_R1_fwd, depths_R2_fwd = getStrandedDepths(reader_aln, curr_exon)
-                                    annotations["depth"] = {
-                                        "med": [median(depths_R1_fwd), median(depths_R2_fwd)],
-                                        "mean": [mean(depths_R1_fwd), mean(depths_R2_fwd)]
-                                    }
-                                    if stranded == "R2":
-                                        annotations["depth"]["med"].reverse()
-                                        annotations["depth"]["mean"].reverse()
-                                exons.append({
-                                    "start": curr_exon.start,
-                                    "end": curr_exon.end,
-                                    "annot": annotations
-                                })
-                            # Add to gene
-                            if gene_id not in annot_by_gene_id:
-                                annot_by_gene_id[gene_id] = {
-                                    "name": gene_id,
-                                    "transcripts": []
+    with BreakendVCFIO(in_variants, annot_field=annotation_field) as reader:
+        for first, second in reader:
+            for bnd in [first, second]:
+                for curr_annot in bnd.info[annotation_field]:
+                    gene_id = curr_annot["Gene"]
+                    tr_id = curr_annot["Feature"]
+                    if tr_id not in processed_tr:
+                        processed_tr.add(tr_id)
+                        tr = tr_by_id[tr_id]
+                        exons = []
+                        for curr_exon in tr.children:
+                            annotations = {}
+                            if stranded is None:
+                                depths = getDepths(in_alignments, curr_exon, 10)
+                                annotations["depth"] = {
+                                    "med": median(depths),
+                                    "mean": mean(depths)
                                 }
-                            annot_by_gene_id[gene_id]["transcripts"].append({
-                                "name": tr_id,
-                                "strand": tr.strand,
-                                "proteins": [{"name": curr_prot.annot["id"], "start": curr_prot.start, "end": curr_prot.end, "annot": {}} for curr_prot in tr.proteins],
-                                "exons": exons
+                            else:
+                                depths_R1_fwd, depths_R2_fwd = getStrandedDepths(in_alignments, curr_exon, 10)
+                                annotations["depth"] = {
+                                    "med": [median(depths_R1_fwd), median(depths_R2_fwd)],
+                                    "mean": [mean(depths_R1_fwd), mean(depths_R2_fwd)]
+                                }
+                                if stranded == "R2":
+                                    annotations["depth"]["med"].reverse()
+                                    annotations["depth"]["mean"].reverse()
+                            exons.append({
+                                "start": curr_exon.start,
+                                "end": curr_exon.end,
+                                "annot": annotations
                             })
+                        # Add to gene
+                        if gene_id not in annot_by_gene_id:
+                            annot_by_gene_id[gene_id] = {
+                                "name": gene_id,
+                                "transcripts": []
+                            }
+                        annot_by_gene_id[gene_id]["transcripts"].append({
+                            "name": tr_id,
+                            "strand": tr.strand,
+                            "proteins": [{"name": curr_prot.annot["id"], "start": curr_prot.start, "end": curr_prot.end, "annot": {}} for curr_prot in tr.proteins],
+                            "exons": exons
+                        })
     return annot_by_gene_id
 
 
-def getDepths(reader_aln, region):
+def getDepths(in_aln, region, min_base_qual=13, excluded_flags="UNMAP,SECONDARY,QCFAIL,DUP"):
     """
     Return list of depths on region.
 
-    :param reader_aln: The file handle to the alignments file.
-    :type reader_aln: pysam.AlignmentFile
+    :param in_aln: Path to the alignments file.
+    :type in_aln: str
     :param region: The evaluated region.
     :type region: anacore.region.Region
+    :param min_base_qual: Minimum base quality to count this read base on depth.
+    :type min_base_qual: int
+    :param excluded_flags: Discard any read that has any of the flags specified in the comma-separated list.
+    :type excluded_flags: str
     :return: Depths on region.
     :rtype: list
     """
-    depths = []
-    expected_pos = region.start
-    for aln_col in reader_aln.pileup(
-        region.reference.name,
-        region.start - 1,  # 0-based
-        region.end,  # 1-based
-        truncate=True,
-        max_depth=1000000,
-        ignore_overlaps=False  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
-    ):  # By defaul filter out unmap, secondary, qcfail and duplicate
-        pileup_pos = aln_col.pos + 1  # 0-based
-        while expected_pos != pileup_pos:  # Take into account positions without alingment
-            depths.append(0)
-            expected_pos += 1
-        curr_dp = sum([1 for read in aln_col.pileups])
-        depths.append(curr_dp)
-        expected_pos += 1
-    end_limit = region.end + 1  # expected_pos is the current unprocessed position
-    while expected_pos != end_limit:  # Take into account positions without alingment
-        depths.append(0)
-        expected_pos += 1
-    return depths
+    out_str = pysam.depth(
+        "-a",
+        "-G", excluded_flags,
+        "-J",
+        "-q", str(min_base_qual),
+        "-r", "{}:{}-{}".format(region.reference.name, region.start, region.end),
+        in_aln
+    )
+    return [int(elt.split()[2]) for elt in out_str.strip().split("\n")]
 
 
-def getStrandedDepths(reader_aln, region):
+def getStrandedDepths(in_aln, region, min_base_qual=13):
     """
     Return lists of stranded depths on region. The first is list of depths from R1 forward. The second is list of depths from R1 reverse.
 
-    :param reader_aln: The file handle to the alignments file.
-    :type reader_aln: pysam.AlignmentFile
+    :param in_aln: Path to the alignments file.
+    :type in_aln: str
     :param region: The evaluated region.
     :type region: anacore.region.Region
-    :return: Stranded depths on region. The first is list of depths from R1 forward. The second is list of depths from R1 reverse.
-    :rtype: (list, list)
+    :param min_base_qual: Minimum base quality to count this read base on depth.
+    :type min_base_qual: int
+    :return: Depths on region.
+    :rtype: list
     """
-    depths_R1_foward = []
-    depths_R1_reverse = []
-    expected_pos = region.start
-    for aln_col in reader_aln.pileup(
-        region.reference.name,
-        region.start - 1,  # 0-based
-        region.end,  # 1-based
-        truncate=True,
-        max_depth=1000000,
-        ignore_overlaps=False  # Prevent bases qualities modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
-    ):  # By defaul filter out unmap, secondary, qcfail and duplicate
-        pileup_pos = aln_col.pos + 1  # 0-based
-        while expected_pos != pileup_pos:  # Take into account positions without alingment
-            depths_R1_foward.append(0)
-            depths_R1_reverse.append(0)
-            expected_pos += 1
-        curr_dp_R1_forward = 0
-        curr_dp_R1_reverse = 0
-        for read in aln_col.pileups:
-            if read.is_read1:
-                if read.is_reverse:
-                    curr_dp_R1_reverse += 1
-                else:
-                    curr_dp_R1_forward += 1
-            else:  # Read 2
-                if read.is_reverse:
-                    curr_dp_R1_forward += 1
-                else:
-                    curr_dp_R1_reverse += 1
-        depths_R1_foward.append(curr_dp_R1_forward)
-        depths_R1_reverse.append(curr_dp_R1_reverse)
-        expected_pos += 1
-    end_limit = region.end + 1  # expected_pos is the current unprocessed position
-    while expected_pos != end_limit:  # Take into account positions without alingment
-        depths_R1_foward.append(0)
-        depths_R1_reverse.append(0)
-        expected_pos += 1
-    return depths_R1_foward, depths_R1_reverse
+    excluded_flags = ["UNMAP", "SECONDARY", "QCFAIL", "DUP"]
+    # R1
+    r1_total = getDepths(
+        in_aln, region, min_base_qual,
+        ",".join(excluded_flags + ["READ2"])
+    )
+    r1_forward = getDepths(
+        in_aln, region, min_base_qual,
+        ",".join(excluded_flags + ["READ2", "REVERSE"])
+    )
+    r1_reverse = np.subtract(r1_total, r1_forward)
+    # R2
+    r2_total = getDepths(
+        in_aln, region, min_base_qual,
+        ",".join(excluded_flags + ["READ1"])
+    )
+    r2_forward = getDepths(
+        in_aln, region, min_base_qual,
+        ",".join(excluded_flags + ["READ1", "REVERSE"])
+    )
+    r2_reverse = np.subtract(r2_total, r2_forward)
+    return (
+        list(map(int, np.add(r1_forward, r2_reverse))),
+        list(map(int, np.add(r1_reverse, r2_forward)))
+    )
 
 
 ########################################################################
