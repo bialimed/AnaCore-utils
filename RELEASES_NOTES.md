@@ -1,6 +1,7 @@
 # Release 3.5.0 [DEV]
 
 ### Improvements:
+  * Update pysam from `0.15.3` to `0.18.0`.
   * Increase execution speed for `bin/inspectBND.py`.
   * Change JSON structure from `bin/fusionsToJSON.py` to improve usage in
   document databases: replacement of the dict feature_by_id by a list with _id

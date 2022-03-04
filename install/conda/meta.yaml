@@ -1,7 +1,7 @@
 {% set version = "3.4.0" %}
 # Dependencies versions
 {% set anacore_version = "=2.10.0" %}
-{% set pysam_version = "=0.15.3" %}
+{% set pysam_version = "=0.18.0" %}
 {% set python_version = ">=3.5" %}
 {% set scipy_version = "=1.2.1" %}
 
