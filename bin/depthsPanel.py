@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2021 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.1'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -23,7 +23,22 @@ import sys
 # FUNCTIONS
 #
 ########################################################################
-def depthsTargets(aln_path, targets, depth_mode, min_depths, log):
+def argparse_type_min_base_qual(qual):
+    """
+    Return value casted to int and check minimum constraint.
+
+    :param qual: Command line argument value for min_base_qual.
+    :type qual: str
+    :return: Value casted to int and check minimum constraint.
+    :rtype: int
+    """
+    qual = int(qual)
+    if qual < 2:
+        raise argparse.ArgumentTypeError("Minimum min-base-qual is 2.")
+    return qual
+
+
+def depthsTargets(aln_path, targets, depth_mode, min_base_qual, min_depths, log):
     """
     Add depths distribution and number of nt below depth thresholds in each target.
 
@@ -33,6 +48,8 @@ def depthsTargets(aln_path, targets, depth_mode, min_depths, log):
     :type targets: list
     :param depth_mode: How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once).
     :type depth_mode: str
+    :param min_base_qual: Minimum base quality to count this read base on depth.
+    :type min_base_qual: int
     :param min_depths: Depth thresholds used to count the number of nt below.
     :type min_depths: list
     :param log: Logger of the script.
@@ -50,49 +67,129 @@ def depthsTargets(aln_path, targets, depth_mode, min_depths, log):
                 "distribution": None,
                 "under_thresholds": {elt: 0 for elt in min_depths}
             }
+            # Get target depths
             target_depths = []
-            for curr_sub_region in curr_target["locations"]:
-                curr_checked = curr_sub_region.start - 1
-                for pileupcolumn in FH_bam.pileup(
-                    curr_sub_region.reference.name,
-                    curr_sub_region.start - 1,
-                    curr_sub_region.end,
-                    max_depth=100000000,
-                    ignore_overlaps=False  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
-                ):
-                    if pileupcolumn.reference_pos + 1 >= curr_sub_region.start and pileupcolumn.reference_pos + 1 <= curr_sub_region.end:
-                        # Missing positions
-                        while curr_checked < pileupcolumn.reference_pos:
-                            target_depths.append(0)
-                            curr_checked += 1
-                        # Current position
-                        curr_reads_depth = 0
-                        curr_frag = set()
-                        for pileupread in pileupcolumn.pileups:
-                            if pileupcolumn.reference_pos + 1 < curr_sub_region.start or pileupcolumn.reference_pos + 1 > curr_sub_region.end:
-                                raise Exception("The reference position {}:{} is out of target {}.".format(curr_sub_region.reference.name, pileupcolumn.reference_pos, curr_sub_region))
-                            if not pileupread.alignment.is_secondary and not pileupread.alignment.is_duplicate and not pileupread.is_refskip:
-                                curr_reads_depth += 1
-                                curr_frag.add(pileupread.alignment.query_name)
-                        if depth_mode == "read":
-                            target_depths.append(curr_reads_depth)
-                        else:
-                            target_depths.append(len(curr_frag))
-                        curr_checked = pileupcolumn.reference_pos + 1
-                # Missing positions
-                while curr_checked < curr_sub_region.end:
-                    target_depths.append(0)
-                    curr_checked += 1
-                # Store depths
-                for threshold in curr_target["depths"]["under_thresholds"]:
-                    curr_target["depths"]["under_thresholds"][threshold] = sum([1 for elt in target_depths if elt < threshold])
-                curr_target["depths"]["distribution"] = {
-                    "lower_quartile": quantile(target_depths, 0.25, interpolation="midpoint"),
-                    "max": max(target_depths),
-                    "median": quantile(target_depths, 0.5),
-                    "min": min(target_depths),
-                    "upper_quartile": quantile(target_depths, 0.75, interpolation="midpoint"),
-                }
+            if depth_mode == "read":
+                for curr_sub_region in curr_target["locations"]:
+                    target_depths.extend(
+                        getReadsDepths(aln_path, curr_sub_region, min_base_qual)
+                    )
+            else:
+                for curr_sub_region in curr_target["locations"]:
+                    target_depths.extend(
+                        getFragmentsDepths(FH_bam, curr_sub_region, min_base_qual)
+                    )
+            # Store depths
+            for threshold in curr_target["depths"]["under_thresholds"]:
+                curr_target["depths"]["under_thresholds"][threshold] = sum([1 for elt in target_depths if elt < threshold])
+            curr_target["depths"]["distribution"] = {
+                "lower_quartile": quantile(target_depths, 0.25, interpolation="midpoint"),
+                "max": max(target_depths),
+                "median": quantile(target_depths, 0.5),
+                "min": min(target_depths),
+                "upper_quartile": quantile(target_depths, 0.75, interpolation="midpoint"),
+            }
+
+
+def getFragmentsDepths(FH_bam, region, min_base_qual=13):
+    """
+    Return list of depths on region (in fragments).
+
+    :param FH_bam: File handle to the alignments file.
+    :type FH_bam: pysam.AlignmentFile
+    :param region: The evaluated region.
+    :type region: anacore.region.Region
+    :param min_base_qual: Minimum base quality to count this read base on depth.
+    :type min_base_qual: int
+    :param excluded_flags: Discard any read that has any of the flags specified in the comma-separated list.
+    :type excluded_flags: str
+    :return: Depths on region.
+    :rtype: list
+    """
+    depths = list()
+    curr_checked = region.start - 1
+    for pileupcolumn in FH_bam.pileup(
+        region.reference.name,
+        region.start - 1,
+        region.end,
+        max_depth=100000000,
+        ignore_overlaps=False,
+        ignore_orphans=False,
+        min_base_quality=10
+    ):
+        if pileupcolumn.reference_pos + 1 >= region.start and pileupcolumn.reference_pos + 1 <= region.end:
+            # Missing positions
+            while curr_checked < pileupcolumn.reference_pos:
+                depths.append(0)
+                curr_checked += 1
+            # Current position
+            curr_frag = set()
+            for pileupread in pileupcolumn.pileups:
+                if pileupcolumn.reference_pos + 1 < region.start or pileupcolumn.reference_pos + 1 > region.end:
+                    raise Exception("The reference position {}:{} is out of target {}.".format(region.reference.name, pileupcolumn.reference_pos, region))
+                if not pileupread.alignment.is_secondary and not pileupread.alignment.is_duplicate and not pileupread.is_refskip:
+                    curr_frag.add(pileupread.alignment.query_name)
+            depths.append(len(curr_frag))
+            curr_checked = pileupcolumn.reference_pos + 1
+    # Missing positions
+    while curr_checked < region.end:
+        depths.append(0)
+        curr_checked += 1
+    return depths
+
+
+# Fast fragments depth but bug following pysam calls with option -s
+# def getFragmentsDepths(in_aln, region, min_base_qual=13, excluded_flags="UNMAP,SECONDARY,QCFAIL,DUP"):
+#     """
+#     Return list of depths on region (in fragments).
+#
+#     :param in_aln: Path to the alignments file.
+#     :type in_aln: str
+#     :param region: The evaluated region.
+#     :type region: anacore.region.Region
+#     :param min_base_qual: Minimum base quality to count this read base on depth.
+#     :type min_base_qual: int
+#     :param excluded_flags: Discard any read that has any of the flags specified in the comma-separated list.
+#     :type excluded_flags: str
+#     :return: Depths on region.
+#     :rtype: list
+#     """
+#     out_str = pysam.depth(
+#         "-a",
+#         "-G", excluded_flags,
+#         "-J",
+#         "-q", str(min_base_qual),
+#         "-r", "{}:{}-{}".format(region.reference.name, region.start, region.end),
+#         "-s",
+#         in_aln
+#     )
+#     return [int(elt.split()[2]) for elt in out_str.strip().split("\n")]
+
+
+def getReadsDepths(in_aln, region, min_base_qual=13, excluded_flags="UNMAP,SECONDARY,QCFAIL,DUP"):
+    """
+    Return list of depths on region (in reads).
+
+    :param in_aln: Path to the alignments file.
+    :type in_aln: str
+    :param region: The evaluated region.
+    :type region: anacore.region.Region
+    :param min_base_qual: Minimum base quality to count this read base on depth.
+    :type min_base_qual: int
+    :param excluded_flags: Discard any read that has any of the flags specified in the comma-separated list.
+    :type excluded_flags: str
+    :return: Depths on region.
+    :rtype: list
+    """
+    out_str = pysam.depth(
+        "-a",
+        "-G", excluded_flags,
+        "-J",
+        "-q", str(min_base_qual),
+        "-r", "{}:{}-{}".format(region.reference.name, region.start, region.end),
+        in_aln
+    )
+    return [int(elt.split()[2]) for elt in out_str.strip().split("\n")]
 
 
 def getTargets(in_targets):
@@ -122,7 +219,7 @@ def getTargets(in_targets):
     return targets
 
 
-def writeJSON(out_path, annotated_targets, depth_mode, min_depths):
+def writeJSON(out_path, annotated_targets, depth_mode, min_base_qual, min_depths):
     """
     Write targets and their count below depth thresholds in a JSON file.
 
@@ -132,6 +229,8 @@ def writeJSON(out_path, annotated_targets, depth_mode, min_depths):
     :type annotated_targets: list
     :param depth_mode: How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once).
     :type depth_mode: str
+    :param min_base_qual: Minimum base quality to count this read base on depth.
+    :type min_base_qual: int
     :param min_depths: Depth thresholds used to count the number of nt below.
     :type min_depths: list
     """
@@ -141,7 +240,11 @@ def writeJSON(out_path, annotated_targets, depth_mode, min_depths):
         writer.write(
             json.dumps(
                 {
-                    "parameters": {"depth_mode": depth_mode, "min_depths": min_depths},
+                    "parameters": {
+                        "depth_mode": depth_mode,
+                        "min_base_qual": min_base_qual,
+                        "min_depths": min_depths
+                    },
                     "results": annotated_targets
                 },
                 sort_keys=True
@@ -157,9 +260,10 @@ def writeJSON(out_path, annotated_targets, depth_mode, min_depths):
 if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Write depths distribution and number of nt below depth thresholds for each target.')
-    parser.add_argument('-v', '--version', action='version', version=__version__)
-    parser.add_argument('-m', '--depth-mode', choices=["read", "fragment"], default="fragment", help='How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once). [Default: %(default)s]')
     parser.add_argument('-d', '--min-depths', type=int, nargs='+', default=[25, 30], help='Depth thresholds used to count the number of nt below. [Default: %(default)s]')
+    parser.add_argument('-m', '--depth-mode', choices=["read", "fragment"], default="fragment", help='How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once). [Default: %(default)s]')
+    parser.add_argument('-q', '--min-base-qual', type=argparse_type_min_base_qual, default=10, help="Minimum quality to take a read base into account in depth calculation. Must be greater than 1. [Default: %(default)s]")
+    parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')
     group_input.add_argument('-a', '--input-aln', required=True, help='Path to the alignments file (format: BAM).')
     group_input.add_argument('-t', '--input-targets', required=True, help='Path to targets file (format: TSV). Required columns area "name" and "locations". The others will be add in metadata. each line is a target corresponding to one or more sub-locations. The locations column contains the list of sub-locations (e.g.: "chr1:100-200,chr1500-680").')
@@ -179,9 +283,12 @@ if __name__ == "__main__":
 
     # Find shallow areas
     log.info("Find validate depths rate by target.")
-    depthsTargets(args.input_aln, targets, args.depth_mode, args.min_depths, log)
+    depthsTargets(
+        args.input_aln, targets, args.depth_mode, args.min_base_qual,
+        args.min_depths, log
+    )
 
     # Write output
     log.info("Write output.")
-    writeJSON(args.output, targets, args.depth_mode, args.min_depths)
+    writeJSON(args.output, targets, args.depth_mode, args.min_base_qual, args.min_depths)
     log.info("End of job")

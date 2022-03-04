@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2021 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -99,7 +99,7 @@ read4	0	chr2	1	60	31M	*	0	0	ATTTGAAGATATTCACCATTATAGAGAACAA	*	NM:i:0	MD:Z:31	AS:
             def info(self, msg):
                 pass
         targets = getTargets(self.tmp_tgt)
-        depthsTargets(self.tmp_bam, targets, "reads", [1, 2, 3], FakeLogger())
+        depthsTargets(self.tmp_bam, targets, "reads", 10, [1, 2, 3], FakeLogger())
         # Test under_thresholds
         expected = [
             {1: 0, 2: 0, 3: 6},
