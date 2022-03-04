@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -104,7 +104,7 @@ read_3	0	art_chr2	8	60	44M8D51M	*	0	0	AATATAAACTTGTGGTAGTTGGAGCTGGTGTTTGCCATAAAT
             "art_chr1:123-123",
             "art_chr3:10-40",
         ]
-        observed = [str(elt) for elt in shallowFromAlignment(self.tmp_bam, selected_regions, "reads", 1, FakeLogger())]
+        observed = [str(elt) for elt in shallowFromAlignment(self.tmp_bam, selected_regions, "reads", 10, 1, FakeLogger())]
         self.assertEqual(sorted(expected), sorted(observed))
 
     def testGetTranscriptsAnnot_withUTR_threeExons(self):

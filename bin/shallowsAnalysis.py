@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.1'
+__version__ = '1.5.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -84,7 +84,7 @@ def addToShallow(curr_chr, curr_pos, prev_opened, shallows):
             prev_opened["end"] = curr_pos
 
 
-def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_depth, log):
+def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_base_qual, min_depth, log):
     """
     Return the list of shallow regions from the alignment file.
 
@@ -94,6 +94,8 @@ def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_depth, log)
     :type selected_regions: anacore.region.RegionList
     :param depth_mode: How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once).
     :type depth_mode: str
+    :param min_base_qual: Minimum base quality to count this read base on depth.
+    :type min_base_qual: int
     :param min_depth: All the locations with a depth under this value are reported in shallows areas.
     :type min_depth: int
     :param log: Logger of the script.
@@ -117,7 +119,9 @@ def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_depth, log)
                 region.start - 1,
                 region.end,
                 max_depth=100000000,
-                ignore_overlaps=False  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
+                ignore_overlaps=False,  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
+                ignore_orphans=False,
+                min_base_quality=min_base_qual
             ):
                 if pileupcolumn.reference_pos + 1 >= region.start and pileupcolumn.reference_pos + 1 <= region.end:
                     # Missing positions
@@ -125,17 +129,16 @@ def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_depth, log)
                         addToShallow(region.reference, curr_checked, prev_opened, shallow)
                         curr_checked += 1
                     # Current position
-                    curr_reads_depth = 0
-                    curr_frag = set()
+                    ids_on_pos = set()
                     for pileupread in pileupcolumn.pileups:
                         if pileupcolumn.reference_pos + 1 < region.start or pileupcolumn.reference_pos + 1 > region.end:
                             raise Exception("The reference position {}:{} is out of target {}.".format(region.reference.name, pileupcolumn.reference_pos, region))
                         if not pileupread.alignment.is_secondary and not pileupread.alignment.is_duplicate and not pileupread.is_refskip:
-                            curr_reads_depth += 1
-                            curr_frag.add(pileupread.alignment.query_name)
-                    curr_depth = curr_reads_depth
-                    if depth_mode == "fragment":
-                        curr_depth = len(curr_frag)
+                            curr_id = pileupread.alignment.query_name
+                            if depth_mode == "read":
+                                curr_id += "_" + pileupread.alignment.is_read1
+                            ids_on_pos.add(curr_id)
+                    curr_depth = len(ids_on_pos)
                     if min_depth > curr_depth:
                         addToShallow(region.reference, pileupcolumn.reference_pos, prev_opened, shallow)
                     curr_checked = pileupcolumn.reference_pos + 1
@@ -507,9 +510,10 @@ def writeGFF(out_path, shallow, args):
 if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Extract shallow areas from the alignment are annotate them with genomic features and known variants.')
-    parser.add_argument('-v', '--version', action='version', version=__version__)
-    parser.add_argument('-m', '--depth-mode', choices=["read", "fragment"], default="fragment", help='How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once). [Default: %(default)s]')
     parser.add_argument('-d', '--min-depth', type=int, default=30, help='All the locations with a depth under this value are reported in shallows areas. [Default: %(default)s]')
+    parser.add_argument('-m', '--depth-mode', choices=["read", "fragment"], default="fragment", help='How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once). [Default: %(default)s]')
+    parser.add_argument('-q', '--min-base-qual', default=10, help="Minimum quality to take a read base into account in depth calculation. [Default: %(default)s]")
+    parser.add_argument('-v', '--version', action='version', version=__version__)
     group_known = parser.add_argument_group('Known variants')
     group_known.add_argument('-n', '--known-count-field', default="CNT", help="Field used in known variants database to store the number of database's samples with this variant. [Default: %(default)s]")
     group_known.add_argument('-i', '--known-hgvsc-field', default="CDS", help='Field used in known variants databases to store the HGVSp. [Default: %(default)s]')
@@ -538,7 +542,10 @@ if __name__ == "__main__":
 
     # Find shallow areas
     log.info("Find shallow areas.")
-    shallow = shallowFromAlignment(args.input_aln, selected_regions, args.depth_mode, args.min_depth, log)
+    shallow = shallowFromAlignment(
+        args.input_aln, selected_regions, args.depth_mode, args.min_base_qual,
+        args.min_depth, log
+    )
 
     # Annotate shallow areas
     if args.input_annotations is not None:
