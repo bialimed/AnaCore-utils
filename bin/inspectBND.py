@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -106,7 +106,7 @@ def filteredByOverlap(targets_by_chr, selected_genes):
     return trimmed_targets_by_chr
 
 
-def getAnnotByGene(tr_by_id, in_alignments, in_variants, stranded=None, annotation_field="ANN"):
+def getAnnotByGene(tr_by_id, in_alignments, in_variants, min_base_qual=13, stranded=None, annotation_field="ANN"):
     """
     Return a light genomic annotations by gene ID of genes overlapping breakends.
 
@@ -116,6 +116,8 @@ def getAnnotByGene(tr_by_id, in_alignments, in_variants, stranded=None, annotati
     :type in_alignments: str
     :param in_variants: Path to the annotated fusions file (format: VCF).
     :type in_variants: str
+    :param min_base_qual: Minimum base quality to count this read base on depth.
+    :type min_base_qual: int
     :param stranded: If your RNA library preps are stranded choose the read matching the transcript strand (R1: sense prep, R2: antisense prep).
     :type stranded: None|boolean
     :param annotation_field: Field used for store annotations.
@@ -138,13 +140,13 @@ def getAnnotByGene(tr_by_id, in_alignments, in_variants, stranded=None, annotati
                         for curr_exon in tr.children:
                             annotations = {}
                             if stranded is None:
-                                depths = getDepths(in_alignments, curr_exon, 10)
+                                depths = getDepths(in_alignments, curr_exon, min_base_qual)
                                 annotations["depth"] = {
                                     "med": median(depths),
                                     "mean": mean(depths)
                                 }
                             else:
-                                depths_R1_fwd, depths_R2_fwd = getStrandedDepths(in_alignments, curr_exon, 10)
+                                depths_R1_fwd, depths_R2_fwd = getStrandedDepths(in_alignments, curr_exon, min_base_qual)
                                 annotations["depth"] = {
                                     "med": [median(depths_R1_fwd), median(depths_R2_fwd)],
                                     "mean": [mean(depths_R1_fwd), mean(depths_R2_fwd)]
@@ -247,6 +249,7 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Produce data to inspect fusions breakends.')
     parser.add_argument('-f', '--annotation-field', default="ANN", help='Field used for store annotations. [Default: %(default)s]')
+    parser.add_argument('-q', '--min-base-qual', default=10, help="Minimum quality to take a read base into account in depth calculation. [Default: %(default)s]")
     parser.add_argument('-s', '--stranded', choices=["R1", "R2"], help='If your RNA library preps are stranded choose the read matching the transcript strand (R1: sense prep, R2: antisense prep).')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs
@@ -272,7 +275,10 @@ if __name__ == "__main__":
 
     # Get annotations by gene
     log.info("Get fusions genomic annotations from {}.".format(args.input_variants))
-    annot_by_gene_id = getAnnotByGene(tr_by_id, args.input_alignments, args.input_variants, args.stranded, args.annotation_field)
+    annot_by_gene_id = getAnnotByGene(
+        tr_by_id, args.input_alignments, args.input_variants, args.min_base_qual,
+        args.stranded, args.annotation_field
+    )
 
     # Annotate domains area on proteins
     if args.input_domains is not None:
