@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.6.2'
+__version__ = '1.7.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -19,7 +19,7 @@ from anacore.vcf import VCFIO, getAlleleRecord, HeaderInfoAttr, HeaderFormatAttr
 # FUNCTIONS
 #
 ########################################################################
-def getADPReads(chrom, pos, ref, alt, aln_file, selected_RG=None):
+def getADPReads(chrom, pos, ref, alt, aln_file, selected_RG=None, min_base_qual=15):
     """
     Return the allele depth (AD) and the depth (DP) for the specified variant. These counts are expressed in number of reads: if the R1 and the R2 of a sequence has overlaps the variant, each is counted.
 
@@ -35,6 +35,8 @@ def getADPReads(chrom, pos, ref, alt, aln_file, selected_RG=None):
     :type aln_file: str
     :param selected_RG: The ID of RG used in AD and DP. Default: all read groups.
     :type selected_RG: list
+    :param min_base_qual: Minimum quality to take a read base into account.
+    :type min_base_qual: int
     :returns: The first element is the AD, the second is the DP.
     :rtype: list
     :warning: Reads ID must be unique in SAM. These counts are expressed in number of reads: if the R1 and the R2 of a sequence has overlaps the variant, each is counted.
@@ -53,7 +55,9 @@ def getADPReads(chrom, pos, ref, alt, aln_file, selected_RG=None):
             inspect_start,
             inspect_end,
             max_depth=100000,
-            ignore_overlaps=False  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
+            ignore_overlaps=False,  # Prevent base quality modification on pair-end overlap (see https://github.com/pysam-developers/pysam/issues/1075#event-5938778682)
+            ignore_orphans=False,
+            min_base_quality=min_base_qual
         ):
             for pileupread in pileupcolumn.pileups:
                 if selected_RG is None or (pileupread.alignment.get_tag("RG") in selected_RG):
@@ -108,13 +112,14 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(
         description='Merges variants from several samples. If one variant is missing from a sample his AD, AF and DP are retrieved from the alignment file of this sample (except if you use --deactivate-completion). The VCFs must come from the same process with same references. Note: for a common variant all the fields values except for AF, AD and DP are retrieved from the first VCF where it has been found.',
-        usage="""%(prog)s [-h] [-v] [-p AF_PRECISION] [-s SELECTED_REGION]
+        usage="""%(prog)s [-h] [-v] [-p AF_PRECISION] [-s SELECTED_REGION] [-q MIN_BASE_QUAL]
                    -i INPUT_VARIANTS [INPUT_VARIANTS ...]
                    (-d | -a INPUT_ALN [INPUT_ALN ...])
                    -o OUTPUT_VARIANTS"""
     )
     parser.add_argument('-v', '--version', action='version', version=__version__)
     parser.add_argument('-d', '--deactivate-completion', action='store_true', help="This option deactivate the calculation of AD, AF and DP for samples where a variant present in other(s) sample(s) has no information.")
+    parser.add_argument('-m', '--min-base-qual', type=int, default=15, help="Minimum quality to take a read base into account in completion process. [Default: %(default)s]")
     parser.add_argument('-p', '--AF-precision', type=int, default=5, help="The AF's decimal precision. [Default: %(default)s]")
     parser.add_argument('-s', '--selected-region', help="Only the variants on this region (example: 'chr1') will be kept. [Default: All the regions are kept]")
     group_input = parser.add_argument_group('Inputs')  # Inputs
@@ -210,7 +215,7 @@ if __name__ == "__main__":
                         chrom_pos, ref_alt = allele_id.split("=")
                         chrom, pos = chrom_pos.split(":")
                         ref, alt = ref_alt.split("/")
-                        AD, DP = getADPReads(chrom, int(pos), ref, alt, aln_by_samples[spl])
+                        AD, DP = getADPReads(chrom, int(pos), ref, alt, aln_by_samples[spl], None, args.min_base_qual)
                         curr_var.samples[spl] = {
                             "AF": [0 if DP == 0 else round(AD / DP, args.AF_precision)],
                             "AD": [AD],
