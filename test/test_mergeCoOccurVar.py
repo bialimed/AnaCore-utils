@@ -541,7 +541,7 @@ class MergeCoOccurVar(unittest.TestCase):
                 self.vcfio,
                 self.variant_1, self.variant_1.getName(),
                 self.variant_2, self.variant_2.getName(),
-                FH_ref, "chr1")
+                FH_ref)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -567,7 +567,7 @@ class MergeCoOccurVar(unittest.TestCase):
                 self.vcfio,
                 self.variant_1, self.variant_1.getName(),
                 self.variant_2, self.variant_2.getName(),
-                FH_ref, "chr1")
+                FH_ref)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -593,7 +593,7 @@ class MergeCoOccurVar(unittest.TestCase):
                 self.vcfio,
                 self.variant_1, self.variant_1.getName(),
                 self.variant_2, self.variant_2.getName(),
-                FH_ref, "chr1")
+                FH_ref)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -619,7 +619,7 @@ class MergeCoOccurVar(unittest.TestCase):
                 self.vcfio,
                 self.variant_1, self.variant_1.getName(),
                 self.variant_2, self.variant_2.getName(),
-                FH_ref, "chr1")
+                FH_ref)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -645,7 +645,7 @@ class MergeCoOccurVar(unittest.TestCase):
                 self.vcfio,
                 self.variant_1, self.variant_1.getName(),
                 self.variant_2, self.variant_2.getName(),
-                FH_ref, "chr1")
+                FH_ref)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -671,7 +671,7 @@ class MergeCoOccurVar(unittest.TestCase):
                 self.vcfio,
                 self.variant_1, self.variant_1.getName(),
                 self.variant_2, self.variant_2.getName(),
-                FH_ref, "chr1")
+                FH_ref)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -697,7 +697,7 @@ class MergeCoOccurVar(unittest.TestCase):
                 self.vcfio,
                 self.variant_1, self.variant_1.getName(),
                 self.variant_2, self.variant_2.getName(),
-                FH_ref, "chr1")
+                FH_ref)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -723,7 +723,7 @@ class MergeCoOccurVar(unittest.TestCase):
                 self.vcfio,
                 self.variant_1, self.variant_1.getName(),
                 self.variant_2, self.variant_2.getName(),
-                FH_ref, "chr1")
+                FH_ref)
         self.assertEqual(
             strVariant(observed_merge),
             strVariant(self.expected_merge)
@@ -749,7 +749,7 @@ class MergeCoOccurVar(unittest.TestCase):
     #             self.vcfio,
     #             self.variant_1, self.variant_1.getName(),
     #             self.variant_2, self.variant_2.getName(),
-    #             FH_ref, "chr1")
+    #             FH_ref)
     #     self.assertEqual(
     #         strVariant(observed_merge),
     #         strVariant(self.expected_merge)

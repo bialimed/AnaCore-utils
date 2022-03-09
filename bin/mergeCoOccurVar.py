@@ -313,7 +313,7 @@ def traceMerge(record, intersection_rate, intersection_count):
     record.info["MCO_IC"].append(intersection_count)
 
 
-def mergedRecord(vcf, first, first_std_name, second, second_std_name, FH_seq, chrom_id):
+def mergedRecord(vcf, first, first_std_name, second, second_std_name, FH_seq):
     """
     Return the VCFRecord corresponding to the merge of first and second.
 
@@ -329,8 +329,6 @@ def mergedRecord(vcf, first, first_std_name, second, second_std_name, FH_seq, ch
     :type second_std_name: str
     :param FH_seq: File handle to the refersence sequence file.
     :type FH_seq: IdxFastaIO
-    :param chrom_id: Chromosome ID.
-    :type chrom_id: str
     :return: The variant corresponding to the merge of first and second.
     :rtype: anacore.vcf.VCFRecord
     :todo: Keep INFO and format on strand from FreeBayes, VarDict, ...
@@ -345,7 +343,7 @@ def mergedRecord(vcf, first, first_std_name, second, second_std_name, FH_seq, ch
     second_start = int(round(second.refStart() + 0.49, 0))
     ref_add = ""
     if second_start - first_end > 0:
-        ref_add = FH_seq.getSub(chrom_id, first_end + 1, second_start - 1)
+        ref_add = FH_seq.getSub(first.chrom, first_end + 1, second_start - 1)
     merged.ref = first.ref + ref_add + second.ref
     merged.ref = merged.ref.replace(VCFRecord.getEmptyAlleleMarker(), "")
     merged.alt = [first.alt[0] + ref_add + second.alt[0]]
@@ -488,7 +486,6 @@ if __name__ == "__main__":
                     chrom_var = deque()
                     prev_list = list()
                     for curr in FH_vcf:
-                        chrom_seq = FH_seq.get(curr.chrom).string
                         std_curr = deepcopy(curr)
                         initVariant(curr, FH_seq)
                         merged_idx = set()
@@ -544,7 +541,7 @@ if __name__ == "__main__":
                                                         first_std_name = std_curr.getName()
                                                         second = prev
                                                         second_std_name = std_prev.getName()
-                                                    merged = mergedRecord(FH_vcf, first, first_std_name, second, second_std_name, chrom_seq)
+                                                    merged = mergedRecord(FH_vcf, first, first_std_name, second, second_std_name, FH_seq)
                                                     traceMerge(merged, intersection_rate, intersection_count)
                                                     log.info("Merge {} and {} in {} (intersection: {:.2f} on {}]).".format(
                                                         prev.getName(), curr.getName(), merged.getName(), intersection_rate, analysed_count
