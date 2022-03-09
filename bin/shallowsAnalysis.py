@@ -136,7 +136,7 @@ def shallowFromAlignment(aln_path, selected_regions, depth_mode, min_base_qual, 
                         if not pileupread.alignment.is_secondary and not pileupread.alignment.is_duplicate and not pileupread.is_refskip:
                             curr_id = pileupread.alignment.query_name
                             if depth_mode == "read":
-                                curr_id += "_" + pileupread.alignment.is_read1
+                                curr_id += "_" + str(pileupread.alignment.is_read1)
                             ids_on_pos.add(curr_id)
                     curr_depth = len(ids_on_pos)
                     if min_depth > curr_depth:
