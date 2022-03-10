@@ -1,4 +1,4 @@
-# Release 3.5.0 [DEV]
+# Release 3.5.0 [2022-03-10]
 
 ### Improvements:
   * Update pysam from `0.15.3` to `0.18.0`.
