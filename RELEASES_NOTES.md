@@ -1,3 +1,9 @@
+# Release 3.6.0 [DEV]
+
+### Improvements:
+  * Update scipy from `1.2.1` to `1.7.3`.
+
+
 # Release 3.5.0 [2022-03-10]
 
 ### Improvements:

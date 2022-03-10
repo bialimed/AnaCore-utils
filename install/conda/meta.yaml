@@ -3,7 +3,7 @@
 {% set anacore_version = "=2.11.0" %}
 {% set pysam_version = "=0.18.0" %}
 {% set python_version = ">=3.5" %}
-{% set scipy_version = "=1.2.1" %}
+{% set scipy_version = "=1.7.3" %}
 
 package:
   name: anacore-utils
@@ -15,7 +15,7 @@ source:
 
 build:
   number: 1
-  script: ${PYTHON} setup.py install
+  script: ${PYTHON} setup.py install --single-version-externally-managed --record=record.txt
   noarch: python
 
 requirements:
