@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.1'
+__version__ = '1.3.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -22,10 +22,11 @@ from anacore.vcf import VCFIO, HeaderFilterAttr
 if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Filter variants on their AD, AF and DP.')
-    parser.add_argument('-m', '--mode', default="tag", choices=["tag", "remove"], help='Select the filter mode. In mode "tag" if the variant does not fit criteria a tag "lowAD" and/or "lowAF" is added in FILTER field. In mode "remove" if the variant does not fit criteria it is removed from the output. [Default: %(default)s]')
     parser.add_argument('-d', '--min-AD', default=4, type=int, help='Filter variants with AD <= than this values. [Default: %(default)s]')
     parser.add_argument('-f', '--min-AF', default=0.02, type=float, help='Filter variants with AF <= than this values. [Default: %(default)s]')
+    parser.add_argument('-m', '--mode', default="tag", choices=["tag", "remove"], help='Select the filter mode. In mode "tag" if the variant does not fit criteria a tag "lowAD" and/or "lowAF" is added in FILTER field. In mode "remove" if the variant does not fit criteria it is removed from the output. [Default: %(default)s]')
     parser.add_argument('-p', '--min-DP', default=20, type=int, help='Filter variants with DP <= than this values. [Default: %(default)s]')
+    parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-i', '--input-variants', help='Path to the variants file (format: VCF).')
     group_output = parser.add_argument_group('Outputs')  # Outputs
