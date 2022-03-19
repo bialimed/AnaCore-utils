@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2020 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.3.0'
+__version__ = '1.3.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -249,7 +249,7 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Produce data to inspect fusions breakends.')
     parser.add_argument('-f', '--annotation-field', default="ANN", help='Field used for store annotations. [Default: %(default)s]')
-    parser.add_argument('-q', '--min-base-qual', default=10, help="Minimum quality to take a read base into account in depth calculation. [Default: %(default)s]")
+    parser.add_argument('-q', '--min-base-qual', type=int, default=10, help="Minimum quality to take a read base into account in depth calculation. [Default: %(default)s]")
     parser.add_argument('-s', '--stranded', choices=["R1", "R2"], help='If your RNA library preps are stranded choose the read matching the transcript strand (R1: sense prep, R2: antisense prep).')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs

@@ -3,6 +3,10 @@
 ### Improvements:
   * Update scipy from `1.2.1` to `1.7.3`.
 
+### Bug fixes:
+  * Fix bug with missing type of quality parameters in `bin/inspectBND.py` and
+  `bin/shallowsAnalysis.py`.
+
 
 # Release 3.5.0 [2022-03-10]
 

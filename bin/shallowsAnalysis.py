@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.5.0'
+__version__ = '1.5.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -512,7 +512,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Extract shallow areas from the alignment are annotate them with genomic features and known variants.')
     parser.add_argument('-d', '--min-depth', type=int, default=30, help='All the locations with a depth under this value are reported in shallows areas. [Default: %(default)s]')
     parser.add_argument('-m', '--depth-mode', choices=["read", "fragment"], default="fragment", help='How count the depth: by reads (each reads is added independently) or by fragment (the R1 and R2 coming from the same pair are counted only once). [Default: %(default)s]')
-    parser.add_argument('-q', '--min-base-qual', default=10, help="Minimum quality to take a read base into account in depth calculation. [Default: %(default)s]")
+    parser.add_argument('-q', '--min-base-qual', type=int, default=10, help="Minimum quality to take a read base into account in depth calculation. [Default: %(default)s]")
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_known = parser.add_argument_group('Known variants')
     group_known.add_argument('-n', '--known-count-field', default="CNT", help="Field used in known variants database to store the number of database's samples with this variant. [Default: %(default)s]")
