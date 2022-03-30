@@ -1,3 +1,10 @@
+# Release 3.6.0 [DEV]
+
+### Bug fixes:
+  * Fix bug in annotating precise breakends with CIPOS > 0 on opposite strands
+  and no overlap with an exon edge in `bin/annotBND.py`.
+
+
 # Release 3.5.1 [2022-03-19]
 
 ### Improvements:

@@ -202,7 +202,6 @@ class TestAnnotBND(unittest.TestCase):
             [{"STRAND": '+', "GENE_SHARD": 'down'}, {"STRAND": '-', "GENE_SHARD": 'up'}]
         )
 
-
     def test_getDistBeforeCDSReverse(self):
         genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
         protein = genes_by_chr["1"][0].children[1].proteins[0]

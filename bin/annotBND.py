@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2018 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '1.5.0'
+__version__ = '1.5.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -436,11 +436,15 @@ def selectedPos(first, first_exons_sup_by_pos, second, second_exons_sup_by_pos):
     :return: Retained spot positions for the first and the second breakend when they contain CIPOS.
     :rtype: (int, int)
     """
+    first_strand = getStrand(first, True)
+    second_strand = getStrand(second, False)
     if len(first_exons_sup_by_pos) == 0 and len(second_exons_sup_by_pos) == 0:  # No shard contain an exon at breakend pos
-        return (first.pos, second.pos)
+        if first_strand == second_strand:
+            return (first.pos, second.pos)
+        else:  # In opposite strand take consistency between BND 1 and 2 (VCF pos is not consistent: move to left)
+            cipos = 0 if "CIPOS" not in second.info else second.info["CIPOS"][1]
+            return (first.pos, second.pos + cipos)
     else:
-        first_strand = getStrand(first, True)
-        second_strand = getStrand(second, False)
         if len(second_exons_sup_by_pos) == 0:  # Only the 5' shard contains at least one exon at breakend pos: the most supported exon boundary for the first breakend is retained
             selected_pos = getMostSupported(first_exons_sup_by_pos)
             offset = selected_pos - first.pos
