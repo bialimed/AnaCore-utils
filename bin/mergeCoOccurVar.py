@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.2.1'
+__version__ = '2.3.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -47,7 +47,11 @@ def getAlnCmp(read, ref_seq):
                 ref_aln.extend(ref_seq[:operation_lg])
                 ref_seq = ref_seq[operation_lg:]
             elif operation_id == 1:  # Insertion
-                read_aln[-1] += "".join(read_seq[:operation_lg])
+                if len(read_aln) != 0:  # Insertion does not start alignment
+                    read_aln[-1] += "".join(read_seq[:operation_lg])
+                    # Insertion starting alignment should be clipping.
+                    # In this situation reference nucleotids cannot be found and
+                    # reference start is after the insertion.
                 read_seq = read_seq[operation_lg:]
             elif operation_id == 2:  # Deletion
                 read_aln.extend(["" for operation_pos in range(operation_lg)])
