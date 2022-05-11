@@ -40,8 +40,10 @@ def getNewHeaderAttr(args):
     final_format = {
         "AD": HeaderFormatAttr("AD", type="Integer", number="A", description="Allele Depth"),
         "DP": HeaderFormatAttr("DP", type="Integer", number="1", description="Total Depth"),
+        "GT": HeaderFormatAttr("GT", type="String", number="1", description="Genotype"),
         "ADSRC": HeaderFormatAttr("ADSRC", type="Integer", number=".", description="Allele Depth by source"),
-        "DPSRC": HeaderFormatAttr("DPSRC", type="Integer", number=".", description="Total Depth by source")
+        "DPSRC": HeaderFormatAttr("DPSRC", type="Integer", number=".", description="Total Depth by source"),
+        "GTSRC": HeaderFormatAttr("GTSRC", type="String", number=".", description="Genotype by source")
     }
     final_samples = None
     for idx_in, curr_in in enumerate(args.inputs_variants):
@@ -119,7 +121,8 @@ def getMergedRecords(inputs_variants, calling_sources, annotations_field, shared
                 for spl in FH_in.samples:
                     support_by_spl[spl] = {
                         "AD": record.getAltAD(spl)[0],
-                        "DP": record.getDP(spl)
+                        "DP": record.getDP(spl),
+                        "GT": record.getGT(spl)
                     }
                 # Rename filters
                 if record.filter is not None:
@@ -160,13 +163,17 @@ def getMergedRecords(inputs_variants, calling_sources, annotations_field, shared
                     # AD and DP by sample (from the first caller finding the variant: callers are in user order)
                     record.format.insert(0, "ADSRC")
                     record.format.insert(0, "DPSRC")
+                    record.format.insert(0, "GTSRC")
                     record.format.insert(0, "AD")
                     record.format.insert(0, "DP")
+                    record.format.insert(0, "GT")
                     for spl_name, spl_data in record.samples.items():
                         spl_data["AD"] = [support_by_spl[spl_name]["AD"]]
                         spl_data["DP"] = support_by_spl[spl_name]["DP"]
+                        spl_data["GT"] = support_by_spl[spl_name]["GT"]
                         spl_data["ADSRC"] = [support_by_spl[spl_name]["AD"]]
                         spl_data["DPSRC"] = [support_by_spl[spl_name]["DP"]]
+                        spl_data["GTSRC"] = [support_by_spl[spl_name]["GT"]]
                 else:
                     prev_variant = variant_by_name[variant_name]
                     prev_variant.info["SRC"].append(curr_caller)
@@ -190,6 +197,7 @@ def getMergedRecords(inputs_variants, calling_sources, annotations_field, shared
                         spl_data.update(record.samples[spl_name])
                         spl_data["ADSRC"].append(support_by_spl[spl_name]["AD"])
                         spl_data["DPSRC"].append(support_by_spl[spl_name]["DP"])
+                        spl_data["GTSRC"].append(support_by_spl[spl_name]["GT"])
     return variant_by_name.values()
 
 
