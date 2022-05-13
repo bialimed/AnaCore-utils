@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.6.0'
+__version__ = '2.7.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -86,7 +86,8 @@ def getAnnotSummary(allele_record, initial_alt, annot_field="ANN", pop_prefixes=
             "subject": {"symbol": annot["SYMBOL"], "feature": annot["Feature"], "feature_type": annot["Feature_type"]},
             "changes": {"HGVSc": annot["HGVSc"], "HGVSp": annot["HGVSp"]},
             "conseq": annot["Consequence"],
-            "pathogenicity": getPathogenicityPredictors(annot, pathogenicity_fields)
+            "pathogenicity": getPathogenicityPredictors(annot, pathogenicity_fields),
+            "is_main": annot["PEAK"] == "1" if "PEAK" in annot else None  # Tag main annotations if flag_pick has been used
         })
     xref = {db: list(xref[db]) for db in xref}
     pop_AF = list(pop_AF.values())

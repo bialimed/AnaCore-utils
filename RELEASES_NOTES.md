@@ -1,5 +1,10 @@
 # Release 3.6.0 [DEV]
 
+### Improvements:
+  * Add storage for flag of main alternative annotation in `bin/VCFToJSON.py`.
+  This flag is optional and is retrieved from PICK field in annotation (example:
+  VCF coming from VEP with flag_pick option).
+
 ### Bug fixes:
   * Fix bug in annotating precise breakends with CIPOS > 0 on opposite strands
   and no overlap with an exon edge in `bin/annotBND.py`.
