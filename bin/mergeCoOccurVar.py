@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 IUCT-O'
 __license__ = 'GNU General Public License'
-__version__ = '2.3.0'
+__version__ = '2.3.1'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -157,7 +157,7 @@ def getIncludingReadsDNA(FH_aln, FH_seq, chrom_id, target_start, target_end):
     """
     including_reads = set()
     for read in FH_aln.fetch(chrom_id, target_start - 1, target_end):
-        if not read.is_duplicate:
+        if not read.is_duplicate and not read.is_secondary:
             reads_pos = read.get_reference_positions()
             if len(reads_pos) != 0:  # Skip alignment with problem
                 ref_start = reads_pos[0] + 1  # 0-based to 1-based
@@ -187,7 +187,7 @@ def getIncludingReadsRNA(FH_aln, FH_seq, chrom_id, target_start, target_end):
     """
     including_reads = set()
     for read in FH_aln.fetch(chrom_id, target_start - 1, target_end):
-        if not read.is_duplicate:
+        if not read.is_duplicate and not read.is_secondary:
             reads_pos = read.get_reference_positions()
             if len(reads_pos) != 0:  # Skip alignment with problem
                 ref_start = reads_pos[0] + 1  # 0-based to 1-based
@@ -221,7 +221,7 @@ def getSupportingReads(var, FH_seq, chrom_id, FH_aln, log):
     supporting_reads = set()
     is_insertion = var.isInsertion()
     for read in FH_aln.fetch(var.chrom, var.upstream_start - 1, var.downstream_end):
-        if not read.is_duplicate:
+        if not read.is_duplicate and not read.is_secondary:
             reads_pos = read.get_reference_positions()
             if len(reads_pos) != 0:  # Skip alignment with problem
                 ref_start = reads_pos[0] + 1  # 0-based to 1-based

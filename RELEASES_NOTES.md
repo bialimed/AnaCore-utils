@@ -6,6 +6,9 @@
   VCF coming from VEP with flag_pick option).
 
 ### Bug fixes:
+  * Fix bug with secondary mapping for aligners producing extra lines in the BAM
+  (like STAR). These secondary mapping were taken into account and will no longer
+  be taken into account.
   * Fix bug in annotating precise breakends with CIPOS > 0 on opposite strands
   and no overlap with an exon edge in `bin/annotBND.py`.
 
