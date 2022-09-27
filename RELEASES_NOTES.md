@@ -1,6 +1,14 @@
 # Release 3.6.0 [DEV]
 
 ### Improvements:
+  * Add scripts to manage microsatellites classification:
+    * `bin/microsatCreateModel.py`
+    * `bin/microsatLenDistrib.py`
+    * `bin/microsatMergeResults.py`
+    * `bin/microsatMsingsClassif.py`
+    * `bin/microsatMSIsensorproProClassif.py`
+    * `bin/microsatSklearnClassify.py`
+    * `bin/microsatStatusToAnnot.py`
   * Add storage for flag of main alternative annotation in `bin/VCFToJSON.py`.
   This flag is optional and is retrieved from PICK field in annotation (example:
   VCF coming from VEP with flag_pick option).
