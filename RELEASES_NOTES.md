@@ -1,4 +1,4 @@
-# Release 3.6.0 [DEV]
+# Release 3.6.0 [2022-10-01]
 
 ### Improvements:
   * Add scripts to manage microsatellites classification:
