@@ -89,7 +89,7 @@ def getStatus(nb_peaks, baseline_locus):
     :return: Predicted status.
     :rtype: anacore.msi.base.Status
     """
-    if nb_peaks >= baseline_locus["threshold"]:
+    if nb_peaks > baseline_locus["threshold"]:
         status = Status.unstable
     else:
         status = Status.stable
