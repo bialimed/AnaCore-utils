@@ -1,30 +1,14 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2017 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2017 IUCT-O'
+__copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
+from anacore.illumina.samplesheet import SampleSheetFactory
 import argparse
-from anacore.illumina import SampleSheetIO
 
 
 ########################################################################
@@ -44,7 +28,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Process
-    samplesheet = SampleSheetIO(args.input_samplesheet)
+    samplesheet = SampleSheetFactory.get(args.input_samplesheet)
     selected_manifests = args.selected_manifests
     if args.selected_manifests is None:
         selected_manifests = samplesheet.manifests.values()

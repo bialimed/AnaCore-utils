@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2019 IUCT-O'
+__copyright__ = 'Copyright (C) 2019 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -13,7 +13,7 @@ import json
 import logging
 import argparse
 from datetime import datetime
-from anacore.illumina import getRunFolderInfo
+from anacore.illumina.run import getRunFolderInfo
 
 
 ########################################################################
