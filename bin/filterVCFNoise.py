@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2018 IUCT-O'
+__copyright__ = 'Copyright (C) 2018 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -29,13 +29,13 @@ def getNoise(input_noise):
     :return: By variant id ("chrom:pos=ref/alt") the noise rate.
     :rtype: dict
     """
-    expected_titles = ["Chromosome", "Position", "Reference_allele", "Alternative_allele", "Noise_rate"]
+    expected_titles = {"Chromosome", "Position", "Reference_allele", "Alternative_allele", "Noise_rate"}
     noise_by_var = dict()
     with HashedSVIO(input_noise, title_starter="#") as FH_noise:
-        if FH_noise.titles != expected_titles:
+        if len(expected_titles - set(FH_noise.titles)) != 0:
             raise Exception(
-                'The header line in "{}" does not correpond to "#{}".'.format(
-                    input_noise, "\t".join(expected_titles)
+                'The header line in "{}" does not contain: {}".'.format(
+                    input_noise, ", ".join(expected_titles)
                 )
             )
         for record in FH_noise:
