@@ -1,3 +1,10 @@
+# Release 3.7.0 [DEV]
+
+### Improvements:
+  * Use user selected annotation tag in header of empty variants file in
+  `bin/VEPWrapper.py`.
+
+
 # Release 3.6.0 [2022-10-01]
 
 ### Improvements:

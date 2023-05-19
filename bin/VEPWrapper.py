@@ -1,25 +1,9 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2019 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2019 IUCT-O'
+__copyright__ = 'Copyright (C) 2019 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -43,6 +27,7 @@ if __name__ == "__main__":
             )
         )
     vep_cmd = sys.argv[1:]
+    ann_tag = vep_cmd[vep_cmd.index("--vcf_info_field") + 1] if "--vcf_info_field" in vep_cmd else "CSQ"
     input_file = vep_cmd[vep_cmd.index("--input_file") + 1]
     output_file = vep_cmd[vep_cmd.index("--output_file") + 1]
 
@@ -66,7 +51,11 @@ if __name__ == "__main__":
             with open(output_file, "w") as FH_out:
                 for line in FH_in:
                     if line.startswith("#CHROM	POS	ID	REF	ALT	QUAL"):
-                        FH_out.write('##INFO=<ID=ANN,Number=.,Type=String,Description="Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature">\n')
+                        FH_out.write(
+                            '##INFO=<ID={},Number=.,Type=String,Description="Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature">\n'.format(
+                                ann_tag
+                            )
+                        )
                     FH_out.write(line)
     else:  # Annotate
         log.info("Process annotation")
