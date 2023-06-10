@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2019 IUCT-O'
+__copyright__ = 'Copyright (C) 2019 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -61,7 +61,6 @@ class TestFilterAnnotVCF(unittest.TestCase):
             "class": "Filter",
             "getter": "chrom",
             "action": "select",
-            "aggregator": "nb:1",
             "operator": "==",
             "values": "artificial_chr2"
         }
@@ -72,7 +71,6 @@ class TestFilterAnnotVCF(unittest.TestCase):
     "class": "Filter",
     "getter": "FILTER",
     "action": "select",
-    "aggregator": "ratio:1",
     "operator": "==",
     "values": "PASS"
 }""")
@@ -207,7 +205,7 @@ class TestFilterAnnotVCF(unittest.TestCase):
                 if "ANN" in record.info:
                     for curr_ann in record.info["ANN"]:
                         observed.append(curr_ann["id"])
-        self.assertEqual(expected, observed)
+        self.assertEqual(observed, expected)
 
     def testResultsFilterAnn(self):
         cmd = self.cmd + ["--input-filters-annotations", self.tmp_annot_filters]
@@ -231,7 +229,7 @@ class TestFilterAnnotVCF(unittest.TestCase):
                     for curr_ann in record.info["ANN"]:
                         observed.append(curr_ann["id"])
 
-        self.assertEqual(expected, observed)
+        self.assertEqual(observed, expected)
 
     def testResultsFilterAnnAndVar(self):
         cmd = self.cmd + ["--input-filters-variants", self.tmp_var_filters, "--input-filters-annotations", self.tmp_annot_filters]
@@ -255,7 +253,7 @@ class TestFilterAnnotVCF(unittest.TestCase):
                 if "ANN" in record.info:
                     for curr_ann in record.info["ANN"]:
                         observed.append(curr_ann["id"])
-        self.assertEqual(expected, observed)
+        self.assertEqual(observed, expected)
 
 
 ########################################################################
