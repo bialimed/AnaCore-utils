@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
+__version__ = '1.2.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -14,6 +14,7 @@ import logging
 import argparse
 from datetime import datetime
 from anacore.illumina.run import getRunFolderInfo
+from anacore.illumina.samplesheet import Sample
 
 
 ########################################################################
@@ -21,14 +22,16 @@ from anacore.illumina.run import getRunFolderInfo
 # FUNCTIONS
 #
 ########################################################################
-class DateTimeEncoder(json.JSONEncoder):
-    """JSON encoder for datetime"""
+class CustomEncoder(json.JSONEncoder):
+    """JSON encoder for datetime and samplesheet.Sample."""
     def default(self, obj):
         encoded = None
         if isinstance(obj, datetime):
             encoded = obj.timestamp()
+        elif isinstance(obj, Sample):
+            encoded = obj.toDict()
         else:
-            encoded = json.JSONEncodzer.default(self, obj)
+            encoded = json.JSONEncoder.default(self, obj)
         return encoded
 
 
@@ -54,6 +57,10 @@ if __name__ == "__main__":
     log.info("Command: " + " ".join(sys.argv))
 
     # Process
-    with open(args.output_info, "w") as FH_out:
-        json.dump(getRunFolderInfo(args.input_run_folder), FH_out, cls=DateTimeEncoder)
+    with open(args.output_info, "w") as writer:
+        json.dump(
+            getRunFolderInfo(args.input_run_folder),
+            writer,
+            cls=CustomEncoder
+        )
     log.info("End of job")
