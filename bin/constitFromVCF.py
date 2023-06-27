@@ -1,31 +1,17 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2018 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2018 IUCT-O'
+__copyright__ = 'Copyright (C) 2018 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.2'
+__version__ = '2.0.0'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
-import sys
 import argparse
-from anacore.vcf import VCFIO, getAlleleRecord
+from anacore.annotVcf import AnnotVCFIO, getAlleleRecord
+import logging
+import os
+import sys
 
 
 ########################################################################
@@ -33,6 +19,55 @@ from anacore.vcf import VCFIO, getAlleleRecord
 # FUNCTIONS
 #
 ########################################################################
+def extendCluster(AF_by_spl, clstr_samples, extend_rate=0.1):
+    """
+    Extend current cluster with superior neighbors AF. In each iteration, cluster
+    is extended from is maximum allele frequency to the following if
+    AF_neighbor <= clutr_max_AF + clutr_max_AF * extend_rate.
+
+    :param AF_by_spl: Allele frequency by sample.
+    :type AF_by_spl: dict
+    :param clstr_samples: Samples in seed cluster.
+    :type clstr_samples: list
+    :param extend_rate: Maximum allele frequency increasing rate to aggregate the following frequency.
+    :type extend_rate: float
+    :return: Extension trace.
+    :rtype: dict
+    """
+    clstr_max_AF = max([AF_by_spl[spl] for spl in clstr_samples])
+    extended_threshold = clstr_max_AF + clstr_max_AF * extend_rate
+    asc_observation = [{"spl": spl, "af": af} for spl, af in sorted(AF_by_spl.items(), key=lambda item: item[1]) if af > clstr_max_AF]
+    trace = {"from": clstr_max_AF, "to": None, "ini_count": len(clstr_samples), "count": None}
+    for obs in asc_observation:
+        if obs["af"] >= clstr_max_AF and obs["af"] <= extended_threshold:
+            clstr_samples.append(obs["spl"])
+            clstr_max_AF = obs["af"]
+            extended_threshold = clstr_max_AF + clstr_max_AF * extend_rate
+            trace["to"] = obs["af"]
+        else:
+            break
+    if trace["to"]:
+        trace["count"] = len(clstr_samples)
+    return trace
+
+
+def getAFBySpl(reader, curr_allele, args):
+    nb_usable_spl = 0  # Nb samples with valid DP at the variant position
+    nb_support_spl = 0  # Nb samples containing the variant
+    AF_by_spl = dict()
+    for curr_spl in reader.samples:
+        curr_DP = curr_allele.getDP(curr_spl)
+        if curr_DP is None:
+            raise Exception('The DP for the variant "{}" in sample "{}" must be set when you merge samples.'.format(curr_allele.getName(), curr_spl))
+        elif curr_DP > args.min_DP:  # Skip samples with limited DP at the variant position
+            nb_usable_spl += 1
+            curr_AF = curr_allele.getAltAF(curr_spl)[0]
+            if curr_AF is not None and curr_AF > 0:  # The sample contain the variant
+                nb_support_spl += 1
+                AF_by_spl[curr_spl] = curr_AF
+    return AF_by_spl, nb_usable_spl, nb_support_spl
+
+
 def getBiggerCluster(freq_by_spl, max_freq_diff):
     """
     Return the bigger group of samples with similar frequencies.
@@ -77,8 +112,9 @@ def getBiggerCluster(freq_by_spl, max_freq_diff):
 ########################################################################
 if __name__ == "__main__":
     # Manage parameters
-    parser = argparse.ArgumentParser(description='Find constitutive variants in population of samples coming from one VCF. An constitutive variant is a variant coming from polymerase error rate at this position, or workflow artifact, ... . It is common in almost all samples with an allele frequency very similar in each samples. If this variant is present in a superiror frequency in a particular sample that can signify that this variant is not an artefact in this sample only.')
-    parser.add_argument('-n', '--noise-offset', type=float, default=0.01, help='The value added to the maximum constitutive frequency of the variant. [Default: %(default)s]')
+    parser = argparse.ArgumentParser(description='Find constitutive variants in population of samples coming from one VCF. An constitutive variant is a variant coming from polymerase error rate at this position, or workflow artifact, ... . It is common in almost all samples with an allele frequency very similar in each samples. If this variant is present in a superior frequency in a particular sample that can signify that this variant is not an artefact in this sample only.')
+    parser.add_argument('-n', '--noise-offset', type=float, default=0.01, help='Value added to the maximum constitutive frequency of the variant. [Default: %(default)s]')
+    parser.add_argument('-e', '--extension-rate', type=float, help='Extention of cluster of constitutive frequencies with neighbor values. Cluster are iteratively extend with following upper frequency if AF_next <= clutr_max_AF + clutr_max_AF * extend_rate.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_thresholds = parser.add_argument_group('Thresolds')  # Thresholds
     group_thresholds.add_argument('-r', '--min-presence-ratio', type=float, default=0.75, help='Minimum ratio between samples with variant at the same AF and the samples with valid depth (see "--min-DP") for declare variant as constitutive. [Default: %(default)s]')
@@ -91,15 +127,23 @@ if __name__ == "__main__":
     group_output.add_argument('-o', '--output-variants', required=True, help='The path to the outputted file containing the constitutive variants (format: TSV).')
     args = parser.parse_args()
 
+    # Logger
+    logging.basicConfig(format='%(asctime)s -- [%(filename)s][pid:%(process)d][%(levelname)s] -- %(message)s')
+    log = logging.getLogger(os.path.basename(__file__))
+    log.setLevel(logging.INFO)
+    log.info("Command: " + " ".join(sys.argv))
+
     # Process
-    with VCFIO(args.input_variants) as FH_in:
-        with open(args.output_variants, "w") as FH_out:
+    with AnnotVCFIO(args.input_variants) as reader:
+        with open(args.output_variants, "w") as writer:
             # Header
-            FH_out.write("## PARAMETERS: {}\n".format(
-                " ".join(sys.argv)
-            ))
-            FH_out.write("## VERSION: {}\n".format(__version__))
-            FH_out.write("\t".join([
+            writer.write(
+                "## PARAMETERS: {}\n".format(
+                    " ".join(sys.argv)
+                )
+            )
+            writer.write("## VERSION: {}\n".format(__version__))
+            writer.write("\t".join([
                 "#Chromosome",
                 "Position",
                 "Reference_allele",
@@ -109,44 +153,76 @@ if __name__ == "__main__":
                 "Nb_usable_spl",
                 "Nb_support_spl",
                 "Nb_constit_spl",
+                "%_support_spl",
+                "%_constit_spl",
+                "%_under_threshold_spl",
+                "filters",
+                "Gene",
+                "HGVSc",
+                "HGVSp",
                 "Constit_spl",
-                "Constit_AF"
+                "Constit_AF",
+                "AF_over_noise_rate"
             ]) + "\n")
             # Records
-            for record in FH_in:
+            nb_spl = len(reader.samples)
+            for record in reader:
                 for idx in range(len(record.alt)):
-                    curr_allele = getAlleleRecord(FH_in, record, idx)
-                    nb_spl = len(FH_in.samples)
-                    nb_usable_spl = 0  # Nb samples with valid DP at the variant position
-                    nb_support_spl = 0  # Nb samples containing the variant
-                    nb_support_constit_spl = 0
-                    AF_by_spl = dict()
-                    for curr_spl in FH_in.samples:
-                        curr_DP = curr_allele.getDP(curr_spl)
-                        if curr_DP is None:
-                            raise Exception('The DP for the variant "{}" in sample "{}" must be set when you merge samples.'.format(curr_allele.getName(), curr_spl))
-                        elif curr_DP > args.min_DP:  # Skip samples with limited DP at the variant position
-                            nb_usable_spl += 1
-                            curr_AF = curr_allele.getAltAF(curr_spl)[0]
-                            if curr_AF is not None and curr_AF > 0:  # The sample contain the variant
-                                nb_support_spl += 1
-                                AF_by_spl[curr_spl] = curr_AF
+                    curr_allele = getAlleleRecord(reader, record, idx)
+                    AF_by_spl, nb_usable_spl, nb_support_spl = getAFBySpl(reader, curr_allele, args)
                     if nb_usable_spl > 0:
                         if nb_support_spl / nb_usable_spl >= args.min_presence_ratio and nb_support_spl >= args.min_presence_count:  # Prefilter by support number for reduce processing time
                             clstr_samples = getBiggerCluster(AF_by_spl, args.max_AF_var)
+                            if args.extension_rate:
+                                extension_log = extendCluster(AF_by_spl, clstr_samples, args.extension_rate)
+                                if extension_log["to"]:
+                                    log.debug(
+                                        "Extend {} cluster from {} to {} ({} samples to {})".format(
+                                            curr_allele.getName(),
+                                            extension_log["from"], extension_log["to"],
+                                            extension_log["ini_count"], extension_log["count"]
+                                        )
+                                    )
                             nb_support_constit_spl = len(clstr_samples)
                             if nb_support_constit_spl / nb_usable_spl >= args.min_presence_ratio and nb_support_constit_spl >= args.min_presence_count:  # The variant is constitutive
                                 clstr_AF = [AF_by_spl[spl] for spl in sorted(clstr_samples)]
-                                FH_out.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+                                noise_threshold = max(clstr_AF)
+                                if args.extension_rate:
+                                    noise_threshold += noise_threshold * args.extension_rate
+                                noise_threshold += args.noise_offset
+                                noise_threshold = min(noise_threshold, 1)
+                                AF_over_threshold = [AF for spl, AF in AF_by_spl.items() if AF > noise_threshold]
+                                nb_under_threshold = nb_support_spl - len(AF_over_threshold)
+                                genes = set()
+                                hgvs_c = set()
+                                hgvs_p = set()
+                                if "ANN" in record.info:
+                                    for annot in record.info["ANN"]:
+                                        genes.add(annot["SYMBOL"])
+                                        hgvs_c.add(annot["HGVSc"])
+                                        hgvs_p.add(annot["HGVSp"])
+                                genes = sorted(["" if elt is None else elt for elt in genes])
+                                hgvs_c = sorted(["" if elt is None else elt for elt in hgvs_c])
+                                hgvs_p = sorted(["" if elt is None else elt for elt in hgvs_p])
+                                writer.write("{}\t{}\t{}\t{}\t{:.5f}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
                                     curr_allele.chrom,
                                     curr_allele.pos,
                                     curr_allele.ref,
                                     curr_allele.alt[0],
-                                    max(clstr_AF) + args.noise_offset,
+                                    noise_threshold,
                                     nb_spl,
                                     nb_usable_spl,
                                     nb_support_spl,
                                     nb_support_constit_spl,
+                                    nb_support_spl / nb_usable_spl,
+                                    nb_support_constit_spl / nb_support_spl,
+                                    nb_under_threshold / nb_support_spl,
+                                    ";".join(sorted(list(set(record.filter)))),
+                                    ";".join(genes),
+                                    ";".join(hgvs_c),
+                                    ";".join(hgvs_p),
                                     ";".join(sorted(clstr_samples)),
-                                    ";".join(map(str, clstr_AF))
+                                    ";".join(map(str, sorted(clstr_AF))),
+                                    ";".join(map(str, sorted(AF_over_threshold)))
                                 ))
+    log.info("End of job")
