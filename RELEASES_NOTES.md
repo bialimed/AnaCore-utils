@@ -4,6 +4,10 @@
   * Use user selected annotation tag in header of empty variants file in
   `bin/VEPWrapper.py`.
 
+### Bug fixes:
+  * Prevent merging overlapped variants in `bin/mergeCoOccurVar.py` (example:
+  18:51084007=CGCGCGCACA/- and 18:51084011=CGCACACA/-).
+
 
 # Release 3.6.0 [2022-10-01]
 

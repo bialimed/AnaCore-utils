@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2019 IUCT-O'
+__copyright__ = 'Copyright (C) 2019 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '2.3.1'
+__version__ = '2.3.2'
 __email__ = 'escudie.frederic@iuct-oncopole.fr'
 __status__ = 'prod'
 
@@ -280,6 +280,23 @@ def areColocated(first, second):
     return included
 
 
+def overlapped(first, second):
+    """
+    Return True if two variants overlap.
+
+    :param first: The upstream variant.
+    :type first: anacore.vcf.VCFRecord updated with iniVariant()
+    :param second: The downstream variant.
+    :type second: anacore.vcf.VCFRecord updated with iniVariant()
+    :return: True if two variants overlap.
+    :rtype: bool
+    """
+    overlapped = False
+    if first.downstream_end > second.upstream_start:
+        overlapped = True
+    return overlapped
+
+
 def initVariant(record, FH_seq):
     """
     Normalize and add attributes (supporting_reads to None, upstream_start, upstream_end, downstream_start, downstream_end).
@@ -512,6 +529,8 @@ if __name__ == "__main__":
                                         removed_idx = len(prev_list) - 1 - idx
                                     elif areColocated(curr, prev):  # The two records are colocated
                                         log.debug("Skip colocated variants {} and {}.".format(prev.getName(), curr.getName()))
+                                    elif overlapped(prev, curr):  # The two records are overlapped
+                                        log.debug("Skip overlapped variants {} and {}.".format(prev.getName(), curr.getName()))
                                     else:  # The two records are close together
                                         prev_AF = prev.getPopAltAF()[0]
                                         curr_AF = curr.getPopAltAF()[0]
