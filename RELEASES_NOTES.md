@@ -1,10 +1,12 @@
 # Release 3.7.0 [DEV]
 
 ### Improvements:
+  * Store exon/intron postion in JSON with `bin/VCFToJSON.py`.
   * Use user selected annotation tag in header of empty variants file in
   `bin/VEPWrapper.py`.
 
 ### Bug fixes:
+  * Fix bug with flag_pick key in `bin/VCFToJSON.py`.
   * Prevent merging overlapped variants in `bin/mergeCoOccurVar.py` (example:
   18:51084007=CGCGCGCACA/- and 18:51084011=CGCACACA/-).
 

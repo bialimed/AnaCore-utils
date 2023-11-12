@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2017 IUCT-O'
+__copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '2.7.0'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '2.8.0'
 
+from anacore.annotVcf import AnnotVCFIO, getAlleleRecord
+import argparse
+import json
+import logging
 import os
 import re
 import sys
-import json
-import logging
-import argparse
-from anacore.annotVcf import AnnotVCFIO, getAlleleRecord
 
 
 ########################################################################
@@ -82,13 +80,24 @@ def getAnnotSummary(allele_record, initial_alt, annot_field="ANN", pop_prefixes=
                                 )
         # Annotations
         annot_container = variant_annot if is_self_variant else collocated_annot
-        annot_container.append({
+        json_annot = {
             "subject": {"symbol": annot["SYMBOL"], "feature": annot["Feature"], "feature_type": annot["Feature_type"]},
             "changes": {"HGVSc": annot["HGVSc"], "HGVSp": annot["HGVSp"]},
             "conseq": annot["Consequence"],
             "pathogenicity": getPathogenicityPredictors(annot, pathogenicity_fields),
-            "is_main": annot["PEAK"] == "1" if "PEAK" in annot else None  # Tag main annotations if flag_pick has been used
-        })
+            "is_main": annot["PICK"] == "1" if "PICK" in annot else None  # Tag main annotations if flag_pick has been used
+        }
+        if "EXON" in annot and "INTRON" in annot:  # Add splice_segment only if calculated
+            json_annot["pos"] = dict()
+            if annot["Feature_type"] == "Transcript":
+                if annot["EXON"]:
+                    exon_pos = int(annot["EXON"].split("/")[0])
+                    json_annot["pos"]["transcript"] = {"exon": exon_pos}
+                elif annot["INTRON"]:
+                    intron_pos = int(annot["INTRON"].split("/")[0])
+                    json_annot["pos"]["transcript"] = {"intron": intron_pos}
+                # else: pass  # if variant is up/downstream of transcript (ex: TERT promoter)
+        annot_container.append(json_annot)
     xref = {db: list(xref[db]) for db in xref}
     pop_AF = list(pop_AF.values())
     return xref, pop_AF, variant_annot, collocated_annot
@@ -161,7 +170,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Converts VCF annotated with VEP in JSON format.')
     parser.add_argument('-r', '--assembly-id', help='ID of the reference used for the variant calling (example: GRCh38.p12).')
     parser.add_argument('-t', '--pathogenicity-fields', default=["CLIN_SIG", "CADD_PHRED", "MetaLR_rankscore", "VEST3_rankscore"], nargs='+', help='The titles of fields used to store pathogenicity predictor results (example: SIFT, PolyPhen, CADD_PHRED). [Default: %(default)s]')
-    parser.add_argument('-p', '--populations-prefixes', default=["exac", "gnomad", "1kg", "esp"], nargs='+', help='The prefixes used to determine database name in population allele frequency fields (example: "gnomAD" is used in gnomAD_AF, gnomAD_EUR_AF). [Default: %(default)s]')
+    parser.add_argument('-p', '--populations-prefixes', default=["gnomadg", "1kg"], nargs='+', help='The prefixes used to determine database name in population allele frequency fields (example: "gnomAD" is used in gnomAD_AF, gnomAD_EUR_AF). [Default: %(default)s]')
     parser.add_argument('-a', '--annotation-field', default="ANN", help='Field used to store annotations. [Default: %(default)s]')
     parser.add_argument('-c', '--calling-source', default=None, help='Add source of the calling in support information.')
     parser.add_argument('-m', '--merged-sources', action="store_true", help='Indicates that variants file come from a merge of several variants calling with anacore.mergeVCFCaller.py.')
