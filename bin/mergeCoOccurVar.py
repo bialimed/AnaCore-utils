@@ -3,9 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2019 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '2.3.2'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '2.3.3'
 
 import os
 import sys
@@ -360,10 +358,10 @@ def mergedRecord(vcf, first, first_std_name, second, second_std_name, FH_seq):
         pFormat=first.format
     )
     # Ref and Alt
-    first_end = int(round(first.refEnd() - 0.49, 0))
-    second_start = int(round(second.refStart() + 0.49, 0))
+    first_end = int(round(first.refEnd() - 0.49, 0))  # First last impacted ref
+    second_start = int(round(second.refStart() + 0.49, 0))  # Second first impacted ref
     ref_add = ""
-    if second_start - first_end > 0:
+    if second_start - first_end - 1 > 0:
         ref_add = FH_seq.getSub(first.chrom, first_end + 1, second_start - 1)
     merged.ref = first.ref + ref_add + second.ref
     merged.ref = merged.ref.replace(VCFRecord.getEmptyAlleleMarker(), "")

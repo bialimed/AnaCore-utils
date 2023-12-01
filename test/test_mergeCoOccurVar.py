@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2018 IUCT-O'
+__copyright__ = 'Copyright (C) 2018 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '2.2.0'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '2.3.0'
 
 import os
 import sys
@@ -521,239 +519,122 @@ class MergeCoOccurVar(unittest.TestCase):
             if os.path.exists(curr_file):
                 os.remove(curr_file)
 
-    def testMergedRecord_1_substit(self):
-        # Variant 1
-        self.variant_1.pos = 5
-        self.variant_1.ref = "A"
-        self.variant_1.alt = ["T"]
-        # Variant 2
-        self.variant_2.pos = 20
-        self.variant_2.ref = "G"
-        self.variant_2.alt = ["C"]
-        # Expected merge
-        self.expected_merge.pos = 5
-        self.expected_merge.ref = "AAATCTCGGCATGCCG"
-        self.expected_merge.alt = ["TAATCTCGGCATGCCC"]
-        self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=A/T", "chr1:20=G/C"]}
-        # Eval
-        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
-            observed_merge = mergedRecord(
-                self.vcfio,
-                self.variant_1, self.variant_1.getName(),
-                self.variant_2, self.variant_2.getName(),
-                FH_ref)
-        self.assertEqual(
-            strVariant(observed_merge),
-            strVariant(self.expected_merge)
-        )
+    def testMergedRecord(self):
+        test_cases = [
+            {  # substit and 14 missing ref between
+                "prev": {"pos": 5, "ref": "A", "alt": ["T"]},
+                "curr": {"pos": 20, "ref": "G", "alt": ["C"]},
+                "merge": {"pos": 5, "ref": "AAATCTCGGCATGCCG", "alt": ["TAATCTCGGCATGCCC"]}
+            },
+            {  # largeSubstit and 1 missing ref between
+                "prev": {"pos": 5, "ref": "AAAT", "alt": ["TGCA"]},
+                "curr": {"pos": 10, "ref": "TC", "alt": ["GG"]},
+                "merge": {"pos": 5, "ref": "AAATCTC", "alt": ["TGCACGG"]}
+            },
+            {  # largeCloseSubstit
+                "prev": {"pos": 5, "ref": "AAAT", "alt": ["TGCA"]},
+                "curr": {"pos": 9, "ref": "CT", "alt": ["GG"]},
+                "merge": {"pos": 5, "ref": "AAATCT", "alt": ["TGCAGG"]}
+            },
+            {  # delIns and 1 missing ref between
+                "prev": {"pos": 5, "ref": "AAAT", "alt": ["-"]},
+                "curr": {"pos": 10, "ref": "-", "alt": ["GGCATCT"]},
+                "merge": {"pos": 5, "ref": "AAATC", "alt": ["CGGCATCT"]}
+            },
 
-    def testMergedRecord_2_largeSubstit(self):
-        # Variant 1
-        self.variant_1.pos = 5
-        self.variant_1.ref = "AAAT"
-        self.variant_1.alt = ["TGCA"]
-        # Variant 2
-        self.variant_2.pos = 10
-        self.variant_2.ref = "TC"
-        self.variant_2.alt = ["GG"]
-        # Expected merge
-        self.expected_merge.pos = 5
-        self.expected_merge.ref = "AAATCTC"
-        self.expected_merge.alt = ["TGCACGG"]
-        self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/TGCA", "chr1:10=TC/GG"]}
-        # Eval
-        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
-            observed_merge = mergedRecord(
-                self.vcfio,
-                self.variant_1, self.variant_1.getName(),
-                self.variant_2, self.variant_2.getName(),
-                FH_ref)
-        self.assertEqual(
-            strVariant(observed_merge),
-            strVariant(self.expected_merge)
-        )
+            {  # insDel and 2 missing ref between
+                "prev": {"pos": 5, "ref": "-", "alt": ["GTGTG"]},
+                "curr": {"pos": 7, "ref": "ATC", "alt": ["-"]},
+                "merge": {"pos": 5, "ref": "AAATC", "alt": ["GTGTGAA"]}
+            },
 
-    def testMergedRecord_3_largeCloseSubstit(self):
-        # Variant 1
-        self.variant_1.pos = 5
-        self.variant_1.ref = "AAAT"
-        self.variant_1.alt = ["TGCA"]
-        # Variant 2
-        self.variant_2.pos = 9
-        self.variant_2.ref = "CT"
-        self.variant_2.alt = ["GG"]
-        # Expected merge
-        self.expected_merge.pos = 5
-        self.expected_merge.ref = "AAATCT"
-        self.expected_merge.alt = ["TGCAGG"]
-        self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/TGCA", "chr1:9=CT/GG"]}
-        # Eval
-        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
-            observed_merge = mergedRecord(
-                self.vcfio,
-                self.variant_1, self.variant_1.getName(),
-                self.variant_2, self.variant_2.getName(),
-                FH_ref)
-        self.assertEqual(
-            strVariant(observed_merge),
-            strVariant(self.expected_merge)
-        )
-
-    def testMergedRecord_4_delIns(self):
-        # Variant 1
-        self.variant_1.pos = 5
-        self.variant_1.ref = "AAAT"
-        self.variant_1.alt = ["-"]
-        # Variant 2
-        self.variant_2.pos = 10
-        self.variant_2.ref = "-"
-        self.variant_2.alt = ["GGCATCT"]
-        # Expected merge
-        self.expected_merge.pos = 5
-        self.expected_merge.ref = "AAATC"
-        self.expected_merge.alt = ["CGGCATCT"]
-        self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/-", "chr1:10=-/GGCATCT"]}
-        # Eval
-        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
-            observed_merge = mergedRecord(
-                self.vcfio,
-                self.variant_1, self.variant_1.getName(),
-                self.variant_2, self.variant_2.getName(),
-                FH_ref)
-        self.assertEqual(
-            strVariant(observed_merge),
-            strVariant(self.expected_merge)
-        )
-
-    def testMergedRecord_5_coDelIns(self):
-        # Variant 1
-        self.variant_1.pos = 5
-        self.variant_1.ref = "AAAT"
-        self.variant_1.alt = ["-"]
-        # Variant 2
-        self.variant_2.pos = 9
-        self.variant_2.ref = "-"
-        self.variant_2.alt = ["AGG"]
-        # Expected merge
-        self.expected_merge.pos = 5
-        self.expected_merge.ref = "AAAT"
-        self.expected_merge.alt = ["AGG"]
-        self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=AAAT/-", "chr1:9=-/AGG"]}
-        # Eval
-        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
-            observed_merge = mergedRecord(
-                self.vcfio,
-                self.variant_1, self.variant_1.getName(),
-                self.variant_2, self.variant_2.getName(),
-                FH_ref)
-        self.assertEqual(
-            strVariant(observed_merge),
-            strVariant(self.expected_merge)
-        )
-
-    def testMergedRecord_6_insDel(self):
-        # Variant 1
-        self.variant_1.pos = 5
-        self.variant_1.ref = "-"
-        self.variant_1.alt = ["GTGTG"]
-        # Variant 2
-        self.variant_2.pos = 7
-        self.variant_2.ref = "ATC"
-        self.variant_2.alt = ["-"]
-        # Expected merge
-        self.expected_merge.pos = 5
-        self.expected_merge.ref = "AAATC"
-        self.expected_merge.alt = ["GTGTGAA"]
-        self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=-/GTGTG", "chr1:7=ATC/-"]}
-        # Eval
-        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
-            observed_merge = mergedRecord(
-                self.vcfio,
-                self.variant_1, self.variant_1.getName(),
-                self.variant_2, self.variant_2.getName(),
-                FH_ref)
-        self.assertEqual(
-            strVariant(observed_merge),
-            strVariant(self.expected_merge)
-        )
-
-    def testMergedRecord_7_closeInsDel(self):
-        # Variant 1
-        self.variant_1.pos = 5
-        self.variant_1.ref = "-"
-        self.variant_1.alt = ["GTGTG"]
-        # Variant 2
-        self.variant_2.pos = 6
-        self.variant_2.ref = "AA"
-        self.variant_2.alt = ["-"]
-        # Expected merge
-        self.expected_merge.pos = 5
-        self.expected_merge.ref = "AAA"
-        self.expected_merge.alt = ["GTGTGA"]
-        self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=-/GTGTG", "chr1:6=AA/-"]}
-        # Eval
-        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
-            observed_merge = mergedRecord(
-                self.vcfio,
-                self.variant_1, self.variant_1.getName(),
-                self.variant_2, self.variant_2.getName(),
-                FH_ref)
-        self.assertEqual(
-            strVariant(observed_merge),
-            strVariant(self.expected_merge)
-        )
-
-    def testMergedRecord_8_coInsDel(self):
-        # Variant 1
-        self.variant_1.pos = 5
-        self.variant_1.ref = "-"
-        self.variant_1.alt = ["GTGTG"]
-        # Variant 2
-        self.variant_2.pos = 5
-        self.variant_2.ref = "AA"
-        self.variant_2.alt = ["-"]
-        # Expected merge
-        self.expected_merge.pos = 5
-        self.expected_merge.ref = "AA"
-        self.expected_merge.alt = ["GTGTG"]
-        self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:5=-/GTGTG", "chr1:5=AA/-"]}
-        # Eval
-        with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
-            observed_merge = mergedRecord(
-                self.vcfio,
-                self.variant_1, self.variant_1.getName(),
-                self.variant_2, self.variant_2.getName(),
-                FH_ref)
-        self.assertEqual(
-            strVariant(observed_merge),
-            strVariant(self.expected_merge)
-        )
-
-    # def testMergedRecord_9_delInsOtherSyntax(self):
-    #     # Variant 1
-    #     self.variant_1.pos = 4
-    #     self.variant_1.ref = "CAAAT"
-    #     self.variant_1.alt = ["C"]
-    #     # Variant 2
-    #     self.variant_2.pos = 9
-    #     self.variant_2.ref = "C"
-    #     self.variant_2.alt = ["CGCATCT"]
-    #     # Expected merge
-    #     self.expected_merge.pos = 5
-    #     self.expected_merge.ref = "AAATC"
-    #     self.expected_merge.alt = ["CGGCATCT"]
-    #     self.expected_merge.info = {"AF": [0.06], "MCO_QUAL": [10, 30], "MCO_VAR": ["chr1:4=CAAAT/-", "chr1:9=C/CGGCATCT"]}
-    #     # Eval
-    #     with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
-    #         observed_merge = mergedRecord(
-    #             self.vcfio,
-    #             self.variant_1, self.variant_1.getName(),
-    #             self.variant_2, self.variant_2.getName(),
-    #             FH_ref)
-    #     self.assertEqual(
-    #         strVariant(observed_merge),
-    #         strVariant(self.expected_merge)
-    #     )
+            {  # insDel and 1 missing ref between
+                "prev": {"pos": 5, "ref": "-", "alt": ["GTGTG"]},
+                "curr": {"pos": 6, "ref": "AA", "alt": ["-"]},
+                "merge": {"pos": 5, "ref": "AAA", "alt": ["GTGTGA"]}
+            },
+            {  # closeInsDel
+                "prev": {"pos": 5, "ref": "-", "alt": ["GTGTG"]},
+                "curr": {"pos": 5, "ref": "AA", "alt": ["-"]},
+                "merge": {"pos": 5, "ref": "AA", "alt": ["GTGTG"]}
+            },
+            {  # delIns and 1 missing ref between
+                "prev": {"pos": 5, "ref": "AAA", "alt": ["-"]},
+                "curr": {"pos": 9, "ref": "-", "alt": ["GGGT"]},
+                "merge": {"pos": 5, "ref": "AAAT", "alt": ["TGGGT"]}
+            },
+            {  # closeDelIns
+                "prev": {"pos": 5, "ref": "AAA", "alt": ["-"]},
+                "curr": {"pos": 8, "ref": "-", "alt": ["GGGT"]},
+                "merge": {"pos": 5, "ref": "AAA", "alt": ["GGGT"]}
+            },
+            {  # closeSubstit
+                "prev": {"pos": 5, "ref": "A", "alt": ["G"]},
+                "curr": {"pos": 6, "ref": "A", "alt": ["T"]},
+                "merge": {"pos": 5, "ref": "AA", "alt": ["GT"]}
+            },
+            {  # closeInsAfter
+                "prev": {"pos": 5, "ref": "A", "alt": ["G"]},
+                "curr": {"pos": 6, "ref": "-", "alt": ["T"]},
+                "merge": {"pos": 5, "ref": "A", "alt": ["GT"]}
+            },
+            {  # closeDelAfter
+                "prev": {"pos": 5, "ref": "A", "alt": ["G"]},
+                "curr": {"pos": 6, "ref": "A", "alt": ["-"]},
+                "merge": {"pos": 5, "ref": "AA", "alt": ["G"]}
+            },
+            {  # closeInsBefore
+                "prev": {"pos": 6, "ref": "-", "alt": ["T"]},
+                "curr": {"pos": 6, "ref": "A", "alt": ["G"]},
+                "merge": {"pos": 6, "ref": "A", "alt": ["TG"]}
+            },
+            {  # closeDelBefore
+                "prev": {"pos": 5, "ref": "A", "alt": ["-"]},
+                "curr": {"pos": 6, "ref": "A", "alt": ["G"]},
+                "merge": {"pos": 5, "ref": "AA", "alt": ["G"]}
+            },
+            {  # delBefore
+                "prev": {"pos": 5, "ref": "A", "alt": ["-"]},
+                "curr": {"pos": 6, "ref": "A", "alt": ["G"]},
+                "merge": {"pos": 5, "ref": "AA", "alt": ["G"]}
+            },
+            {  # coDelIns
+                "prev": {"pos": 5, "ref": "AAAT", "alt": ["-"]},
+                "curr": {"pos": 9, "ref": "-", "alt": ["AGG"]},
+                "merge": {"pos": 5, "ref": "AAAT", "alt": ["AGG"]}
+            },
+            {  # coInsDel
+                "prev": {"pos": 5, "ref": "-", "alt": ["GTGTG"]},
+                "curr": {"pos": 5, "ref": "AA", "alt": ["-"]},
+                "merge": {"pos": 5, "ref": "AA", "alt": ["GTGTG"]}
+            }
+        ]
+        for curr_test in test_cases:
+            self.variant_1.pos = curr_test["prev"]["pos"]
+            self.variant_1.ref = curr_test["prev"]["ref"]
+            self.variant_1.alt = curr_test["prev"]["alt"]
+            self.variant_2.pos = curr_test["curr"]["pos"]
+            self.variant_2.ref = curr_test["curr"]["ref"]
+            self.variant_2.alt = curr_test["curr"]["alt"]
+            self.expected_merge.pos = curr_test["merge"]["pos"]
+            self.expected_merge.ref = curr_test["merge"]["ref"]
+            self.expected_merge.alt = curr_test["merge"]["alt"]
+            self.expected_merge.info = {
+                "AF": [0.06],
+                "MCO_QUAL": [10, 30],
+                "MCO_VAR": [self.variant_1.getName(), self.variant_2.getName()]
+            }
+            # Eval
+            with IdxFastaIO(self.tmp_fasta_path) as FH_ref:
+                observed_merge = mergedRecord(
+                    self.vcfio,
+                    self.variant_1, self.variant_1.getName(),
+                    self.variant_2, self.variant_2.getName(),
+                    FH_ref)
+            self.assertEqual(
+                strVariant(observed_merge),
+                strVariant(self.expected_merge)
+            )
 
 
 def strVariant(var):

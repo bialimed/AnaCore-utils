@@ -7,6 +7,8 @@
 
 ### Bug fixes:
   * Fix bug with flag_pick key in `bin/VCFToJSON.py`.
+  * Fix bug in merging of two successive substitutions with
+  `bin/mergeCoOccurVar.py`.
   * Prevent merging overlapped variants in `bin/mergeCoOccurVar.py` (example:
   18:51084007=CGCGCGCACA/- and 18:51084011=CGCACACA/-).
 
