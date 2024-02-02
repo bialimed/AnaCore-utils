@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2017 IUCT-O'
+__copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.1'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '1.4.2'
 
 import os
 import sys
@@ -13,6 +11,7 @@ import time
 import argparse
 import subprocess
 from subprocess import Popen, PIPE
+import uuid
 
 BIN_DIR = os.path.dirname(__file__)
 os.environ['PATH'] = os.environ['PATH'] + os.pathsep + BIN_DIR
@@ -209,7 +208,7 @@ class TmpFiles:
         :type prefix: str
         """
         if prefix is None:
-            prefix = str(time.time()) + "_" + str(os.getpid())
+            prefix = str(uuid.uuid4())
         self.files = list()
         self.tmp_dir = tmp_dir
         self.prefix = prefix
