@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2019 IUCT-O'
+__copyright__ = 'Copyright (C) 2019 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '1.3.0'
 
 
 from anacore.gtf import GTFIO
@@ -240,14 +238,15 @@ def loadCosmic(db_path, db_version, fusions_by_partners, aliases_by_symbol, anno
     """
     # Sample ID    Sample name    Primary site    Site subtype 1    Site subtype 2    Site subtype 3    Primary histology    Histology subtype 1    Histology subtype 2    Histology subtype 3    Fusion ID    Translocation Name    5'_CHROMOSOME    5'_GENOME_START_FROM    5'_GENOME_START_TO    5'_GENOME_STOP_FROM    5'_GENOME_STOP_TO    5'_STRAND    3'_CHROMOSOME    3'_GENOME_START_FROM    3'_GENOME_START_TO    3'_GENOME_STOP_FROM    3'_GENOME_STOP_TO    3'_STRAND    Fusion type    Pubmed_PMID
     with HashedSVIO(db_path) as reader:
+        reader.titles = [elt.upper().replace(" ", "_") for elt in reader.titles]
         for record in reader:
-            if record["Translocation Name"] != "":
-                matches = re.fullmatch(r"ENS.+\((.+)\):.+_ENS.+\((.+)\):.+", record["Translocation Name"])  # ENST00000324093.4(PLXND1):r.1_2864_ENST00000393238.3(TMCC1):r.918_5992
+            if record["TRANSLOCATION_NAME"] != "":
+                matches = re.fullmatch(r"ENS.+\((.+)\):.+_ENS.+\((.+)\):.+", record["TRANSLOCATION_NAME"])  # ENST00000324093.4(PLXND1):r.1_2864_ENST00000393238.3(TMCC1):r.918_5992
                 if matches is None:
                     log.warning(
                         "Error to parse gene names {} from cosmic (PMID: {}).".format(
-                            record["Translocation Name"],
-                            record["Pubmed_PMID"]
+                            record["TRANSLOCATION_NAME"],
+                            record["PUBMED_PMID"]
                         )
                     )
                 else:
@@ -260,11 +259,11 @@ def loadCosmic(db_path, db_version, fusions_by_partners, aliases_by_symbol, anno
                         fusions_by_partners[fusion_partners] = {source: set()}
                     if source not in fusions_by_partners[fusion_partners]:
                         fusions_by_partners[fusion_partners][source] = set()
-                    fusions_by_partners[fusion_partners][source].add(int(record["Fusion ID"]))
-                    if record["Pubmed_PMID"] != "":
+                    fusions_by_partners[fusion_partners][source].add(int(record["FUSION_ID"]))
+                    if record["PUBMED_PMID"] != "":
                         if "PMID" not in fusions_by_partners[fusion_partners]:
                             fusions_by_partners[fusion_partners]["PMID"] = set()
-                        fusions_by_partners[fusion_partners]["PMID"].add(int(record["Pubmed_PMID"]))
+                        fusions_by_partners[fusion_partners]["PMID"].add(int(record["PUBMED_PMID"]))
 
 
 def loadGeneric(db_path, db_name, db_version, fusions_by_partners, aliases_by_symbol, annotation_symbols, up_title="up_gene", down_title="down_gene"):
