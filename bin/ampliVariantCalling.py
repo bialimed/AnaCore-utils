@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.2'
+__version__ = '1.4.3'
 
 import os
 import sys
@@ -558,7 +558,7 @@ def filterBED(in_bed, in_names, out_bed, nb_col=None):
                         FH_out.write(line)
 
 
-def VarDictFct(in_reference, in_regions, in_aln, out_variants, logger, tmp_file, min_alt_freq=0.02, min_alt_count=4, min_base_qual=25, vardict_call="vardict-java"):
+def VarDictFct(in_reference, in_regions, in_aln, out_variants, logger, tmp_file, prefix="", min_alt_freq=0.02, min_alt_count=4, min_base_qual=25, vardict_call="vardict-java"):
     """
     Dicover amplicons variants with VarDict.
 
@@ -574,6 +574,8 @@ def VarDictFct(in_reference, in_regions, in_aln, out_variants, logger, tmp_file,
     :type logger: Logger
     :param tmp_file: Temporaries files manager.
     :type tmp_file: TmpFiles
+    :param prefix: Prefix for tmp files.
+    :type prefix: str
     :param min_alt_freq: The threshold for allele frequency.
     :type min_alt_freq: float
     :param min_base_qual: The phred score for a base to be considered a good call.
@@ -581,8 +583,8 @@ def VarDictFct(in_reference, in_regions, in_aln, out_variants, logger, tmp_file,
     :param vardict_call: Command used to call vardict.
     :type vardict_call: str
     """
-    out_vardict = tmp.add("vardict.txt")
-    out_strand_bias = tmp.add("strdBias.txt")
+    out_vardict = tmp.add(prefix + "_vardict.txt")
+    out_strand_bias = tmp.add(prefix + "_strdBias.txt")
     VarDictStep1(in_reference, in_regions, in_aln, out_vardict, min_alt_freq, min_alt_count, min_base_qual, vardict_call).submit(logger)
     VarDictStep2(out_vardict, out_strand_bias).submit(logger)
     VarDictStep3(out_strand_bias, out_variants, min_alt_freq).submit(logger)
@@ -666,6 +668,7 @@ if __name__ == "__main__":
             curr_gp_aln_new_RG, curr_gp_vcf,
             args.output_log,
             tmp,
+            curr_gp,
             args.min_alt_freq,
             args.min_alt_count,
             args.min_base_qual,
