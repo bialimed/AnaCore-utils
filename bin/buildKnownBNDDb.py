@@ -123,8 +123,11 @@ def selectAnnotSymbol(gene_symbol, annotation_symbols, aliases_by_symbol):
     :rtype: str
     """
     retained_name = None
-    if gene_symbol not in aliases_by_symbol and "ORF" in gene_symbol:
-        gene_symbol = gene_symbol.replace("ORF", "orf")
+    if gene_symbol not in aliases_by_symbol:
+        if gene_symbol.upper() in aliases_by_symbol:
+            gene_symbol = gene_symbol.upper()
+        elif gene_symbol.replace("ORF", "orf") in aliases_by_symbol:
+            gene_symbol = gene_symbol.replace("ORF", "orf")
     aliases = [gene_symbol]
     if gene_symbol in aliases_by_symbol:
         aliases = aliases_by_symbol[gene_symbol]
