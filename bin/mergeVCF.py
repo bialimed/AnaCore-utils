@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2017 IUCT-O'
+__copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.7.0'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '1.7.1'
 
 import sys
 import pysam
@@ -152,6 +150,7 @@ if __name__ == "__main__":
     # Get identified variants from VCF
     variants = dict()
     aln_by_samples = dict()
+    spl_info_by_spl = dict()
     for vcf_idx, current_vcf in enumerate(args.input_variants):
         current_aln = None
         if not args.deactivate_completion:
@@ -160,6 +159,8 @@ if __name__ == "__main__":
             # Manage samples
             for curr_spl in FH_vcf.samples:  # For each sample in VCF
                 aln_by_samples[curr_spl] = current_aln
+                if curr_spl in FH_vcf.samples_info:
+                    spl_info_by_spl[curr_spl] = FH_vcf.samples_info[curr_spl]
             # Manage records
             for record in FH_vcf:  # For each variant
                 if args.selected_region is None or record.chrom == args.selected_region:
@@ -193,6 +194,7 @@ if __name__ == "__main__":
         FH_out.format["AD"] = HeaderFormatAttr("AD", type="Integer", number="A", description="The alleles depths.")
         FH_out.format["DP"] = HeaderFormatAttr("DP", type="Integer", number="1", description="Depth.")
         FH_out.samples = [spl for spl in sorted(aln_by_samples)]
+        FH_out.sample_info = spl_info_by_spl
         FH_out.writeHeader()
 
         # Records
