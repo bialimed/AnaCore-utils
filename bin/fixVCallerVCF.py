@@ -1,33 +1,15 @@
 #!/usr/bin/env python3
-#
-# Copyright (C) 2019 IUCT-O
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2019 IUCT-O'
+__copyright__ = 'Copyright (C) 2019 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.2.0'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '1.3.0'
 
+from anacore.vcf import VCFIO, HeaderInfoAttr
+import argparse
+import logging
 import os
 import sys
-import logging
-import argparse
-from anacore.vcf import VCFIO, HeaderInfoAttr
 
 
 ########################################################################
@@ -59,6 +41,21 @@ def getCleanningRules(variant_caller):
     return info_by_caller[variant_caller]
 
 
+def getDelInfo(variant_caller):
+    """
+    Return tags to delete in INFO field.
+
+    :param variant_caller: The variant caller used to produce the VCF to fix.
+    :type variant_caller: str
+    :return: Tags to delete in INFO field.
+    :rtype: set
+    """
+    del_by_caller = {
+        "vardict": ["SAMPLE"]
+    }
+    return del_by_caller[variant_caller]
+
+
 ########################################################################
 #
 # MAIN
@@ -83,23 +80,26 @@ if __name__ == "__main__":
 
     # Process
     clean_info = getCleanningRules(args.variant_caller)
-    with VCFIO(args.output_variants, "w") as FH_out:
-        with VCFIO(args.input_variants) as FH_in:
+    del_info = getDelInfo(args.variant_caller)
+    with VCFIO(args.output_variants, "w") as writer:
+        with VCFIO(args.input_variants) as reader:
             # Header
-            FH_out.copyHeader(FH_in)
-            for tag in FH_out.info:
+            writer.copyHeader(reader)
+            for tag in writer.info:
                 if tag in clean_info:
-                    prev = FH_out.info[tag]
+                    prev = writer.info[tag]
                     new = clean_info[tag]["declaration"]
                     if prev.type != new.type or prev.number != new.number:
-                        FH_out.info[tag] = new
+                        writer.info[tag] = new
                     else:
                         del(clean_info[tag])
-            FH_out.writeHeader()
+            for tag in del_info:
+                del(writer.info[tag])
+            writer.writeHeader()
             # Records
-            for record in FH_in:
+            for record in reader:
                 for tag, value in record.info.items():
                     if tag in clean_info:
                         record.info[tag] = clean_info[tag]["process"](value)
-                FH_out.write(record)
+                writer.write(record)
     log.info("End of job")
