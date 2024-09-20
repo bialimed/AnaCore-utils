@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '2.8.0'
+__version__ = '2.9.0'
 
 from anacore.annotVcf import AnnotVCFIO, getAlleleRecord
 import argparse
@@ -87,15 +87,23 @@ def getAnnotSummary(allele_record, initial_alt, annot_field="ANN", pop_prefixes=
             "pathogenicity": getPathogenicityPredictors(annot, pathogenicity_fields),
             "is_main": annot["PICK"] == "1" if "PICK" in annot else None  # Tag main annotations if flag_pick has been used
         }
-        if "EXON" in annot and "INTRON" in annot:  # Add splice_segment only if calculated
+        # Add HGVSg if calculated
+        if "HGVSg" in annot:
+            json_annot["changes"]["HGVSg"] = annot["HGVSg"]
+        # Add splice_segment only if calculated
+        if "EXON" in annot and "INTRON" in annot:
             json_annot["pos"] = dict()
             if annot["Feature_type"] == "Transcript":
-                if annot["EXON"]:
-                    exon_pos = int(annot["EXON"].split("/")[0])
-                    json_annot["pos"]["transcript"] = {"exon": exon_pos}
-                elif annot["INTRON"]:
-                    intron_pos = int(annot["INTRON"].split("/")[0])
-                    json_annot["pos"]["transcript"] = {"intron": intron_pos}
+                if annot["EXON"] or annot["INTRON"]:
+                    json_annot["pos"]["transcript"] = dict()
+                    if annot["EXON"]:
+                        exons, exons_ct = annot["EXON"].split("/")
+                        exon_pos = [int(elt) for elt in exons.split("-")]
+                        json_annot["pos"]["transcript"]["exon"] = exon_pos
+                    if annot["INTRON"]:
+                        introns, introns_ct = annot["INTRON"].split("/")
+                        intron_pos = [int(elt) for elt in introns.split("-")]
+                        json_annot["pos"]["transcript"]["intron"] = intron_pos
                 # else: pass  # if variant is up/downstream of transcript (ex: TERT promoter)
         annot_container.append(json_annot)
     xref = {db: list(xref[db]) for db in xref}
@@ -114,10 +122,15 @@ def getPathogenicityPredictors(annot, pathogenicity_fields=None):
     :return: by predictor the predicted pathogenicity.
     :rtype: dict
     """
-    pathogenicity_fields = ["CLIN_SIG", "CADD_PHRED", "MetaLR_rankscore", "VEST3_rankscore"] if pathogenicity_fields is None else pathogenicity_fields
+    if pathogenicity_fields is None:
+        pathogenicity_fields = ["CLIN_SIG"]
     rename = {
+        "AlphaMissence_class": "AlphaMissence",
+        "AlphaMissence_am_class": "AlphaMissence",
         "CLIN_SIG": "ClinVar",
-        "CADD_PHRED": "CADD_phred"
+        "ClinVar_CLINSIG": "ClinVar",
+        "CADD_PHRED": "CADD_phred",
+        "dbNSFP_CADD_PHRED": "CADD_phred"
     }
     score_by_predictor = {}
     for key in pathogenicity_fields:
