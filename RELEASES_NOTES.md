@@ -1,7 +1,9 @@
 # Release 3.7.0 [DEV]
 
 ### Improvements:
-  * Store exon/intron postion in JSON with `bin/VCFToJSON.py`.
+  * Add script to convert TSV variant database in indexed VCF:
+  `bin/tsvDbToVCF.py`.
+  * Store exon/intron postion and HGVSg in JSON with `bin/VCFToJSON.py`.
   * Use user selected annotation tag in header of empty variants file in
   `bin/VEPWrapper.py`.
 
