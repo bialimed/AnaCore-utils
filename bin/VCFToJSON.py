@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '2.9.0'
+__version__ = '2.9.1'
 
 from anacore.annotVcf import AnnotVCFIO, getAlleleRecord
 import argparse
@@ -125,20 +125,22 @@ def getPathogenicityPredictors(annot, pathogenicity_fields=None):
     if pathogenicity_fields is None:
         pathogenicity_fields = ["CLIN_SIG"]
     rename = {
-        "AlphaMissence_class": "AlphaMissence",
-        "AlphaMissence_am_class": "AlphaMissence",
-        "CLIN_SIG": "ClinVar",
-        "ClinVar_CLINSIG": "ClinVar",
-        "CADD_PHRED": "CADD_phred",
-        "dbNSFP_CADD_PHRED": "CADD_phred"
+        "alphamissense_class": "AlphaMissense",
+        "alphamissense_am_class": "AlphaMissense",
+        "clin_sig": "ClinVar",
+        "clinvar_clnsig": "ClinVar",
+        "clinvar_onc": "ClinVar_onc",
+        "cadd_phred": "CADD_phred"
     }
     score_by_predictor = {}
     for key in pathogenicity_fields:
         if key in annot and annot[key] != "":
             source = key
-            if key in rename:
-                source = rename[key]
-            score_by_predictor[source] = annot[key]
+            if key.lower().startswith("dbnsfp_"):  # remove aggregator db name
+                source = source[7:]
+            if source.lower() in rename:
+                source = rename[source.lower()]
+            score_by_predictor[source] = annot[key].lower() if annot[key] else None
     return score_by_predictor
 
 
