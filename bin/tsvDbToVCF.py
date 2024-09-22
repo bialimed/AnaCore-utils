@@ -33,7 +33,8 @@ ALPHAMISSENCE = '''variant:
 info:
     am_pathogenicity:
         name: score
-        description: Pathogenicity prediction score between 0 and 1.
+        description: "Calibrated AlphaMissense pathogenicity scores (ranging between 0 and 1), which can
+be interpreted as the predicted probability of a variant being clinically pathogenic."
         type: Float
     am_class:
         name: class
@@ -60,6 +61,11 @@ DBNSFP = '''variant:
     alt: alt
     id: rs_dbSNP
 info:
+    AlphaMissense_pred:
+        name: AlphaMissense_class
+        description: Pathogenicity prediction class.
+    AlphaMissense_rankscore:
+        description: Pathogenicity prediction score after scaling.
     CADD_phred:
         description: Pathogenicity prediction score after normalisation and PHRED scaling.
         type: Float
@@ -69,7 +75,7 @@ info:
         type: Float
     clinvar_clnsig:
         name: ClinVar_class
-        description: Pathogenicity prediction score after scaling.
+        description: Pathogenicity prediction class.
         type: Float
     MetaLR_rankscore:
         description: Pathogenicity prediction score after scaling.
