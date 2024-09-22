@@ -140,7 +140,7 @@ def getPathogenicityPredictors(annot, pathogenicity_fields=None):
                 source = source[7:]
             if source.lower() in rename:
                 source = rename[source.lower()]
-            score_by_predictor[source] = annot[key].lower() if annot[key] else None
+            score_by_predictor[source] = annot[key]
     return score_by_predictor
 
 
