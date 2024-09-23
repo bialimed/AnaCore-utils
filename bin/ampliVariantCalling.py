@@ -3,11 +3,11 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.4.3'
+__version__ = '1.5.0'
 
 import os
 import sys
-import time
+import logging
 import argparse
 import subprocess
 from subprocess import Popen, PIPE
@@ -91,96 +91,19 @@ class Cmd:
             except Exception:
                 raise Exception("Version cannot be retrieve for the software '" + self.program + "'.")
 
-    def parser(self, log_file):
-        """
-        Parse the command results to add information in log_file.
-
-        :param log_file: Path to the sample process log file.
-        :type log_file: str
-        """
-        pass
-
-    def submit(self, log_file=None):
+    def submit(self, logger=None):
         """
         Launch command, trace this action in log and parse results.
 
-        :param log_file: Path to the sample process log file.
-        :type log_file: str
+        :param logger: Logger instance.
+        :type logger: logging.Logger
         """
-        # Log
-        if log_file is not None:
-            FH_log = Logger(log_file)
-            FH_log.write('# ' + self.description + '\n')
-            FH_log.write('\tSoftware:\n\t\t' + os.path.basename(self.program) + ' version: ' + self.get_version() + '\n')
-            FH_log.write('\tCommand:\n\t\t' + self.get_cmd() + '\n')
-            FH_log.write('\tExecution:\n\t\tstart: ' + time.strftime("%d %b %Y %H:%M:%S", time.localtime()) + '\n')
-            FH_log.close()
-        # Process
+        cmd_id = str(uuid.uuid4())
+        if logger is not None:
+            logger.info('Start sub-command {}: {}'.format(cmd_id, self.get_cmd()))
         subprocess.check_output(self.get_cmd(), shell=True)
-        # Log
-        if log_file is not None:
-            FH_log = Logger(log_file)
-            FH_log.write('\t\tend:   ' + time.strftime("%d %b %Y %H:%M:%S", time.localtime()) + '\n')
-            FH_log.close()
-            # Post-process results
-            self.parser(log_file)
-
-
-class Logger:
-    """
-    Log file handler.
-
-    :copyright: FROGS's team INRA.
-    """
-
-    def __init__(self, filepath=None):
-        """
-        :param filepath: The log filepath. [default : STDOUT]
-        :type filepath: str
-        """
-        self.filepath = filepath
-        self.file_handle = None
-        if self.filepath is not None and self.filepath is not sys.stdout:
-            self.file_handle = open(self.filepath, "a")
-        else:
-            self.file_handle = sys.stdout
-
-    def __del__(self):
-        """Close file handler when the logger is detroyed."""
-        self.close()
-
-    def close(self):
-        """Close file handler."""
-        if self.filepath is not None and self.filepath is not sys.stdout:
-            if self.file_handle is not None:
-                self.file_handle.close()
-                self.file_handle = None
-
-    def write(self, msg):
-        """
-        Write msg on file.
-
-        :param msg: The message to write.
-        :type msg: str
-        """
-        self.file_handle.write(msg)
-
-    @staticmethod
-    def static_write(filepath, msg):
-        """
-        Write msg on file.
-
-        :param filepath: The log filepath. [default : STDOUT]
-        :type filepath: str
-        :param msg: The message to write.
-        :type msg: str
-        """
-        if filepath is not None and filepath is not sys.stdout:
-            FH_log = open(filepath, "a")
-            FH_log.write(msg)
-            FH_log.close()
-        else:
-            sys.stdout.write(msg)
+        if logger is not None:
+            logger.info("End sub-command {}".format(cmd_id))
 
 
 class TmpFiles:
@@ -614,12 +537,16 @@ if __name__ == "__main__":
     group_input.add_argument('-a', '--input-aln', required=True, help='The path to the alignment file (format: BAM).')
     group_output = parser.add_argument_group('Outputs')  # Outputs
     group_output.add_argument('-ov', '--output-variants', required=True, help='The path to the outputted variants file (format: VCF).')
-    group_output.add_argument('-ol', '--output-log', default=sys.stdout, help='The path to the outputted log file (format: txt). [Default: STDOUT]')
     args = parser.parse_args()
 
-    Logger.static_write(args.output_log, "## Application\n\tSoftware:\n\t\t" + os.path.basename(sys.argv[0]) + " (version: " + str(__version__) + ")\n\tCommand:\n\t\t" + " ".join(sys.argv) + "\n\n")
     tmp = TmpFiles(os.path.dirname(args.output_variants))
     library_name = os.path.basename(args.input_aln).split(".")[0] if args.library_name is None else args.library_name
+
+    # Logger
+    logging.basicConfig(format='%(asctime)s -- [%(filename)s][pid:%(process)d][%(levelname)s] -- %(message)s')
+    log = logging.getLogger(os.path.basename(__file__))
+    log.setLevel(logging.INFO)
+    log.info("Command: " + " ".join(sys.argv))
 
     # Get non-overlapping groups
     groups_names = set()
@@ -633,7 +560,7 @@ if __name__ == "__main__":
     # Split BAM in non-overlapping regions
     gp_alignment = [tmp.add(gp + ".bam") for gp in groups_names]
     out_bam_pattern = gp_alignment[-1][:-(len(groups_names[-1]) + 4)] + "{GP}.bam"
-    SplitBAMByRG(args.input_non_overlapping_design, args.input_aln, out_bam_pattern).submit(args.output_log)
+    SplitBAMByRG(args.input_non_overlapping_design, args.input_aln, out_bam_pattern).submit(log)
 
     # Variant calling
     groups = list()
@@ -642,7 +569,7 @@ if __name__ == "__main__":
 
         # Index BAM
         tmp.files.append(curr_gp_aln + ".bai")
-        SamtoolsIndex(curr_gp_aln).submit(args.output_log)
+        SamtoolsIndex(curr_gp_aln).submit(log)
 
         # Select regions of current group
         curr_gp_regions = tmp.add(curr_gp + "_amplicons.txt")
@@ -656,9 +583,9 @@ if __name__ == "__main__":
 
         # Add RG on BAM
         curr_gp_aln_new_RG = tmp.add(curr_gp + "_RG.bam")
-        AddRGOnBAM(curr_gp_aln, curr_gp_aln_new_RG, "ILLUMINA", library_name, library_name).submit(args.output_log)
+        AddRGOnBAM(curr_gp_aln, curr_gp_aln_new_RG, "ILLUMINA", library_name, library_name).submit(log)
         tmp.files.append(curr_gp_aln_new_RG + ".bai")
-        SamtoolsIndex(curr_gp_aln_new_RG).submit(args.output_log)
+        SamtoolsIndex(curr_gp_aln_new_RG).submit(log)
 
         # Call variants
         curr_gp_vcf = tmp.add(curr_gp + ".vcf")
@@ -666,7 +593,7 @@ if __name__ == "__main__":
             args.input_genome,
             curr_gp_regions_with_prim_4_col,
             curr_gp_aln_new_RG, curr_gp_vcf,
-            args.output_log,
+            log,
             tmp,
             curr_gp,
             args.min_alt_freq,
@@ -677,7 +604,7 @@ if __name__ == "__main__":
 
         # Filters variants located on primers
         curr_gp_clean_vcf = tmp.add(curr_gp + "_clean.vcf")
-        FilterVCFPrimers(args.input_genome, curr_gp_regions_with_prim, curr_gp_vcf, curr_gp_clean_vcf).submit(args.output_log)
+        FilterVCFPrimers(args.input_genome, curr_gp_regions_with_prim, curr_gp_vcf, curr_gp_clean_vcf).submit(log)
 
         # Store current group files
         groups.append({
@@ -695,13 +622,14 @@ if __name__ == "__main__":
         [curr_gp["vcf"] for curr_gp in groups],
         [curr_gp["aln"] for curr_gp in groups],
         out_gather
-    ).submit(args.output_log)
+    ).submit(log)
     out_melt = tmp.add("melt.vcf")
-    MeltOverlappingRegions(library_name, out_gather, out_melt).submit(args.output_log)
+    MeltOverlappingRegions(library_name, out_gather, out_melt).submit(log)
 
     # Fix vardict header
     out_gather = tmp.add("gatherOverlapping.vcf")
-    fixVardictHeader(out_melt, args.output_variants).submit(args.output_log)
+    fixVardictHeader(out_melt, args.output_variants).submit(log)
 
     # Clean temporary files
     tmp.deleteAll()
+    log.info("End of job")
