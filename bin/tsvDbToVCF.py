@@ -24,7 +24,7 @@ import yaml
 # PRESETS
 #
 ################################################################################
-ALPHAMISSENCE = '''variant:
+ALPHAMISSENSE = '''variant:
     region: "#CHROM"
     start: POS
     ref: REF
@@ -166,8 +166,8 @@ def getCfgFromPreset(preset):
     :rtype: dict
     """
     preset_content = None
-    if preset == "AlphaMissence":
-        preset_content = ALPHAMISSENCE
+    if preset == "AlphaMissense":
+        preset_content = ALPHAMISSENSE
     elif preset == "CADD":
         preset_content = CADD
     elif preset == "dbNSFP":
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_config = parser.add_mutually_exclusive_group(required=True)
     group_config.add_argument('-f', '--input-configuration', help='Path to configuration specify fields for variant coordinates and INFO tags (format: YAML). Database must be describe in two parts. First: "variant" contains column titles to find chrom, pos, ref, alt and optionaly id. Second: "info" contains the list of columns with override behaviour from default. Default behaviour for each column is to convert in INFO tag with name corresponding to column name, blank description, type=String and number=1. In info section each entry use TSV column tilte as key and can set name (INFO tag name), description, type (Integer, Float, Character and String) and number (1, A, G, R, and .).')
-    group_config.add_argument('-p', '--preset', choices=["AlphaMissence", "CADD", "dbNSFP"], help='Preset for converting configuration.')
+    group_config.add_argument('-p', '--preset', choices=["AlphaMissense", "CADD", "dbNSFP"], help='Preset for converting configuration.')
     group_input = parser.add_argument_group('Inputs')
     group_input.add_argument('-i', '--input-variants', required=True, help='Path to variants file (format: TSV).')
     group_input.add_argument('-s', '--input-sequences', required=True, help='Path to reference sequences file (format: fasta with faidx).')
