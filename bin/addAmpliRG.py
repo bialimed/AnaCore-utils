@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2017 IUCT-O'
+__copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '2.1.0'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '3.0.0'
 
 import os
 import sys
@@ -92,7 +90,7 @@ def getOffsetPenalty(read, region, end_is_usable=False):
 
 def endOffsetIsUsable(read, first_region, second_region):
     """
-    Return true if the read has sufficient length ad quality to overlap all the two regions. In this case The end offset can be used in penalty calculation for best source selection.
+    Return true if the read has sufficient length and quality to overlap all the two regions. In this case The end offset can be used in penalty calculation for best source selection.
 
     :param read: Evaluated read.
     :type read: pysam.AlignedSegment
@@ -168,7 +166,7 @@ def selectBestSource(read, sources):
     return selected_region
 
 
-def getSourceRegion(read, regions, anchor_offset=0):
+def getSourceRegion(read, regions, anchor_offset=0, term_offset=None):
     """
     Return the region where the read come from. Returns None if no region corresponds to the read.
 
@@ -178,6 +176,8 @@ def getSourceRegion(read, regions, anchor_offset=0):
     :type regions: list
     :param anchor_offset: The alignment of the read can start at N nucleotids after the start of the primer. This parameter allows to take account the possible mismatches on the firsts read positions.
     :type anchor_offset: int
+    :param term_offset: Maximum offset between read end and second primer.
+    :type term_offset: int
     :return: The region where the read come from.
     :return: None/anacore.region.Region
     """
@@ -189,7 +189,12 @@ def getSourceRegion(read, regions, anchor_offset=0):
                 break
             if read_aln_start <= curr_region.end + anchor_offset:
                 if read_aln_start >= curr_region.end - anchor_offset:
-                    overlapped_regions.append(curr_region)
+                    if term_offset is None:
+                        overlapped_regions.append(curr_region)
+                    else:
+                        read_aln_end = read.reference_start + 1
+                        if read_aln_end >= curr_region.start - term_offset and read_aln_end <= curr_region.start + term_offset:
+                            overlapped_regions.append(curr_region)
     else:
         read_aln_start = read.reference_start + 1
         for curr_region in regions:
@@ -197,7 +202,11 @@ def getSourceRegion(read, regions, anchor_offset=0):
                 break
             if read_aln_start >= curr_region.start - anchor_offset:
                 if read_aln_start <= curr_region.start + anchor_offset:
-                    overlapped_regions.append(curr_region)
+                    if term_offset is None:
+                        overlapped_regions.append(curr_region)
+                    else:
+                        if read.reference_end >= curr_region.end - term_offset and read.reference_end <= curr_region.end + term_offset:
+                            overlapped_regions.append(curr_region)
     selected_region = None
     if len(overlapped_regions) == 1:
         selected_region = overlapped_regions[0]
@@ -297,7 +306,10 @@ def processSingleReads(aln_reader, panel_regions, RG_id_by_source, args):
             else:
                 source_region = None
                 if curr_read.reference_name in panel_regions:
-                    source_region = getSourceRegion(curr_read, panel_regions[curr_read.reference_name], args.anchor_offset)
+                    end_offset = None
+                    if args.mode == "single_complete":
+                        end_offset = 7
+                    source_region = getSourceRegion(curr_read, panel_regions[curr_read.reference_name], args.anchor_offset, end_offset)
                 if source_region is None:
                     ct_by_category["out_target"] += 1
                 elif args.check_strand and not hasValidStrand(curr_read, source_region):
@@ -467,10 +479,10 @@ def writeJSONSummary(out_path, data):
 if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Add RG corresponding to the amplicon source. For one reads pair the amplicon is determined from the position of the first match position of the two reads (primers start positions).')
-    parser.add_argument('-f', '--summary-format', default='tsv', choices=['json', 'tsv'], help='The summary format. [Default: %(default)s]')
     parser.add_argument('-d', '--check-strand', action='store_true', help='With this option the strand of amplicons is checked.')
-    parser.add_argument('-m', '--single-mode', action='store_true', help='Process single-end alignments.')
+    parser.add_argument('-f', '--summary-format', default='tsv', choices=['json', 'tsv'], help='The summary format. [Default: %(default)s]')
     parser.add_argument('-l', '--anchor-offset', type=int, default=4, help='The alignment of the read can start at N nucleotids after the start of the primer. This parameter allows to take account the possible mismatches on the firsts read positions. [Default: %(default)s]')
+    parser.add_argument('-m', '--mode', choices=["paired", "single", "single_complete"], default='paired', help='Recognition mode: "paired" for alignments from paired-end sequencing, "single" for alignment in single read without guarantee that all reads contain both primers, and "single_complete" for combined mates reads or single-read sequencing with read longer than amplicons (reads contain two primers). [Default: %(default)s]')
     parser.add_argument('-z', '--min-zoi-cov', type=int, default=10, help='The minimum cumulative length of reads pair in zone of interest. If the number of nucleotids coming from R1 on ZOI + the number of nucleotids coming from R2 on ZOI is lower than this value the pair is counted in "only_primers". [Default: %(default)s]')
     parser.add_argument('-t', '--RG-tag', default='LB', help='RG tag used to store the area ID. [Default: %(default)s]')
     parser.add_argument('-v', '--version', action='version', version=__version__)
@@ -507,10 +519,10 @@ if __name__ == "__main__":
                 RG_idx += 1
         # Parse reads
         with pysam.AlignmentFile(tmp_aln, "wb", header=new_header) as FH_out:
-            if args.single_mode:
-                log_data = processSingleReads(FH_in, panel_regions, RG_id_by_source, args)
-            else:
+            if args.mode == "paired":
                 log_data = processPairedReads(FH_in, panel_regions, RG_id_by_source, args)
+            else:
+                log_data = processSingleReads(FH_in, panel_regions, RG_id_by_source, args)
 
     # Sort output file
     pysam.sort("-o", args.output_aln, tmp_aln)
