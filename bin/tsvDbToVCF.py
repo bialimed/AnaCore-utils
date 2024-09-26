@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2024 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 
 from anacore.db.homo_sapiens.accession import ChrAccession
@@ -243,7 +243,12 @@ if __name__ == "__main__":
     convert(cfg, args)
 
     # Index
-    pysam.bcftools.sort('-o', args.output_variants + ".tmp_sort", args.output_variants + ".tmp", catch_stdout=False)
+    pysam.bcftools.sort(
+        '--temp-dir', os.path.dirname(args.output_variants),
+        '-o', args.output_variants + ".tmp_sort",
+        args.output_variants + ".tmp",
+        catch_stdout=False
+    )
     os.remove(args.output_variants + ".tmp")
     pysam.tabix_compress(args.output_variants + ".tmp_sort", args.output_variants)
     os.remove(args.output_variants + ".tmp_sort")
