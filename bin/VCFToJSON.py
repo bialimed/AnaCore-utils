@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '2.9.1'
+__version__ = '2.9.2'
 
 from anacore.annotVcf import AnnotVCFIO, getAlleleRecord
 import argparse
@@ -97,13 +97,9 @@ def getAnnotSummary(allele_record, initial_alt, annot_field="ANN", pop_prefixes=
                 if annot["EXON"] or annot["INTRON"]:
                     json_annot["pos"]["transcript"] = dict()
                     if annot["EXON"]:
-                        exons, exons_ct = annot["EXON"].split("/")
-                        exon_pos = [int(elt) for elt in exons.split("-")]
-                        json_annot["pos"]["transcript"]["exon"] = exon_pos
+                        json_annot["pos"]["transcript"]["exons"] = getTrImpactedSeg(annot, "EXON")
                     if annot["INTRON"]:
-                        introns, introns_ct = annot["INTRON"].split("/")
-                        intron_pos = [int(elt) for elt in introns.split("-")]
-                        json_annot["pos"]["transcript"]["intron"] = intron_pos
+                        json_annot["pos"]["transcript"]["introns"] = getTrImpactedSeg(annot, "INTRON")
                 # else: pass  # if variant is up/downstream of transcript (ex: TERT promoter)
         annot_container.append(json_annot)
     xref = {db: list(xref[db]) for db in xref}
@@ -173,6 +169,26 @@ def getPopInfo(annot_key, pop_prefixes=None, logger=None):
         if logger is not None:
             logger.warning('The population information stored with tag "{}" cannot be used by "{}".'.format(annot_key, sys.argv[0]))
     return source, name
+
+
+def getTrImpactedSeg(annot, feature_type):
+    """
+    Return impacted transcript's feature segments.
+
+    :param annot: The information from an annotation feature.
+    :type annot: dict
+    :param feature_type: EXON or INTRON.
+    :type feature_type: str
+    :return: First (start) and last (end) of impacted segments.
+    :rtype: dict
+    """
+    impacted_str, segments_ct = annot[feature_type].split("/")
+    if "-" in impacted_str:
+        start, end = impacted_str.split("-")
+        impacted_segments = {"start": int(start), "end": int(end)}
+    else:
+        impacted_segments = {"start": int(impacted_str), "end": int(impacted_str)}
+    return impacted_segments
 
 
 ########################################################################
