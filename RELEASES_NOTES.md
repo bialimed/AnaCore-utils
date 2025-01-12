@@ -1,6 +1,7 @@
 # Release 3.7.0 [DEV]
 
 ### Improvements:
+  * Reduce memory usage for `bin/depthsMetrics.py`.
   * Add script to convert TSV variant database in indexed VCF:
   `bin/tsvDbToVCF.py`.
   * Store exon/intron postion and HGVSg in JSON with `bin/VCFToJSON.py`.

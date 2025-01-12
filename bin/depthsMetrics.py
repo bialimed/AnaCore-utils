@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2018 IUCT-O'
+__copyright__ = 'Copyright (C) 2018 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '1.2.0'
 
 import os
 import sys
 import json
-import numpy
 import logging
 import argparse
 from anacore.sv import SVIO
@@ -32,36 +29,34 @@ def loadFromDepthFile(in_path, samples):
     :return: The list of depths and by sample the list of counts.
     :rtype: list, dict
     """
-    encountered_depths = dict()
+    encountered_depths = set()
     count_by_spl = dict()
     with SVIO(in_path, has_title=False) as FH_depths:
         count_by_spl = {curr_spl: dict() for curr_spl in samples}
         for record in FH_depths:  # record = [chr, pos, deph_spl_1, ..., depth_spl_n]
-            for spl_idx, curr_spl in enumerate(samples):
-                depth = int(record[spl_idx + 2])
-                encountered_depths[depth] = 1
-                if depth in count_by_spl[curr_spl]:
-                    count_by_spl[curr_spl][depth] += 1
+            for spl_name, depth in zip(samples, record[2:]):
+                depth = int(depth)
+                encountered_depths.add(depth)
+                if depth in count_by_spl[spl_name]:
+                    count_by_spl[spl_name][depth] += 1
                 else:
-                    count_by_spl[curr_spl][depth] = 1
-    depths_list = sorted([key for key in encountered_depths])
+                    count_by_spl[spl_name][depth] = 1
+    depths_list = sorted(encountered_depths)
     for spl in samples:
-        spl_counts = list()
-        for depth in depths_list:
-            if depth in count_by_spl[spl]:
-                spl_counts.append(count_by_spl[spl][depth])
-            else:
-                spl_counts.append(0)
+        spl_counts = [
+            count_by_spl[spl][depth] if depth in count_by_spl[spl] else 0
+            for depth in depths_list
+        ]
         count_by_spl[spl] = spl_counts
     return depths_list, count_by_spl
 
 
-def getDistribution(values, percentile_step=25, precision=4):
+def getDistribution(ct_by_dp, percentile_step=25, precision=4):
     """
     Return the distribution of values (min, max and percentiles).
 
-    :param values: The values.
-    :type values: list
+    :param ct_by_dp: Count by depth (keys and values are integer).
+    :type ct_by_dp: dict
     :param percentile_step: Only this percentile and his multiples are returned.
     :type percentile_step: int
     :param precision: The decimal precision.
@@ -69,16 +64,38 @@ def getDistribution(values, percentile_step=25, precision=4):
     :retrun: The min, max and percentiles values. Example: {"min":0, "05_percentile":10, "10_percentile":15, ..., "95_percentile":853, "max":859}
     :rtype: dict
     """
-    distrib = {
-        "min": round(min(values), precision),
-        "max": round(max(values), precision)
+    ordered_dp = sorted([dp for dp, ct in ct_by_dp.items() if ct != 0])
+    metrics = {
+        "min": ordered_dp[0] if len(ordered_dp) else 0,
+        "max": ordered_dp[-1] if len(ordered_dp) else 0
     }
-    for curr_percentile in range(percentile_step, 100, percentile_step):
-        distrib['{:02}'.format(curr_percentile) + "_percentile"] = round(numpy.percentile(values, curr_percentile, interpolation="midpoint"), precision)
-    return distrib
+    total_ct = sum(ct_by_dp.values())
+    next_percentile = percentile_step
+    next_percentile_ct = (next_percentile * total_ct / 100) + 0.5
+    prev_dp = -1
+    end_ct = 0
+    for curr_dp in ordered_dp:
+        curr_ct = ct_by_dp[curr_dp]
+        start_ct = end_ct + 1
+        end_ct += curr_ct
+        while next_percentile_ct <= end_ct:
+            percentile_str = '{:02}_percentile'.format(next_percentile)
+            if next_percentile_ct < start_ct:  # Between prev and current
+                metrics[percentile_str] = round(
+                    prev_dp + ((curr_dp - prev_dp) / 2),  # Midpoint
+                    4
+                )
+            else:
+                metrics[percentile_str] = curr_dp
+            next_percentile += percentile_step
+            next_percentile_ct = (next_percentile * total_ct / 100) + 0.5
+            if next_percentile == 100:  # Was last pecentile
+                return metrics
+        prev_dp = curr_dp
+    return metrics
 
 
-def getDistribMetrics(depths_list, count_by_spl, percentiles_step):
+def getDistribMetrics(depths_list, count_by_spl, percentile_step):
     """
     Return the distribution of depths by sample.
 
@@ -86,18 +103,14 @@ def getDistribMetrics(depths_list, count_by_spl, percentiles_step):
     :type depths_list: list
     :param count_by_spl: By sample the list of counts corresponding to the depths_list.
     :type count_by_spl: dict
-    :param percentiles_step: Only this percentile and his multiples are returned.
-    :type percentiles_step: int
+    :param percentile_step: Only this percentile and his multiples are returned.
+    :type percentile_step: int
     :retrun: Distribution of depths by sample.
     :rtype: dict
     """
     distrib_by_spl = {}
     for spl_name, count_by_depth in count_by_spl.items():
-        val_list = []
-        for dp, count in zip(depths_list, count_by_depth):
-            for idx in range(count):
-                val_list.append(dp)
-        distrib_by_spl[spl_name] = getDistribution(val_list, percentiles_step)
+        distrib_by_spl[spl_name] = getDistribution(count_by_depth, percentile_step)
     return distrib_by_spl
 
 
