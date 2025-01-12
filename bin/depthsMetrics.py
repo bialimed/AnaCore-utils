@@ -109,8 +109,9 @@ def getDistribMetrics(depths_list, count_by_spl, percentile_step):
     :rtype: dict
     """
     distrib_by_spl = {}
-    for spl_name, count_by_depth in count_by_spl.items():
-        distrib_by_spl[spl_name] = getDistribution(count_by_depth, percentile_step)
+    for spl_name, ct_list in count_by_spl.items():
+        ct_by_dp = {dp: ct for dp, ct in zip(depths_list, ct_list) if ct != 0}
+        distrib_by_spl[spl_name] = getDistribution(ct_by_dp, percentile_step)
     return distrib_by_spl
 
 

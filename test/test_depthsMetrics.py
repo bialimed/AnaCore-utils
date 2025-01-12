@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2021 CHU Toulouse'
+__copyright__ = 'Copyright (C) 2024 CHU Toulouse'
 __license__ = 'GNU General Public License'
 __version__ = '1.0.0'
 
-import numpy
 import os
-import statistics
 import sys
+import tempfile
 import unittest
+import uuid
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_DIR = os.path.dirname(TEST_DIR)
@@ -17,7 +17,7 @@ BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
-from depthsMetrics import getDistribution
+from depthsMetrics import getDistribution, loadFromDepthFile
 
 
 ########################################################################
@@ -25,36 +25,41 @@ from depthsMetrics import getDistribution
 # FUNCTIONS
 #
 ########################################################################
-def getDistributionNumpy(ct_by_dp, percentile_step=25, precision=4):
-    values = []
-    for dp, count in ct_by_dp.items():
-        for idx in range(count):
-            values.append(dp)
-    distrib = {
-        "min": round(min(values), precision),
-        "max": round(max(values), precision)
-    }
-    for curr_percentile in range(percentile_step, 100, percentile_step):
-        distrib['{:02}'.format(curr_percentile) + "_percentile"] = round(numpy.percentile(values, curr_percentile, interpolation="midpoint"), precision)
-    return distrib
-
-
-def getDistributionStatistics(ct_by_dp, percentile_step=25, precision=4):
-    values = []
-    for dp, count in ct_by_dp.items():
-        for idx in range(count):
-            values.append(dp)
-    distrib = {
-        "min": round(min(values), precision),
-        "max": round(max(values), precision)
-    }
-    values = statistics.quantiles(values, n=100, method='inclusive')
-    for curr_percentile in range(percentile_step, 100, percentile_step):
-        distrib['{:02}'.format(curr_percentile) + "_percentile"] = round(values[curr_percentile + 1], precision)
-    return distrib
-
-
 class DepthsMetrics(unittest.TestCase):
+    def setUp(self):
+        tmp_folder = tempfile.gettempdir()
+        unique_id = str(uuid.uuid1())
+        self.tmp_dp = os.path.join(tmp_folder, unique_id + "_depths.tsv")
+        with open(self.tmp_dp, "w") as writer:
+            writer.write("""1	100	0	10
+1	101	0	10
+1	102	0	10
+1	103	5	50
+1	104	6	60
+1	105	4	40
+1	106	7	70
+1	107	5	50
+1	108	5	50
+1	109	6	60
+1	110	4	40
+2	210	12	120
+2	211	13	13
+2	212	11	110
+2	213	12	120
+2	214	11	110
+2	215	12	120
+2	216	10	100
+2	217	11	110
+2	218	12	0
+2	219	13	0
+2	220	15	150""")
+
+    def tearDown(self):
+        # Clean temporary files
+        for curr_file in [self.tmp_dp]:
+            if os.path.exists(curr_file):
+                os.remove(curr_file)
+
     def test_getDistribution(self):
         datasets = [
             {
@@ -112,6 +117,20 @@ class DepthsMetrics(unittest.TestCase):
                     getDistribution(curr["data"], percentile_step, 4),
                     curr["expected"][percentile_step]
                 )
+
+    def test_loadFromDepthFile(self):
+        dp_list, ct_list_by_spl = loadFromDepthFile(self.tmp_dp, ["splA", "splB"])
+        self.assertEqual(
+            dp_list,
+            [0, 4, 5, 6, 7, 10, 11, 12, 13, 15, 40, 50, 60, 70, 100, 110, 120, 150]
+        )
+        self.assertEqual(
+            ct_list_by_spl,
+            {
+                "splA": [3, 2, 3, 2, 1, 1, 3, 4, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                "splB": [2, 0, 0, 0, 0, 3, 0, 0, 1, 0, 2, 3, 2, 1, 1, 3, 3, 1]
+            }
+        )
 
 
 ########################################################################
