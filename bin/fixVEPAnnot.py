@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2019 IUCT-O'
+__copyright__ = 'Copyright (C) 2019 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.1.0'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '1.2.0'
 
 import argparse
 from anacore.annotVcf import AnnotVCFIO
 from anacore.vcf import getAlleleRecord, VCFIO
 import logging
 import os
+import re
 import sys
 
 
@@ -72,6 +71,41 @@ def changeCosmicAnnotations(record, annot_field, cosmic_reader):
             annot["Existing_variation"] = "&".join(new_existing)
         else:
             annot["Existing_variation"] = None
+
+
+def fixHGVSp(record, annot_field, is_predicted=True):
+    """
+    Fix known errors in HGVSp if it exists.
+
+    :param record: Annotated VCF record from VEP.
+    :type record: anacore.vcf.VCFRecord
+    :param annot_field: Field used to store annotations.
+    :type annot_field: str
+    :param is_predicted: If True HGVSp notation will use predicted format:
+    NM_00001.1:p.(Pro128*) instead of NM_00001.1:p.Pro128*.
+    :type is_predicted: bool
+    """
+    for annot in record.info[annot_field]:
+        if "HGVSp" in annot and annot["HGVSp"]:
+            # Extract
+            subject, change = annot["HGVSp"].split(":", 1)
+            change = change[2:]
+            if "(" in change:
+                change = change[1:-1]
+            # Tyr32_Pro34delinsTer becomes Tyr32Ter
+            match = re.match(r"^(...\d+)_...\d+delins(Ter|\*)$", change)
+            if match:
+                change = "{}{}".format(match.groups(1), match.groups(2))
+            else:
+                # Ala314= becomes =
+                match = re.match(r"^...\d+=$", change)
+                if match:
+                    change = "="
+            # Predicted
+            if is_predicted:
+                annot["HGVSp"] = "{}:p.({})".format(subject, change)
+            else:
+                annot["HGVSp"] = "{}:p.{}".format(subject, change)
 
 
 def getDatabankVersion(cosmic_reader):
@@ -139,6 +173,7 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Reverse normalisation produced by VEP in allele annotation field.')
     parser.add_argument('-a', '--annotations-field', default="ANN", help='Field used to store annotations. [Default: %(default)s]')
+    parser.add_argument('-p', '--hgvsp-predicted', action='store_true', help='If True HGVSp notation will use predicted format: NM_00001.1:p.(Pro128*) instead of NM_00001.1:p.Pro128*.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-c', '--input-cosmic', help='The path to the variants known in COSMIC (format: VCF with tbi). This option replace non-allele specific cosmic annotation produce by VEP to allelle-specific annotation. Ensembl is unfortunately not licensed to redistribute allele-specific data for cosmic.')
@@ -181,5 +216,8 @@ if __name__ == "__main__":
                 # Replace cosmic annotations
                 if args.input_cosmic:
                     changeCosmicAnnotations(record, FH_in.annot_field, cosmic_reader)
+                # Fix HGVS errors
+                fixHGVSp(record, FH_in.annot_field, args.hgvsp_predicted)
+                # Write record
                 FH_out.write(record)
     log.info("End of job")
