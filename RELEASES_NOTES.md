@@ -1,6 +1,7 @@
 # Release 3.7.0 [DEV]
 
 ### Improvements:
+  * Manage unstranded breakpoints in `bin/strandedBND.py`.
   * Reduce memory usage for `bin/depthsMetrics.py`.
   * Add script to convert TSV variant database in indexed VCF:
   `bin/tsvDbToVCF.py`.
@@ -9,6 +10,7 @@
   `bin/VEPWrapper.py`.
 
 ### Bug fixes:
+  * Fix bug with breakpoints containing insertion in `bin/strandedBND.py`.
   * Fix bug with flag_pick key in `bin/VCFToJSON.py`.
   * Fix bug in merging of two successive substitutions with
   `bin/mergeCoOccurVar.py`.

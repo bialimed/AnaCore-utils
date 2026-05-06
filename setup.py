@@ -43,7 +43,7 @@ setup(
     author_email='escudie.frederic@iuct-oncopole.fr',
     license='GNU GPL v3',
     packages=["bin"],
-    python_requires='>=3.5',
+    python_requires='>=3.10',
     install_requires=load_requirements("requirements.txt"),
     scripts=load_scripts("bin")
 )

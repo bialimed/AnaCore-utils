@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2020 IUCT-O'
+__copyright__ = 'Copyright (C) 2020 CHU Toulouse'
 __license__ = 'GNU General Public License'
 __version__ = '1.0.0'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
 
 import os
 import uuid
