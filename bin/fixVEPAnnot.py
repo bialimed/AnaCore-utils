@@ -95,7 +95,7 @@ def fixHGVSp(record, annot_field, is_predicted=True):
             # Tyr32_Pro34delinsTer becomes Tyr32Ter
             match = re.match(r"^(...\d+)_...\d+delins(Ter|\*)$", change)
             if match:
-                change = "{}{}".format(match.groups(1), match.groups(2))
+                change = f"{match.groups(1)}{match.groups(2)}"
             else:
                 # Ala314= becomes =
                 match = re.match(r"^...\d+=$", change)
@@ -103,9 +103,9 @@ def fixHGVSp(record, annot_field, is_predicted=True):
                     change = "="
             # Predicted
             if is_predicted:
-                annot["HGVSp"] = "{}:p.({})".format(subject, change)
+                annot["HGVSp"] = f"{subject}:p.({change})"
             else:
-                annot["HGVSp"] = "{}:p.{}".format(subject, change)
+                annot["HGVSp"] = f"{subject}:p.{change}"
 
 
 def getDatabankVersion(cosmic_reader):
@@ -173,7 +173,7 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Reverse normalisation produced by VEP in allele annotation field.')
     parser.add_argument('-a', '--annotations-field', default="ANN", help='Field used to store annotations. [Default: %(default)s]')
-    parser.add_argument('-p', '--hgvsp-predicted', action='store_true', help='If True HGVSp notation will use predicted format: NM_00001.1:p.(Pro128*) instead of NM_00001.1:p.Pro128*.')
+    parser.add_argument('-p', '--hgvsp-unpredicted', action='store_true', help='If True HGVSp notation will use not predicted format: NM_00001.1:p.Pro128* instead of NM_00001.1:p.(Pro128*).')
     parser.add_argument('-v', '--version', action='version', version=__version__)
     group_input = parser.add_argument_group('Inputs')  # Inputs
     group_input.add_argument('-c', '--input-cosmic', help='The path to the variants known in COSMIC (format: VCF with tbi). This option replace non-allele specific cosmic annotation produce by VEP to allelle-specific annotation. Ensembl is unfortunately not licensed to redistribute allele-specific data for cosmic.')
@@ -197,7 +197,7 @@ if __name__ == "__main__":
             if args.input_cosmic:
                 cosmic_reader = VCFIO(args.input_cosmic, "i")
                 cosmic_version = getDatabankVersion(cosmic_reader)
-                FH_out.extra_header.append("##COSMIC={}".format(cosmic_version))
+                FH_out.extra_header.append(f"##COSMIC={cosmic_version}")
             FH_out.writeHeader()
             # Records
             for record in FH_in:
@@ -217,7 +217,7 @@ if __name__ == "__main__":
                 if args.input_cosmic:
                     changeCosmicAnnotations(record, FH_in.annot_field, cosmic_reader)
                 # Fix HGVS errors
-                fixHGVSp(record, FH_in.annot_field, args.hgvsp_predicted)
+                fixHGVSp(record, FH_in.annot_field, not args.hgvsp_unpredicted)
                 # Write record
                 FH_out.write(record)
     log.info("End of job")

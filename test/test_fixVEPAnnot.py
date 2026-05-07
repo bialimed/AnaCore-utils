@@ -38,7 +38,6 @@ class FixVEPAnnot(unittest.TestCase):
         # Exec command
         self.cmd = [
             "fixVEPAnnot.py",
-            "--hgvsp-predicted",
             "--annotations-field", "TESTANN",
             "--input-cosmic", self.tmp_cosmic_bz,
             "--input-variants", self.tmp_input,
