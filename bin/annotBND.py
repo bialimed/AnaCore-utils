@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2018 IUCT-O'
+__copyright__ = 'Copyright (C) 2018 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '1.5.1'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
+__version__ = '1.6.0'
 
 
 import os
@@ -43,7 +41,7 @@ def shardIsBeforeBND(record):
     if len(set(is_before_break)) > 1:
         record_name = record.id if record.id is not None else record.getName()
         log.error(
-            "The breakend {} has several fusion partners with different break's configuration.".format(record_name),
+            f"The breakend {record_name} has several fusion partners with different break's configuration.",
             exec_info=True
         )
     return is_before_break[0]
@@ -151,23 +149,26 @@ def getGeneAnnot(record, genes_by_chr):
         for curr_gene in overlapped_genes:
             overlapped_transcripts = curr_gene.children.getOverlapped(bnd_region)
             if len(overlapped_transcripts) == 0:
-                log.warn("The breakpoint {} is contained by gene {} but by 0 of these transcripts.".format(bnd_region, curr_gene))
+                log.warning(f"The breakpoint {bnd_region} is contained by gene {curr_gene} but by 0 of these transcripts.")
             else:
                 for curr_transcript in overlapped_transcripts:
                     if len(curr_transcript.proteins) > 1:
                         log.error(
-                            "The management of several proteins for one transcript is not implemented. The transcript {} contains several proteins {}.".format(curr_transcript, curr_transcript.proteins),
+                            f"The management of several proteins for one transcript is not implemented. The transcript {curr_transcript} contains several proteins {curr_transcript.proteins}.",
                             exec_info=True
                         )
                     if curr_transcript.strand is None:
                         log.error(
-                            "The transcript {} has no strand.".format(curr_transcript),
+                            f"The transcript {curr_transcript} has no strand.",
                             exec_info=True
                         )
+                    tr_id = curr_transcript.annot["id"]
+                    if "transcript_version" in curr_transcript.annot and not curr_transcript.annot["id"].endswith(f".{curr_transcript.annot['transcript_version']}"):
+                        tr_id = f"{curr_transcript.annot['id']}.{curr_transcript.annot['transcript_version']}"
                     curr_annot = {
                         "SYMBOL": curr_gene.name,
                         "Gene": curr_gene.annot["id"],
-                        "Feature": curr_transcript.annot["id"],
+                        "Feature":  tr_id,
                         "Feature_type": "Transcript",
                         "STRAND": curr_transcript.strand,
                         "Protein": "" if len(curr_transcript.proteins) == 0 else curr_transcript.proteins[0].annot["id"],
@@ -177,14 +178,11 @@ def getGeneAnnot(record, genes_by_chr):
                         "Protein_position": None,
                         "Codon_position": None
                     }
-                    # Intron, exon and CDS posiion
+                    # Intron, exon and CDS position
                     subregion, subregion_idx = curr_transcript.getSubFromRefPos(bnd_region.start)
                     if issubclass(subregion.__class__, Intron):  # On intron
                         curr_annot["RNA_ELT_TYPE"] = "intron"
-                        curr_annot["RNA_ELT_POS"] = "{}/{}".format(
-                            subregion_idx,
-                            len(curr_transcript.children) - 1
-                        )
+                        curr_annot["RNA_ELT_POS"] = f"{subregion_idx}/{len(curr_transcript.children) - 1}"
                         if len(curr_transcript.proteins) > 0 and curr_transcript.strand == record_strand:
                             curr_protein = curr_transcript.proteins[0]
                             # Get CDS on last implicated exon for first shard and first implicated exon on second shard
@@ -208,7 +206,7 @@ def getGeneAnnot(record, genes_by_chr):
                     else:  # On exon
                         nb_exon = len(curr_transcript.children)
                         curr_annot["RNA_ELT_TYPE"] = "exon"
-                        curr_annot["RNA_ELT_POS"] = "{}/{}".format(subregion_idx, nb_exon)
+                        curr_annot["RNA_ELT_POS"] = f"{subregion_idx}/{nb_exon}"
                         if bnd_region.start == subregion.start:
                             if subregion_idx == 1 and subregion.strand == "+":  # Start of the first exon
                                 curr_annot["RNA_ELT_TYPE"] += "&transcriptStart"
@@ -357,10 +355,10 @@ def annotModelRetIntron(first, second, annotation_field):
                                     if "spliceEnd" in second_annot["RNA_ELT_TYPE"] or "transcriptStart" in second_annot["RNA_ELT_TYPE"]:  # from non-coding first on splice donor to second 5'UTR on splice acceptor
                                         inframe = "1"
             first_annot["IN_FRAME"].append(
-                "{}:{}".format(second_annot["Feature"], inframe)
+                f"{second_annot['Feature']}:{inframe}"
             )
             second_annot["IN_FRAME"].append(
-                "{}:{}".format(first_annot["Feature"], inframe)
+                f"{first_annot['Feature']}:{inframe}"
             )
     for first_annot in first.info[annotation_field]:
         first_annot["IN_FRAME"] = "&".join(first_annot["IN_FRAME"])
@@ -549,12 +547,12 @@ if __name__ == "__main__":
     log.info("Command: " + " ".join(sys.argv))
 
     # Load annotations
-    log.info("Load model from {}.".format(args.input_annotations))
+    log.info(f"Load model from {args.input_annotations}.")
     genes = loadModel(args.input_annotations, "genes")
     genes_by_chr = splittedByRef(genes)
 
     # Annot variants
-    log.info("Annot variants in {}.".format(args.input_variants))
+    log.info(f"Annot variants in {args.input_variants}.")
     with BreakendVCFIO(args.output_variants, "w", args.annotation_field) as writer:
         with BreakendVCFIO(args.input_variants) as reader:
             # Header

@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 __author__ = 'Frederic Escudie'
-__copyright__ = 'Copyright (C) 2020 IUCT-O'
+__copyright__ = 'Copyright (C) 2020 CHU Toulouse'
 __license__ = 'GNU General Public License'
 __version__ = '1.3.0'
-__email__ = 'escudie.frederic@iuct-oncopole.fr'
-__status__ = 'prod'
 
 import os
 import sys
@@ -22,7 +20,7 @@ BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
-from annotBND import annotGeneShard, annotModelRetIntron, exonsPos, getDistBeforeCDSForward, getDistBeforeCDSReverse, getGeneAnnot, getMostSupported, selectedPos, shardIsBeforeBND
+from annotBND2 import annotGeneShard, annotModelRNA, exonsPos, getDistBeforeCDSForward, getDistBeforeCDSReverse, getGeneAnnot, getMostSupported, selectedPos, shardIsBeforeBND
 # todo: annot
 
 
@@ -376,7 +374,7 @@ class TestAnnotBND(unittest.TestCase):
         )
         self.assertEqual(exonsPos(record, genes_by_chr), {90: 2})
 
-    def test_annotModelRetIntron(self):
+    def test_annotModelRNA(self):
         genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
         # Fragments +/-
         # tr3->tr1&tr2: intron&CDS->spliceEnd&CDS undetermined
@@ -385,7 +383,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 40, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 40})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
@@ -409,7 +407,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 40, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 40})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
@@ -433,7 +431,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 84, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 84})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
@@ -457,7 +455,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 60, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 60})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
@@ -481,7 +479,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 230, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 230})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
@@ -507,7 +505,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 83, "id_02", "A", ["A[1:189["], info={"ANNOT_POS": 83})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
@@ -528,7 +526,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 160, "id_02", "A", ["A]2:120]"], info={"ANNOT_POS": 160})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
@@ -551,7 +549,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 150, "id_02", "A", ["A]2:150]"], info={"ANNOT_POS": 150})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
@@ -574,7 +572,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 190, "id_02", "A", ["A]2:150]"], info={"ANNOT_POS": 190})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
@@ -597,7 +595,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 241, "id_02", "A", ["]2:150]A"], info={"ANNOT_POS": 241})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
@@ -618,7 +616,7 @@ class TestAnnotBND(unittest.TestCase):
         mate = VCFRecord("1", 235, "id_02", "A", ["]2:150]A"], info={"ANNOT_POS": 235})
         record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
         mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
-        annotModelRetIntron(record, mate, "ANN")
+        annotModelRNA(record, mate, "ANN")
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
             [  # expected
