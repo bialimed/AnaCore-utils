@@ -20,7 +20,7 @@ BIN_DIR = os.path.join(APP_DIR, "bin")
 sys.path.append(BIN_DIR)
 os.environ['PATH'] = BIN_DIR + os.pathsep + os.environ['PATH']
 
-from annotBND2 import annotGeneShard, annotModelRNA, exonsPos, getDistBeforeCDSForward, getDistBeforeCDSReverse, getGeneAnnot, getMostSupported, selectedPos, shardIsBeforeBND
+from annotBND import annotGeneShard, annotModelDNA, annotModelRNA, exonsPos, getDistBeforeCDSForward, getDistBeforeCDSReverse, getGeneAnnot, getMostSupported, selectedPos, shardIsBeforeBND
 # todo: annot
 
 
@@ -374,6 +374,219 @@ class TestAnnotBND(unittest.TestCase):
         )
         self.assertEqual(exonsPos(record, genes_by_chr), {90: 2})
 
+    def test_annotModelDNA(self):
+        genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
+        # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->intron&CDS 6->22 => in_frame, intron&CDS->intron&UTR 6->UTR => ?
+        # tr4->tr1&tr2: intron&CDS->intron&CDS 26->22 => frameshift, intron&CDS->intron&UTR 26->UTR => ?
+        record = VCFRecord("1", 195, "id_01", "A", ["A]1:60]"], info={"ANNOT_POS": 195, "RNA_FIRST": True})
+        mate = VCFRecord("1", 60, "id_02", "A", ["A[1:195["], info={"ANNOT_POS": 60})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:1&TR_02:.'),
+                ('TR_04', 'TR_01:0&TR_02:.')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->intron&CDS 6->22 => in_frame with ignored insert 4, intron&CDS->intron&UTR 6->UTR => ?
+        # tr4->tr1&tr2: intron&CDS->intron&CDS 26->22 => frameshift with ignored insert 4, intron&CDS->intron&UTR 26->UTR => ?
+        record = VCFRecord("1", 195, "id_01", "A", ["AGGGG]1:60]"], info={"ANNOT_POS": 195, "RNA_FIRST": True})
+        mate = VCFRecord("1", 60, "id_02", "A", ["AGGGG[1:195["], info={"ANNOT_POS": 60})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:1&TR_02:.'),
+                ('TR_04', 'TR_01:0&TR_02:.')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: exon&CDS->exon&CDS 5->30 => in_frame, exon&CDS->exon&CDS 5->9 => in_frame
+        # tr4->tr1&tr2: exon&CDS->exon&CDS 5->30 => in_frame, exon&CDS->exon&CDS 5->9 => in_frame
+        record = VCFRecord("1", 139, "id_01", "A", ["A]1:32]"], info={"ANNOT_POS": 139, "RNA_FIRST": True})
+        mate = VCFRecord("1", 32, "id_02", "A", ["A[1:139["], info={"ANNOT_POS": 32})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:1&TR_02:1'),
+                ('TR_04', 'TR_01:1&TR_02:1')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: exon&CDS->exon&CDS 4->30 => frameshift, exon&CDS->exon&CDS 4->9 => frameshift
+        # tr4->tr1&tr2: exon&CDS->exon&CDS 4->30 => frameshift, exon&CDS->exon&CDS 4->9 => frameshift
+        record = VCFRecord("1", 140, "id_01", "A", ["A]1:32]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
+        mate = VCFRecord("1", 32, "id_02", "A", ["A[1:140["], info={"ANNOT_POS": 32})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:0&TR_02:0'),
+                ('TR_04', 'TR_01:0&TR_02:0')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: exon&CDS->exon&CDS 4->30 => in_frame with ignored insert 2, exon&CDS->exon&CDS 4->9 => in_frame with ignored insert 2
+        # tr4->tr1&tr2: exon&CDS->exon&CDS 4->30 => in_frame with ignored insert 2, exon&CDS->exon&CDS 4->9 => in_frame with ignored insert 2
+        record = VCFRecord("1", 140, "id_01", "A", ["AGG]1:32]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
+        mate = VCFRecord("1", 32, "id_02", "A", ["AGG[1:140["], info={"ANNOT_POS": 32})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:1&TR_02:1'),
+                ('TR_04', 'TR_01:1&TR_02:1')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: exon&CDS->exon&CDS 4->30 => in_frame with ignored insert 5, exon&CDS->exon&CDS 4->9 => in_frame with ignored insert 5
+        # tr4->tr1&tr2: exon&CDS->exon&CDS 4->30 => in_frame with ignored insert 5, exon&CDS->exon&CDS 4->9 => in_frame with ignored insert 5
+        record = VCFRecord("1", 140, "id_01", "A", ["AGGGGG]1:32]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
+        mate = VCFRecord("1", 32, "id_02", "A", ["AGGGGG[1:140["], info={"ANNOT_POS": 32})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:1&TR_02:1'),
+                ('TR_04', 'TR_01:1&TR_02:1')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: exon&CDS->exon&CDS 4->30 => frameshift with ignored insert 4, exon&CDS->exon&CDS 4->9 => frameshift with ignored insert 4
+        # tr4->tr1&tr2: exon&CDS->exon&CDS 4->30 => frameshift with ignored insert 4, exon&CDS->exon&CDS 4->9 => frameshift with ignored insert 4
+        record = VCFRecord("1", 140, "id_01", "A", ["AGGGG]1:32]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
+        mate = VCFRecord("1", 32, "id_02", "A", ["AGGGG[1:140["], info={"ANNOT_POS": 32})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:0&TR_02:0'),
+                ('TR_04', 'TR_01:0&TR_02:0')
+            ]
+        )
+        ## Junction between exon and intron
+        # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->exon&CDS undertermined, intron&CDS->exon&CDS undertermined
+        # tr4->tr1&tr2: exon&CDS->exon&CDS 11->16 => frameshift, exon&CDS->intron&CDS undertermined
+        record = VCFRecord("1", 145, "id_01", "A", ["A]1:85]"], info={"ANNOT_POS": 145, "RNA_FIRST": True})
+        mate = VCFRecord("1", 85, "id_02", "A", ["A[1:145["], info={"ANNOT_POS": 85})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:.&TR_02:.'),
+                ('TR_04', 'TR_01:0&TR_02:.')
+            ]
+        )
+        ## UTR
+        # Fragments -/+
+        # tr3->tr1&tr2: exon&CDS->exon&UTR3' frameshift, exon&CDS->intron&UTR3' frameshift
+        # tr4->tr1&tr2: exon&CDS->exon&UTR3' frameshift, exon&CDS->intron&UTR3' frameshift
+        record = VCFRecord("1", 10, "id_01", "A", ["[1:245[A"], info={"ANNOT_POS": 10, "RNA_FIRST": True})
+        mate = VCFRecord("1", 245, "id_02", "A", ["[1:10[A"], info={"ANNOT_POS": 245})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_03:0&TR_04:0'),
+                ('TR_02', 'TR_03:0&TR_04:0'),
+            ]
+        )
+        # Fragments +/-
+        # tr1->tr3&tr4: exon&UTR5'->exon&UTR5' in_frame, exon&CDS->intron&UTR5' undetermined
+        # tr2->tr3&tr4: exon&UTR5'->exon&UTR5' in_frame, exon&UTR5'->intron&UTR5' undetermined
+        record = VCFRecord("1", 95, "id_01", "A", ["A]1:145]"], info={"ANNOT_POS": 95, "RNA_FIRST": True})
+        mate = VCFRecord("1", 145, "id_02", "A", ["A[1:95["], info={"ANNOT_POS": 145})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_03', 'TR_01:1&TR_02:.&TR_03:0&TR_04:0'),
+                ('TR_04', 'TR_01:1&TR_02:.&TR_03:0&TR_04:0')
+            ]
+        )
+        ## Non-coding
+        # Fragments -/+
+        # tr5->tr3&tr4: exon->exon&UTR3' frameshift, exon->exon&UTR3' frameshift
+        record = VCFRecord("2", 80, "id_01", "A", ["[1:245[A"], info={"ANNOT_POS": 80, "RNA_FIRST": True})
+        mate = VCFRecord("1", 245, "id_02", "A", ["[2:80[A"], info={"ANNOT_POS": 245})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_05', 'TR_03:0&TR_04:0')
+            ]
+        )
+        # Fragments -/-
+        # tr5->tr1&tr2: exon->exon&UTR5' in_frame, exon->intron&UTR5' undetermined
+        record = VCFRecord("2", 80, "id_01", "A", ["]1:140]A"], info={"ANNOT_POS": 80, "RNA_FIRST": True})
+        mate = VCFRecord("1", 140, "id_02", "A", ["A[2:80["], info={"ANNOT_POS": 140})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_05', 'TR_01:1&TR_02:.&TR_03:0&TR_04:0')
+            ]
+        )
+        # Fragments -/-
+        # tr5->tr1&tr2: intron->exon&UTR5' undetermined, intron->intron&UTR5' in_frame
+        record = VCFRecord("2", 120, "id_01", "A", ["]1:140]A"], info={"ANNOT_POS": 120, "RNA_FIRST": True})
+        mate = VCFRecord("1", 140, "id_02", "A", ["A[2:120["], info={"ANNOT_POS": 140})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelDNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_05', 'TR_01:.&TR_02:1&TR_03:0&TR_04:0')
+            ]
+        )
+
     def test_annotModelRNA(self):
         genes_by_chr = splittedByRef(loadModel(self.tmp_annot, "genes"))
         # Fragments +/-
@@ -393,11 +606,45 @@ class TestAnnotBND(unittest.TestCase):
                 ('TR_04', 'TR_01:0&TR_02:0')
             ]
         )
+        # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->spliceEnd&CDS undetermined
+        # tr4->tr1&tr2: spliceStart&CDS->spliceEnd&CDS in_frame with insert 1
+        record = VCFRecord("1", 189, "id_01", "A", ["GA]1:40]"], info={"ANNOT_POS": 189, "RNA_FIRST": True})
+        mate = VCFRecord("1", 40, "id_02", "A", ["GA[1:189["], info={"ANNOT_POS": 40})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:.&TR_02:.'),
+                ('TR_04', 'TR_01:1&TR_02:1')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->spliceEnd&CDS undetermined
+        # tr4->tr1&tr2: spliceStart&CDS->spliceEnd&CDS in_frame with insert 4
+        record = VCFRecord("1", 189, "id_01", "A", ["AGGGG]1:40]"], info={"ANNOT_POS": 189, "RNA_FIRST": True})
+        mate = VCFRecord("1", 40, "id_02", "A", ["AGGGG[1:189["], info={"ANNOT_POS": 40})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:.&TR_02:.'),
+                ('TR_04', 'TR_01:1&TR_02:1')
+            ]
+        )
         self.assertEqual(
             [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
             [  # expected
-                ('TR_01', 'TR_01:0&TR_02:0&TR_03:.&TR_04:0'),
-                ('TR_02', 'TR_01:0&TR_02:0&TR_03:.&TR_04:0')
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:.&TR_04:1'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:.&TR_04:1')
             ]
         )
         # Fragments +/-
@@ -425,6 +672,54 @@ class TestAnnotBND(unittest.TestCase):
             ]
         )
         # Fragments +/-
+        # tr3->tr1&tr2: spliceStart&CDS->spliceEnd&CDS in_frame with insert 6
+        # tr4->tr1&tr2: CDS->spliceEnd&CDS in_frame with insert 6
+        record = VCFRecord("1", 140, "id_01", "A", ["AGGGGGG]1:40]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
+        mate = VCFRecord("1", 40, "id_02", "A", ["AGGGGGG[1:189["], info={"ANNOT_POS": 40})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:1&TR_02:1'),
+                ('TR_04', 'TR_01:1&TR_02:1')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:1&TR_04:1'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:1&TR_04:1')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: spliceStart&CDS->spliceEnd&CDS frameshift with insert 4
+        # tr4->tr1&tr2: CDS->spliceEnd&CDS in_frame frameshift with insert 4
+        record = VCFRecord("1", 140, "id_01", "A", ["AGGGG]1:40]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
+        mate = VCFRecord("1", 40, "id_02", "A", ["AGGGG[1:189["], info={"ANNOT_POS": 40})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:0&TR_02:0'),
+                ('TR_04', 'TR_01:0&TR_02:0')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0')
+            ]
+        )
+        # Fragments +/-
         # tr3->tr1&tr2: intron&CDS->CDS undetermined, intron&CDS->intron&UTR in_frame
         # tr4->tr1&tr2: CDS->CDS in_frame, CDS->intron&UTR undetermined
         record = VCFRecord("1", 188, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 188, "RNA_FIRST": True})
@@ -446,6 +741,54 @@ class TestAnnotBND(unittest.TestCase):
             [  # expected
                 ('TR_01', 'TR_01:0&TR_02:0&TR_03:.&TR_04:1'),
                 ('TR_02', 'TR_01:0&TR_02:0&TR_03:1&TR_04:.')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->CDS undetermined, intron&CDS->intron&UTR in_frame with insert 6
+        # tr4->tr1&tr2: CDS->CDS in_frame with insert 6, CDS->intron&UTR undetermined
+        record = VCFRecord("1", 188, "id_01", "A", ["AGGGGGG]1:40]"], info={"ANNOT_POS": 188, "RNA_FIRST": True})
+        mate = VCFRecord("1", 84, "id_02", "A", ["AGGGGGG[1:189["], info={"ANNOT_POS": 84})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:.&TR_02:1'),
+                ('TR_04', 'TR_01:1&TR_02:.')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:.&TR_04:1'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:1&TR_04:.')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->CDS undetermined, intron&CDS->intron&UTR frameshift with insert 5
+        # tr4->tr1&tr2: CDS->CDS frameshift with insert 5, CDS->intron&UTR undetermined
+        record = VCFRecord("1", 188, "id_01", "A", ["AGGGGG]1:40]"], info={"ANNOT_POS": 188, "RNA_FIRST": True})
+        mate = VCFRecord("1", 84, "id_02", "A", ["AGGGGG[1:189["], info={"ANNOT_POS": 84})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:.&TR_02:0'),
+                ('TR_04', 'TR_01:0&TR_02:.')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:.&TR_04:0'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:0&TR_04:.')
             ]
         )
         # Fragments +/-
@@ -473,6 +816,30 @@ class TestAnnotBND(unittest.TestCase):
             ]
         )
         # Fragments +/-
+        # tr3->tr1&tr2: intron&CDS->intron&CDS in_frame with ignored insert 1, intron&CDS->intron&UTR frameshift with insert 1
+        # tr4->tr1&tr2: intron&CDS->intron&CDS frameshift with ignored insert 1, intron&CDS->intron&UTR in_frame with insert 1
+        record = VCFRecord("1", 195, "id_01", "A", ["AG]1:40]"], info={"ANNOT_POS": 195, "RNA_FIRST": True})
+        mate = VCFRecord("1", 60, "id_02", "A", ["AG[1:189["], info={"ANNOT_POS": 60})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0'),
+                ('TR_02', 'TR_01:0&TR_02:0'),
+                ('TR_03', 'TR_01:1&TR_02:0'),
+                ('TR_04', 'TR_01:0&TR_02:1')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:1&TR_04:0'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:0&TR_04:1')
+            ]
+        )
+        # Fragments +/-
         # tr3->tr1&tr2: spliceStart&CDS->spliceEnd&UTR in_frame, spliceStart&CDS->spliceEnd&UTR frameshift
         # tr4->tr1&tr2: CDS->spliceEnd&UTR in_frame, CDS->spliceEnd&UTR frameshift
         record = VCFRecord("1", 140, "id_01", "A", ["A]1:40]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
@@ -494,6 +861,32 @@ class TestAnnotBND(unittest.TestCase):
             [  # expected
                 ('TR_01', 'TR_01:0&TR_02:0&TR_03:1&TR_04:1'),
                 ('TR_02', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_03', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_04', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0')
+            ]
+        )
+        # Fragments +/-
+        # tr3->tr1&tr2: spliceStart&CDS->spliceEnd&UTR frameshift with insert 2, spliceStart&CDS->spliceEnd&UTR in_frame with insert 2
+        # tr4->tr1&tr2: CDS->spliceEnd&UTR frameshift with insert 2, CDS->spliceEnd&UTR in_frame with insert 2
+        record = VCFRecord("1", 140, "id_01", "A", ["AGG]1:40]"], info={"ANNOT_POS": 140, "RNA_FIRST": True})
+        mate = VCFRecord("1", 230, "id_02", "A", ["AGG[1:189["], info={"ANNOT_POS": 230})
+        record.info["ANN"] = sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"])
+        mate.info["ANN"] = sorted(getGeneAnnot(mate, genes_by_chr), key=lambda elt: elt["Feature"])
+        annotModelRNA(record, mate, "ANN")
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in record.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_03', 'TR_01:0&TR_02:1&TR_03:0&TR_04:0'),
+                ('TR_04', 'TR_01:0&TR_02:1&TR_03:0&TR_04:0')
+            ]
+        )
+        self.assertEqual(
+            [(elt["Feature"], elt["IN_FRAME"]) for elt in mate.info["ANN"]],  # observed
+            [  # expected
+                ('TR_01', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
+                ('TR_02', 'TR_01:0&TR_02:0&TR_03:1&TR_04:1'),
                 ('TR_03', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0'),
                 ('TR_04', 'TR_01:0&TR_02:0&TR_03:0&TR_04:0')
             ]
@@ -679,6 +1072,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "intron",
@@ -688,6 +1082,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "intron",
@@ -707,6 +1102,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "intron",
@@ -716,6 +1112,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 3
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "intron&utr",
@@ -736,6 +1133,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "intron",
@@ -745,6 +1143,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "intron",
@@ -764,6 +1163,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "intron",
@@ -773,6 +1173,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 1
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "intron&utr",
@@ -793,6 +1194,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&spliceStart",
@@ -802,6 +1204,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 3
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "intron&utr",
@@ -822,6 +1225,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&spliceEnd",
@@ -831,6 +1235,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 1
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "exon&spliceEnd",
@@ -850,6 +1255,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -860,6 +1266,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 70
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -870,6 +1277,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 20
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "intron",
@@ -879,6 +1287,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 3
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon&spliceStart",
@@ -898,6 +1307,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -908,6 +1318,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 101
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -918,6 +1329,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 51
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "exon&spliceEnd",
@@ -927,6 +1339,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 1
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon&spliceEnd",
@@ -946,6 +1359,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&transcriptStart&utr",
@@ -956,6 +1370,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 111
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "exon&transcriptStart&utr",
@@ -966,6 +1381,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 61
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "exon",
@@ -975,6 +1391,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 2
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon",
@@ -994,6 +1411,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon",
@@ -1003,6 +1421,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 2
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "intron&utr",
@@ -1013,6 +1432,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 0
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "exon&transcriptStart&utr",
@@ -1023,6 +1443,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 45
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon&transcriptStart&utr",
@@ -1043,6 +1464,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon",
@@ -1052,6 +1474,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 2
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "exon",
@@ -1071,6 +1494,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                  {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon",
@@ -1080,6 +1504,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 3
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "intron&utr",
@@ -1090,6 +1515,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 0
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1100,6 +1526,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 43
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1120,6 +1547,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                  {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon",
@@ -1129,6 +1557,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 3
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "intron",
@@ -1138,6 +1567,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1148,6 +1578,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 43
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1168,6 +1599,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                  {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1178,6 +1610,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 38
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "intron",
@@ -1187,6 +1620,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "exon",
@@ -1196,6 +1630,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 1
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon",
@@ -1215,6 +1650,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                  {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1225,6 +1661,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 43
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "intron",
@@ -1234,6 +1671,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "intron",
@@ -1243,6 +1681,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 3
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon",
@@ -1262,6 +1701,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                  {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1272,6 +1712,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 64
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1282,6 +1723,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 14
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "intron",
@@ -1291,6 +1733,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 3
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon",
@@ -1310,6 +1753,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                  {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1320,6 +1764,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 64
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1330,6 +1775,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 14
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "intron",
@@ -1339,6 +1785,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon",
@@ -1358,6 +1805,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                  {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1368,6 +1816,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 64
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1378,6 +1827,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 14
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "intron",
@@ -1387,6 +1837,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": 1
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon",
@@ -1406,6 +1857,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                  {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_01",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_01",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1416,6 +1868,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 64
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N01", "Gene": "GENE_I01", "Feature": "TR_02",
                     "Feature_type": "Transcript", "STRAND": "-", "Protein": "PROT_02",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1426,6 +1879,7 @@ class TestAnnotBND(unittest.TestCase):
                     "CDS_DIST": 14
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "intron",
@@ -1435,6 +1889,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon",
@@ -1454,6 +1909,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1463,6 +1919,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1482,6 +1939,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1491,6 +1949,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 1,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1510,6 +1969,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1519,6 +1979,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1538,6 +1999,7 @@ class TestAnnotBND(unittest.TestCase):
             sorted(getGeneAnnot(record, genes_by_chr), key=lambda elt: elt["Feature"]),
             [
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_03",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_03",
                     "RNA_ELT_TYPE": "exon&utr",
@@ -1547,6 +2009,7 @@ class TestAnnotBND(unittest.TestCase):
                     "Codon_position": None
                 },
                 {
+                    "BND_ORDER": 2,
                     "SYMBOL": "GENE_N02", "Gene": "GENE_I02", "Feature": "TR_04",
                     "Feature_type": "Transcript", "STRAND": "+", "Protein": "PROT_04",
                     "RNA_ELT_TYPE": "exon&utr",
