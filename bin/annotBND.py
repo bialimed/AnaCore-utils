@@ -145,15 +145,14 @@ def annotModelDNA(first, second, annotation_field):
       * 3' shard keeps the end of the second transcript in right strand,
       * the phase of the second transcript is kept.
     The following table details IN_FRAME values for all the analysed configurations:
-    5' shard     3' shard   Inframe   Note
-    CDS          CDS        0/1       Check the phase (end of first shard and start of second shard and inssertion for exon to exon junction)
-    5'UTR        5'UTR      1         The first does not start
-    *            3'UTR      0         The second is not expressed
-    CDS          5'UTR      ?         
-    3'UTR        5'UTR      ?         If the trancription terminator is cut and the sequence continue to exon and splice to the next or if is readthrough
-    5'UTR        CDS        ?         Can be use an other TSS and traduction start.
-    3'UTR        CDS        ?         If the trancription terminator is cut and the sequence continue to exon and splice to the next or if is readthrough
-    non-coding   5'UTR      1         1 if first and second BND are in intron or in splice site.
+    5' shard           3' shard      Inframe   Note
+    *                  3'UTR         0         The second is not expressed
+    CDS-intron         CDS-intron    0/1       In frame: the position of the codon in the exon of the first transcript matches to the codon's previous position in the second transcript
+    CDS-exon           CDS-exon      0/1       In frame: the position of the codon in the exon of the first transcript, plus the size of the insertion caused by the translocation, match to the codon's previous position in the second transcript
+    5'UTR-intron       5'UTR-intron  1         Splicing is preserved and the second transcript starts CDS
+    5'UTR-exon         5'UTR-exon    1         Splicing is preserved and the second transcript starts CDS
+    non-coding-intron  5'UTR-intron  1         Splicing is preserved and the second transcript starts CDS
+    non-coding-exon    5'UTR-exon    1         Splicing is preserved and the second transcript starts CDS
 
     :param first: Breakend of the 5' shard of the fusion.
     :type first: anacore.vcf.VCFRecord
@@ -178,7 +177,9 @@ def annotModelDNA(first, second, annotation_field):
                 if first_strand == first_annot["STRAND"] and second_strand == second_annot["STRAND"]:
                     if second_annot["Protein"] != "":  # The second RNA is coding
                         inframe = "."
-                        if first_annot["Protein"] != "":  # First and second transcripts are coding
+                        if second_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_POS"].endswith("3prim"):  # first: * and second: 3'UTR
+                            inframe = "0"
+                        elif first_annot["Protein"] != "":  # First and second transcripts are coding
                             if not first_annot["RNA_ELT_TYPE"].endswith("utr") and not second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: CDS and second: CDS
                                 if "intron" in first_annot["RNA_ELT_TYPE"] and "intron" in second_annot["RNA_ELT_TYPE"]:  # Junction between introns
                                     # Hypothesis: keep splicing structure
@@ -194,9 +195,7 @@ def annotModelDNA(first, second, annotation_field):
                                         inframe = "1"
                                 # Junction between intron and exon => . (splice site alteration)
                             else:  # At least one breakend falls in UTR
-                                if second_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_POS"].endswith("3prim"):  # first: * and second: 3'UTR
-                                    inframe = "0"
-                                elif first_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: UTR and second: UTR
+                                if first_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_TYPE"].endswith("utr"):  # first: UTR and second: UTR
                                     if first_annot["RNA_ELT_POS"].endswith("5prim") and second_annot["RNA_ELT_POS"].endswith("5prim"):  # first: 5'UTR and second: 5'UTR
                                         if "intron" in first_annot["RNA_ELT_TYPE"] and "intron" in second_annot["RNA_ELT_TYPE"]:
                                             inframe = "1"
@@ -204,9 +203,7 @@ def annotModelDNA(first, second, annotation_field):
                                             inframe = "1"
                                     # first: 3'UTR and second: 5'UTR unknown behavior => .
                         else:  # First is not coding
-                            if second_annot["RNA_ELT_TYPE"].endswith("utr") and second_annot["RNA_ELT_POS"].endswith("3prim"):  # first: * and second: 3'UTR
-                                inframe = "0"
-                            elif second_annot["RNA_ELT_POS"].endswith("5prim"):  # first: non-coding and second: 5'UTR
+                            if second_annot["RNA_ELT_POS"].endswith("5prim"):  # first: non-coding and second: 5'UTR
                                 if first_annot["RNA_ELT_TYPE"].startswith("intron") and second_annot["RNA_ELT_TYPE"].startswith("intron"):  # from non-coding first in intron to second 5'UTR in intron
                                     inframe = "1"
                                 elif first_annot["RNA_ELT_TYPE"].startswith("exon") and second_annot["RNA_ELT_TYPE"].startswith("exon"):  # from non-coding first on splice donor to second 5'UTR on splice acceptor
