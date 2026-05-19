@@ -86,34 +86,35 @@ def getKnownPartners(record, known_field="known_partners"):
 
 def getFusionAnnot(record, mate, annot_field="ANN"):
     fusion_annot = list()
-    if len(record.info[annot_field]) == 0:  # record: no annot ; mate: ?
-        for mate_annot_idx, mate_annot in enumerate(mate.info[annot_field]):
-            fusion_annot.append({
-                "features_annotation": [None, mate_annot_idx],
-                "inframe": "."
-            })
-    elif len(mate.info[annot_field]) == 0:  # record: ? ; mate: no annot
-        for record_annot_idx, record_annot in enumerate(record.info[annot_field]):
+    annot_idx_by_rec_feature = dict()
+    for record_annot_idx, record_annot in enumerate(record.info[annot_field]):
+        if record_annot["IN_FRAME"] is None:  # record: annot ; mate: no annot
             fusion_annot.append({
                 "features_annotation": [record_annot_idx, None],
                 "inframe": "."
             })
-    else:  # record: annot ; mate: annot
-        for record_annot_idx, record_annot in enumerate(record.info[annot_field]):
-            inframe_by_partner = {}
+        else:  # record: annot ; mate: annot (store record)
             record_bnd_order = record_annot["BND_ORDER"] if "BND_ORDER" in record_annot else ""
-            for elt in record_annot["IN_FRAME"].split("&"):
-                mate_feature, inframe = elt.split(":")
+            annot_idx_by_rec_feature[f"{record_annot['Feature']}__{record_bnd_order}"] = record_annot_idx
+    for mate_annot_idx, mate_annot in enumerate(mate.info[annot_field]):
+        if mate_annot["IN_FRAME"] is None:  # record: no annot ; mate: annot
+            fusion_annot.append({
+                "features_annotation": [None, mate_annot_idx],
+                "inframe": "."
+            })
+        else:  # record: annot ; mate: annot process frame
+            mate_bnd_order = mate_annot["BND_ORDER"] if "BND_ORDER" in mate_annot else ""
+            record_bnd_order = {"1": "2", "2": "1", "": ""}[mate_bnd_order]  # Record is first if mate is second, is second if mate is first
+            for elt in mate_annot["IN_FRAME"].split("&"):
+                record_feature, inframe = elt.split(":")
                 if inframe == "1":
                     inframe = True
                 elif inframe == "0":
                     inframe = False
-                inframe_by_partner[f"{mate_feature}__{record_bnd_order}"] = inframe
-            for mate_annot_idx, mate_annot in enumerate(mate.info[annot_field]):
                 fusion_annot.append({
                     "features_annotation": [record_annot_idx, mate_annot_idx],
-                    "inframe": inframe_by_partner[
-                        f"{mate_annot['Feature']}__{record_bnd_order}"
+                    "inframe": annot_idx_by_rec_feature[
+                        f"{record_feature}__{record_bnd_order}"
                     ]
                 })
     return fusion_annot
@@ -155,10 +156,10 @@ if __name__ == "__main__":
         for record, mate in reader:
             curr_json = dict()
             # Breakend order
-            if "RNA_FIRST" in mate.info or "PRED_RNA_FIRST" in mate.info:
+            is_stranded = "RNA_FIRST" in record.info
+            if not is_stranded and "PRED_RNA_FIRST" in mate.info:
                 mate, record = record, mate
             # Coord information
-            is_stranded = True if "RNA_FIRST" in record.info or "RNA_FIRST" in mate.info else False
             curr_json["breakends"] = [
                 getBreakendInfo(record, is_stranded, args.annotation_field, args.assembly_id),
                 getBreakendInfo(mate, is_stranded, args.annotation_field, args.assembly_id)
