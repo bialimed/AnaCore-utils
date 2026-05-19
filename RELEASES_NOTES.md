@@ -3,7 +3,8 @@
 ### Improvements:
   * Manage unstranded breakpoints, DNA matrix and translocations with an
   insertion in `bin/annotBND.py`.
-  * Manage unstranded breakpoints in `bin/strandedBND.py`.
+  * Manage unstranded breakpoints in `bin/strandedBND.py` and
+  `bin/annotKnownBND.py`.
   * Reduce memory usage for `bin/depthsMetrics.py`.
   * Add script to convert TSV variant database in indexed VCF:
   `bin/tsvDbToVCF.py`.
