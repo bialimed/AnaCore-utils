@@ -764,7 +764,15 @@ if __name__ == "__main__":
                 id="ANNOT_POS",
                 type="Integer",
                 number="1",
-                description="Breakend position used in annotation. It take into account CIPOS to give priority to a breakend on exon boundaries."
+                description="Breakend position used in annotation. It take into account CIPOS to give priority to a breakend on exon boundaries.",
+                source="anacore-utils/annotBND.py"
+            )
+            writer.info["ANNOT_POS_RVS"] = HeaderInfoAttr(
+                id="ANNOT_POS_RVS",
+                type="Integer",
+                number="1",
+                description="For unstranded RNA fusions, breakend position used in annotation. It take into account CIPOS to give priority to a breakend on exon boundaries.",
+                source="anacore-utils/annotBND.py"
             )
             writer.info["PRED_RNA_FIRST"] = HeaderInfoAttr(
                 id="PRED_RNA_FIRST",
@@ -782,25 +790,14 @@ if __name__ == "__main__":
                     annot_pair = getAnnotForcedStrand(first, second, genes_by_chr, args.biological_matrix)
                     annot_switched = getAnnotForcedStrand(second, first, genes_by_chr, args.biological_matrix)
                     # Update pos and annot
-                    if annot_pair["nb_prom_ok"] > 0 and annot_switched["nb_prom_ok"] == 0:
-                        selected_annot = annot_pair
-                    elif annot_pair["nb_prom_ok"] == 0 and annot_switched["nb_prom_ok"] > 0:
-                        selected_annot = {"first": annot_switched["second"], "second": annot_switched["first"]}
-                    else:
-                        selected_annot = {
-                            "first": {
-                                "annot": annot_pair["first"]["annot"] + annot_switched["second"]["annot"],
-                                "pos": annot_pair["first"]["pos"]
-                            },
-                            "second": {
-                                "annot": annot_pair["second"]["annot"] + annot_switched["first"]["annot"],
-                                "pos": annot_pair["second"]["pos"]
-                            }
-                        }
-                    first.info[args.annotation_field] = selected_annot["first"]["annot"]
-                    first.info["ANNOT_POS"] = selected_annot["first"]["pos"]
-                    second.info[args.annotation_field] = selected_annot["second"]["annot"]
-                    second.info["ANNOT_POS"] = selected_annot["second"]["pos"]
+                    first.info[args.annotation_field] = annot_pair["first"]["annot"] + annot_switched["second"]["annot"]
+                    first.info["ANNOT_POS"] = annot_pair["first"]["pos"]
+                    if annot_pair["first"]["pos"] != annot_switched["second"]["pos"]:
+                        first.info["ANNOT_POS_RVS"] = annot_switched["second"]["pos"]
+                    second.info[args.annotation_field] = annot_pair["second"]["annot"] + annot_switched["first"]["annot"]
+                    second.info["ANNOT_POS"] = annot_pair["second"]["pos"]
+                    if annot_pair["second"]["pos"] != annot_switched["first"]["pos"]:
+                        second.info["ANNOT_POS_RVS"] = annot_switched["first"]["pos"]
                     # Switch first and second if the promoter seems to be on second
                     if annot_switched["nb_prom_ok"] < annot_pair["nb_prom_ok"]:
                         first.info["PRED_RNA_FIRST"] = True
