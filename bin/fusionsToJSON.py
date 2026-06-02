@@ -30,6 +30,8 @@ def getBreakendInfo(record, is_stranded, annot_field="ANN", assembly_id=None):
         "assembly": None if assembly_id is None else assembly_id,
         "strand": None if not is_stranded else getStrand(record)
     }
+    if "ANNOT_POS_RVS" in record.info and record.info["ANNOT_POS_RVS"] != coordinates["annot_pos"]:
+        coordinates["annot_pos_rvs"] = record.info["ANNOT_POS_RVS"]
     features = []
     for idx, feature in enumerate(record.info[annot_field]):
         cp_feature = deepcopy(feature)
@@ -107,15 +109,14 @@ def getFusionAnnot(record, mate, annot_field="ANN"):
             record_bnd_order = {"1": "2", "2": "1", "": ""}[mate_bnd_order]  # Record is first if mate is second, is second if mate is first
             for elt in mate_annot["IN_FRAME"].split("&"):
                 record_feature, inframe = elt.split(":")
+                record_annot_idx = annot_idx_by_rec_feature[f"{record_feature}__{record_bnd_order}"]
                 if inframe == "1":
                     inframe = True
                 elif inframe == "0":
                     inframe = False
                 fusion_annot.append({
                     "features_annotation": [record_annot_idx, mate_annot_idx],
-                    "inframe": annot_idx_by_rec_feature[
-                        f"{record_feature}__{record_bnd_order}"
-                    ]
+                    "inframe": inframe
                 })
     return fusion_annot
 
@@ -159,6 +160,12 @@ if __name__ == "__main__":
             is_stranded = "RNA_FIRST" in record.info
             if not is_stranded and "PRED_RNA_FIRST" in mate.info:
                 mate, record = record, mate
+            # Stranded by
+            curr_json["stranded_by"] = None
+            if is_stranded:
+                curr_json["stranded_by"] = "lab"
+            elif "PRED_RNA_FIRST" in record.info or "PRED_RNA_FIRST" in mate.info:
+                curr_json["stranded_by"] = "annot"
             # Coord information
             curr_json["breakends"] = [
                 getBreakendInfo(record, is_stranded, args.annotation_field, args.assembly_id),
