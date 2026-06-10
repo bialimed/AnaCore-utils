@@ -51,8 +51,8 @@ def aliasesBySymbolsFromEnsembl(in_aliases):
     aliases_by_symbol = {}
     with HashedSVIO(in_aliases) as reader:
         for record in reader:
-            name = record["Gene name"]
-            alias = record["Gene Synonym"]
+            name = record["Gene name"].upper()
+            alias = record["Gene Synonym"].upper()
             if name not in aliases_by_symbol:
                 aliases_by_symbol[name] = [name, alias]
             else:
@@ -76,8 +76,8 @@ def aliasesBySymbolsFromNCBI(in_aliases):
     aliases_by_symbol = {}
     with HashedSVIO(in_aliases) as reader:
         for record in reader:
-            name = record["Symbol"]
-            aliases = record["Synonyms"].split("|")
+            name = record["Symbol"].upper()
+            aliases = [elt.upper() for elt in record["Synonyms"].split("|")]
             if name not in aliases_by_symbol:
                 aliases_by_symbol[name] = [name] + aliases
             else:
@@ -96,16 +96,18 @@ def annotSymbols(in_annotations):
 
     :param in_annotations: Path to the genes annotations file.
     :type in_annotations: str
-    :return: List of genes names used in genes annotations file.
-    :rtype: set
+    :return: By upper gene name the gene name used in genes annotations file.
+    :rtype: dict
     """
-    annotation_symbols = set()
+    annotation_symbols = dict()
     with GTFIO(in_annotations) as reader:
         for record in reader:
             if "gene_name" in record.annot:
-                annotation_symbols.add(record.annot["gene_name"])
+                name = record.annot["gene_name"]
+                annotation_symbols[name.upper()] = name
             elif "gene" in record.annot:
-                annotation_symbols.add(record.annot["gene"])
+                name = record.annot["gene"]
+                annotation_symbols[name.upper()] = name
     return annotation_symbols
 
 
@@ -115,27 +117,23 @@ def selectAnnotSymbol(gene_symbol, annotation_symbols, aliases_by_symbol):
 
     :param gene_symbol: Gene name.
     :type gene_symbol: str
-    :param annotation_symbols: List of genes names known in genes annotations file.
-    :type annotation_symbols: set
+    :param annotation_symbols: By upper gene name the gene name used in genes annotations file.
+    :type annotation_symbols: dict
     :param aliases_by_symbol: Gene name aliases by symbol.
     :type aliases_by_symbol: dict
     :return: Alias of the gene symbol used in genes annotations file.
     :rtype: str
     """
     retained_name = None
-    if gene_symbol not in aliases_by_symbol:
-        if gene_symbol.upper() in aliases_by_symbol:
-            gene_symbol = gene_symbol.upper()
-        elif gene_symbol.replace("ORF", "orf") in aliases_by_symbol:
-            gene_symbol = gene_symbol.replace("ORF", "orf")
-    aliases = [gene_symbol]
-    if gene_symbol in aliases_by_symbol:
-        aliases = aliases_by_symbol[gene_symbol]
+    uc_symbol = gene_symbol.upper()
+    aliases = [uc_symbol]
+    if uc_symbol in aliases_by_symbol:
+        aliases = aliases_by_symbol[uc_symbol]
     for curr_name in aliases:
         if curr_name in annotation_symbols:
-            retained_name = curr_name
+            retained_name = annotation_symbols[curr_name]
     if retained_name is None:
-        raise Exception("The gene with aliases {} cannot be found in genes annotations.".format(aliases))
+        raise Exception(f"The gene with aliases {aliases} cannot be found in genes annotations.")
     return retained_name
 
 
@@ -195,7 +193,7 @@ def loadChimerdb(db_path, db_version, fusions_by_partners, aliases_by_symbol, an
     :param annotation_symbols: List of genes names known in genes annotations file.
     :type annotation_symbols: set
     """
-    # id    Source    webSource    Fusion_pair    H_gene    H_chr    H_position    H_strand    T_gene    T_chr    T_position    T_strand    Breakpoint_Type    Genome_Build_Version    PMID    Disease    Validation    Kinase    Oncogene    Tumor_suppressor    Receptor    Transcription_Factor    ChimerPub    ChimerSeq
+    # id        ChimerDB_Type   Source  webSource       Fusion_pair     5Gene_Junction  3Gene_Junction  H_gene  H_chr   H_position      H_strand        T_gene  T_chr   T_position      T_strand        Genomic_breakpoint   Exonic_breakpoint       Breakpoint_Type Genome_Build_Version    PMID    Disease Validation      Frame   Chr_info        Kinase  Oncogene        Tumor_suppressor        Receptor        Transcription_FactorChimerPub        ChimerSeq       ChimerSeq+
     with HashedSVIO(db_path) as reader:
         for record in reader:
             up_gene = None
@@ -239,18 +237,14 @@ def loadCosmic(db_path, db_version, fusions_by_partners, aliases_by_symbol, anno
     :param annotation_symbols: List of genes names known in genes annotations file.
     :type annotation_symbols: set
     """
-    # Sample ID    Sample name    Primary site    Site subtype 1    Site subtype 2    Site subtype 3    Primary histology    Histology subtype 1    Histology subtype 2    Histology subtype 3    Fusion ID    Translocation Name    5'_CHROMOSOME    5'_GENOME_START_FROM    5'_GENOME_START_TO    5'_GENOME_STOP_FROM    5'_GENOME_STOP_TO    5'_STRAND    3'_CHROMOSOME    3'_GENOME_START_FROM    3'_GENOME_START_TO    3'_GENOME_STOP_FROM    3'_GENOME_STOP_TO    3'_STRAND    Fusion type    Pubmed_PMID
+    # SAMPLE_ID SAMPLE_NAME     PRIMARY_SITE    SITE_SUBTYPE_1  SITE_SUBTYPE_2  SITE_SUBTYPE_3  PRIMARY_HISTOLOGY       HISTOLOGY_SUBTYPE_1     HISTOLOGY_SUBTYPE_2     HISTOLOGY_SUBTYPE_3     FUSION_ID       TRANSLOCATION_NAME   5'_CHROMOSOME   5'_STRAND       5'_GENE_ID      5'_GENE_NAME    5'_LAST_OBSERVED_EXON   5'_GENOME_START_FROM    5'_GENOME_START_TO      5'_GENOME_STOP_FROM     5'_GENOME_STOP_TO       3'_CHROMOSOME3'_STRAND       3'_GENE_ID      3'_GENE_NAME    3'_FIRST_OBSERVED_EXON  3'_GENOME_START_FROM    3'_GENOME_START_TO      3'_GENOME_STOP_FROM     3'_GENOME_STOP_TO       FUSION_TYPE     PUBMED_PMID
     with HashedSVIO(db_path) as reader:
-        reader.titles = [elt.upper().replace(" ", "_") for elt in reader.titles]
         for record in reader:
             if record["TRANSLOCATION_NAME"] != "":
                 matches = re.fullmatch(r"ENS.+\((.+)\):.+_ENS.+\((.+)\):.+", record["TRANSLOCATION_NAME"])  # ENST00000324093.4(PLXND1):r.1_2864_ENST00000393238.3(TMCC1):r.918_5992
                 if matches is None:
                     log.warning(
-                        "Error to parse gene names {} from cosmic (PMID: {}).".format(
-                            record["TRANSLOCATION_NAME"],
-                            record["PUBMED_PMID"]
-                        )
+                        f"Error to parse gene names {record['TRANSLOCATION_NAME']} from cosmic (PMID: {record['PUBMED_PMID']})."
                     )
                 else:
                     up_gene, down_gene = matches.groups()
@@ -333,10 +327,12 @@ def loadMitelman(db_path, db_version, fusions_by_partners, aliases_by_symbol, an
     if "," in db_path:
         mbca_path, ref_path = db_path.split(",")
         pubmed_by_fusion = pubmedByFusion(ref_path)
-    # MolClin    RefNo    InvNo    Morph    Topo    Immunology    GeneLength    GeneShort    GeneLong    KaryLength    KaryShort    KaryLong
+    # MolClin   RefNo   InvNo   Morph   Topo    Immunology      GeneLength      GeneShort       GeneLong        KaryLength      KaryShort       KaryLong
     with HashedSVIO(mbca_path) as reader:
-        for record in reader:
-            if record["GeneShort"] != "":
+        for row_idx, record in enumerate(reader):
+            if "GeneShort" not in record:
+                log.warning(f"Invalid record line {row_idx} in {mbca_path}.")
+            elif record["GeneShort"] != "":
                 for fusion in record["GeneShort"].split(","):
                     if "/" in fusion:
                         genes = fusion.replace("+", "").split("/")  # PDRG1/ARF3/RUNX1 => fusion between 3 genes
@@ -348,9 +344,7 @@ def loadMitelman(db_path, db_version, fusions_by_partners, aliases_by_symbol, an
                                 found = True
                             except Exception:
                                 log.warning(
-                                    "Error to parse gene names [{}, {}] from Mitelman (PMID: {}).".format(
-                                        up_gene, down_gene, record["RefNo"]
-                                    )
+                                    f"Error to parse gene names [{up_gene}, {down_gene}] from Mitelman (PMID: {record['RefNo']})."
                                 )
                             if found:
                                 fusion_partners = "{}_@_{}".format(up_gene, down_gene)
@@ -375,7 +369,7 @@ def pubmedByFusion(in_ref):
     :return: Pubmed IDs by fusion partners.
     :rtype: dict
     """
-    # RefNo    TitleLength    TitleShort    TitleLong    Volume    Year    Journal    Text    Abbreviation    AuthorsLength    AuthorsShort    AuthorsLong    Flag    Pubmed
+    # RefNo     TitleLength     TitleShort      TitleLong       Volume  Year    Journal Text    Abbreviation    AuthorsLength   AuthorsShort    AuthorsLong     Flag    Pubmed
     pubmed_by_fusion = {}
     with HashedSVIO(in_ref) as reader:
         for record in reader:
@@ -422,16 +416,12 @@ class InputsDatabases(argparse.Action):
         for db_arg in values:
             if db_arg.count(":") != 2:
                 raise argparse.ArgumentTypeError(
-                    'Argument "{}" is invalid. The format must be: "MODEL:VERSION:PATH".'.format(
-                        db_arg
-                    )
+                    f'Argument "{db_arg}" is invalid. The format must be: "MODEL:VERSION:PATH".'
                 )
             model, version, path = db_arg.split(":")
             if model.lower() not in fct_by_model:
                 raise argparse.ArgumentTypeError(
-                    'Database model "{}" is invalid. It must be selected in {}.'.format(
-                        model, sorted(fct_by_model.keys())
-                    )
+                    f'Database model "{model}" is invalid. It must be selected in {sorted(fct_by_model.keys())}.'
                 )
             databases.append({
                 "model": model,
@@ -451,11 +441,11 @@ if __name__ == "__main__":
     # Manage parameters
     parser = argparse.ArgumentParser(description='Write unique known fusions partners database from multiple databases.')
     parser.add_argument('-v', '--version', action='version', version=__version__)
-    group_input = parser.add_argument_group('Inputs')  # Inputs
+    group_input = parser.add_argument_group('Inputs')
     group_input.add_argument('-l', '--input-aliases', required=True, help="Path to the file containing aliases between genes symbols (format: TSV). Each line contains a symbol (Gene name) with one of these aliases (Gene Synonym). This file can be obtain from Ensembl's biomart.")
     group_input.add_argument('-a', '--input-annotations', required=True, help='Path to the file containing the genes annotations used in analysis (format: GTF).')
     group_input.add_argument('-d', '--inputs-databases', action=InputsDatabases, nargs='+', required=True, help='Paths to databases format: "model:version:path". Model must be in ["babiceanu", "bodymap", "chimerdb", "cosmic", "mitelman"]. Example: -d cosmic:91:~/cosmic91_fusion.tsv chimerdb:Kb3.0:~/chimerKb.tsv mitelman:2019:~/MBCA.TXT.DATA,~/REF.TXT.DATA.')
-    group_output = parser.add_argument_group('Outputs')  # Outputs
+    group_output = parser.add_argument_group('Outputs')
     group_output.add_argument('-o', '--output-database', required=True, help='Path to the fusions partners database (format: TSV).')
     args = parser.parse_args()
 
