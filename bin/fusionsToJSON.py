@@ -19,7 +19,7 @@ from anacore.fusion import BreakendVCFIO, getStrand
 # FUNCTIONS
 #
 ########################################################################
-def getBreakendInfo(record, is_stranded, annot_field="ANN", assembly_id=None):
+def getBreakendInfo(record, is_first, annot_field="ANN", assembly_id=None):
     coordinates = {
         "region": record.chrom,
         "pos": record.pos,
@@ -28,7 +28,7 @@ def getBreakendInfo(record, is_stranded, annot_field="ANN", assembly_id=None):
         "ref": record.ref,
         "alt": record.alt[0],
         "assembly": None if assembly_id is None else assembly_id,
-        "strand": None if not is_stranded else getStrand(record)
+        "strand": getStrand(record, is_first)
     }
     if "ANNOT_POS_RVS" in record.info and record.info["ANNOT_POS_RVS"] != coordinates["annot_pos"]:
         coordinates["annot_pos_rvs"] = record.info["ANNOT_POS_RVS"]
@@ -168,8 +168,8 @@ if __name__ == "__main__":
                 curr_json["stranded_by"] = "annot"
             # Coord information
             curr_json["breakends"] = [
-                getBreakendInfo(record, is_stranded, args.annotation_field, args.assembly_id),
-                getBreakendInfo(mate, is_stranded, args.annotation_field, args.assembly_id)
+                getBreakendInfo(record, True, args.annotation_field, args.assembly_id),
+                getBreakendInfo(mate, False, args.annotation_field, args.assembly_id)
             ]
             # Filters
             curr_json["filters"] = record.filter
