@@ -23,3 +23,6 @@ requires-python = ">=3.10"
 [project.urls]
 Homepage = "https://github.com/bialimed/anacore-utils"
 Repository = "https://github.com/bialimed/anacore-utils"
+
+[tool.setuptools]
+packages = []

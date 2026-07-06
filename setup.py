@@ -20,11 +20,10 @@ def load_scripts(path):
         filepath = os.path.join(path, filename)
         if os.path.isdir(filepath):
             if filename != "test":
-                load_scripts(filepath)
+                scripts += load_scripts(filepath)
         else:
             if filename.endswith(".py") and not filename.startswith("__"):
                 scripts.append(filepath)
-    print(scripts)
     return scripts
 
 
