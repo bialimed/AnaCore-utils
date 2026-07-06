@@ -13,7 +13,7 @@ dependencies = [
     "anacore == 2.12.1",
     "scikit-learn == 1.3.2"
 ]
-dynamic = ["version"]
+dynamic = ["version", "scripts"]
 keywords = ["bio", "NGS"]
 license.text = "GNU GPL v3"
 name = "anacore-utils"
@@ -23,6 +23,3 @@ requires-python = ">=3.10"
 [project.urls]
 Homepage = "https://github.com/bialimed/anacore-utils"
 Repository = "https://github.com/bialimed/anacore-utils"
-
-[tool.setuptools.packages.find]
-where = ['bin']

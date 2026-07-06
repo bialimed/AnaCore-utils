@@ -14,6 +14,21 @@ def get_version():
     return version
 
 
+def load_scripts(path):
+    scripts = []
+    for filename in os.listdir(path):
+        filepath = os.path.join(path, filename)
+        if os.path.isdir(filepath):
+            if filename != "test":
+                load_scripts(filepath)
+        else:
+            if filename.endswith(".py") and not filename.startswith("__"):
+                scripts.append(filepath)
+    print(scripts)
+    return scripts
+
+
 setup(
     version=get_version(),
+    scripts=load_scripts("bin")
 )
