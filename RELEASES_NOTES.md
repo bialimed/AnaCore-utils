@@ -1,4 +1,4 @@
-# Release 3.7.0 [DEV]
+# Release 3.7.0 [2026-07-06]
 
 ### Improvements:
   * Manage unstranded breakpoints, DNA matrix and translocations with an
@@ -6,7 +6,7 @@
   * Manage unstranded breakpoints in `bin/strandedBND.py` and
   `bin/annotKnownBND.py`.
   * Reduce memory usage for `bin/depthsMetrics.py`.
-  * Add script to convert TSV variant database in indexed VCF:
+  * Add script to convert TSV variants database in indexed VCF:
   `bin/tsvDbToVCF.py`.
   * Store exon/intron postion and HGVSg in JSON with `bin/VCFToJSON.py`.
   * Use user selected annotation tag in header of empty variants file in
