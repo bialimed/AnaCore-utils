@@ -3,7 +3,7 @@
 __author__ = 'Frederic Escudie'
 __copyright__ = 'Copyright (C) 2017 CHU Toulouse'
 __license__ = 'GNU General Public License'
-__version__ = '2.9.2'
+__version__ = '2.10.0'
 
 from anacore.annotVcf import AnnotVCFIO, getAlleleRecord
 import argparse
@@ -19,6 +19,34 @@ import sys
 # FUNCTIONS
 #
 ########################################################################
+#: Databases of the IDs stored in the VEP field "Existing_variation", by matching pattern.
+#: HGMD encodes the variant class in the second letter of the accession: CM (missense
+#: and nonsense), CS (splicing), CD (small deletion), CI (small insertion), CX (small
+#: indel), CR (regulatory), CG (gross deletion), CN (gross insertion or duplication)
+#: and CL (complex rearrangement). The pattern is anchored on the trailing digits to
+#: prevent the capture of the IDs of another database starting with the same letters.
+XREF_DB_BY_PATTERN = [
+    ("dbSNP", re.compile(r"^rs")),
+    ("cosmic", re.compile(r"^COS")),
+    ("HGMD", re.compile(r"^C[MSDIXRGNL]\d+$"))
+]
+
+
+def getXrefDB(db_id):
+    """
+    Return the name of the database using the variant ID or None if it cannot be determined.
+
+    :param db_id: The variant ID (example: "rs587776767", "COSV57482192", "CS1414230").
+    :type db_id: str
+    :return: The database name or None.
+    :rtype: str
+    """
+    for db_name, pattern in XREF_DB_BY_PATTERN:
+        if pattern.search(db_id):
+            return db_name
+    return None
+
+
 def getAnnotSummary(allele_record, initial_alt, annot_field="ANN", pop_prefixes=None, pathogenicity_fields=None, logger=None):
     """
     Return a summary of the diffrent annotations of the variant. This summary is about identical known variants (xref), AF in populations (pop_AF), annotations of the variant and annotations of the collocated variants.
@@ -48,12 +76,9 @@ def getAnnotSummary(allele_record, initial_alt, annot_field="ANN", pop_prefixes=
         # Similar knowns variants
         if is_self_variant and annot["Existing_variation"] is not None:
             for db_id in annot["Existing_variation"].split("&"):
-                if db_id.startswith("rs"):
-                    xref["dbSNP"].add(db_id)
-                elif db_id.startswith("COS"):
-                    xref["cosmic"].add(db_id)
-                elif db_id.startswith("CM"):
-                    xref["HGMD"].add(db_id)
+                db_name = getXrefDB(db_id)
+                if db_name is not None:
+                    xref[db_name].add(db_id)
                 else:
                     xref["Unknown"].add(db_id)
                     if logger is not None:
